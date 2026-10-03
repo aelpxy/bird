@@ -19,6 +19,15 @@ pub(crate) enum Command {
     Login { api: String },
     /// Deploy an image as a service, creating it if needed
     Deploy(DeployArgs),
+    /// List templates for ready-made services like postgres and valkey
+    Templates,
+    /// Create a service from a template, such as `bird add postgres`
+    Add {
+        template: Name,
+        /// Service name, defaults to the template name
+        #[arg(long)]
+        name: Option<Name>,
+    },
     /// List services and their machines
     #[command(visible_alias = "ls")]
     List,

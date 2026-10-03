@@ -33,12 +33,14 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::VolumePathChanged { .. }
         | Error::ImageChange { .. }
         | Error::HasVolumes(_)
-        | Error::VolumeMissing(_) => StatusCode::CONFLICT,
+        | Error::VolumeMissing(_)
+        | Error::ServiceExists(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
         | Error::DomainNotFound(_)
         | Error::DeploymentNotFound(_)
         | Error::NoRollbackTarget(_)
+        | Error::TemplateNotFound(_)
         | Error::NoMachines(_) => StatusCode::NOT_FOUND,
         Error::Podman(bird_podman::Error::Pull { .. })
         | Error::Validation(_)

@@ -5,6 +5,7 @@ mod error;
 mod logs;
 mod scale;
 mod services;
+mod templates;
 mod variables;
 mod volumes;
 
@@ -15,5 +16,6 @@ pub use error::ErrorBody;
 pub use logs::{LogEntry, LogStream};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};
+pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
 pub use variables::{UpdateVariables, VariablesResponse};
 pub use volumes::VolumeSpec;

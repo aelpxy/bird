@@ -1,0 +1,16 @@
+name = "postgres"
+description = "PostgreSQL 18 (Debian) with a persistent volume and a generated password"
+image = "docker.io/library/postgres:18"
+port = 5432
+health = "tcp"
+connection = "DATABASE_URL"
+
+[[volumes]]
+name = "data"
+path = "/var/lib/postgresql"
+
+[variables]
+POSTGRES_USER = "postgres"
+POSTGRES_DB = "postgres"
+POSTGRES_PASSWORD = "${{secret}}"
+DATABASE_URL = "postgresql://${{POSTGRES_USER}}:${{POSTGRES_PASSWORD}}@{service}.internal:5432/${{POSTGRES_DB}}"

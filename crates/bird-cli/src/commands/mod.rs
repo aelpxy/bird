@@ -8,6 +8,7 @@ mod logs;
 mod remove;
 mod scale;
 mod table;
+mod templates;
 
 use anyhow::Result;
 
@@ -19,6 +20,10 @@ pub(crate) async fn run(args: Args) -> Result<()> {
     match args.command {
         Command::Login { api } => login::run(api).await,
         Command::Deploy(deploy) => deploy::run(&connect(args.api)?, deploy).await,
+        Command::Templates => templates::list(&connect(args.api)?).await,
+        Command::Add { template, name } => {
+            templates::add(&connect(args.api)?, &template, name).await
+        }
         Command::List => list::run(&connect(args.api)?).await,
         Command::Remove { name, purge } => remove::run(&connect(args.api)?, &name, purge).await,
         Command::Domains { command } => domains::run(&connect(args.api)?, command).await,

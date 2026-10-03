@@ -65,6 +65,12 @@ pub enum Error {
     HasVolumes(Name),
     #[error("volume {0} no longer exists in podman, its data was removed outside bird")]
     VolumeMissing(Name),
+    #[error("no template named {0}, run `bird templates` to list them")]
+    TemplateNotFound(Name),
+    #[error("built-in template is invalid: {0}")]
+    Template(String),
+    #[error("a service named {0} already exists, pick another with --name")]
+    ServiceExists(Name),
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
     #[error("domain {0} is not attached to this service")]

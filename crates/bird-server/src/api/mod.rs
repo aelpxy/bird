@@ -9,6 +9,7 @@ mod openapi;
 mod scale;
 mod services;
 mod stream;
+mod templates;
 mod variables;
 
 use std::sync::Arc;
@@ -54,4 +55,6 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(logs::logs))
         .routes(routes!(scale::update))
         .routes(routes!(variables::list, variables::update))
+        .routes(routes!(templates::list))
+        .routes(routes!(templates::deploy))
 }
