@@ -17,7 +17,6 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
 
 const UPSTREAM: &str = "127.0.0.1:9101";
 const PROXY: &str = "127.0.0.1:9100";
@@ -33,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn upstream() -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind(UPSTREAM).await?;
+    let listener = bird_proxy::bind(UPSTREAM.parse()?)?;
     println!("upstream on {UPSTREAM}");
     loop {
         let (stream, _) = listener.accept().await?;
@@ -56,7 +55,7 @@ async fn proxy() -> Result<(), Box<dyn std::error::Error>> {
     let routes = Routes::new();
     routes.replace(table);
 
-    let listener = TcpListener::bind(PROXY).await?;
+    let listener = bird_proxy::bind(PROXY.parse()?)?;
     println!("proxy on {PROXY} -> {UPSTREAM} for Host: bench.localhost");
     Proxy::new(routes, ProxyConfig::default())
         .serve(listener, async {

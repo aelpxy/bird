@@ -5,7 +5,6 @@ use bird_core::{EnvironmentId, Name};
 use bird_podman::{Podman, default_socket};
 use bird_proxy::{Proxy, ProxyConfig, Routes};
 use bird_store::Store;
-use tokio::net::TcpListener;
 
 use crate::db::Db;
 use crate::deploy::DeployGuard;
@@ -47,8 +46,8 @@ pub async fn run(config: Config) -> Result<()> {
     let mut supervisor = Supervisor::new(state.clone());
     supervisor.sweep().await;
 
-    let api_listener = TcpListener::bind(config.api_addr).await?;
-    let proxy_listener = TcpListener::bind(config.proxy_addr).await?;
+    let api_listener = bird_proxy::bind(config.api_addr)?;
+    let proxy_listener = bird_proxy::bind(config.proxy_addr)?;
     tracing::info!(
         api = %config.api_addr,
         proxy = %config.proxy_addr,
