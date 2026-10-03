@@ -35,6 +35,8 @@ pub(crate) async fn redeploy(
         env: BTreeMap::new(),
         health: None,
         command: None,
+        memory: None,
+        cpus: None,
         volumes: Vec::new(),
         allow_image_change: false,
     };
@@ -165,6 +167,18 @@ async fn save_config(
                         Service { health, ..service }
                     }
                     None => service,
+                };
+                let service = if request.memory.is_some() || request.cpus.is_some() {
+                    let memory = request.memory.unwrap_or(service.memory);
+                    let cpus = request.cpus.unwrap_or(service.cpus);
+                    store.set_resources(service.id, memory, cpus)?;
+                    Service {
+                        memory,
+                        cpus,
+                        ..service
+                    }
+                } else {
+                    service
                 };
                 let service = match &request.command {
                     Some(command) => {

@@ -52,6 +52,16 @@ fn command(row: &Row<'_>, idx: usize) -> rusqlite::Result<Option<Command>> {
     .transpose()
 }
 
+fn limit<T>(row: &Row<'_>, idx: usize) -> rusqlite::Result<T>
+where
+    T: TryFrom<u32>,
+    T::Error: std::error::Error + Send + Sync + 'static,
+{
+    let raw: u32 = row.get(idx)?;
+    T::try_from(raw)
+        .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
+}
+
 fn replicas(row: &Row<'_>, idx: usize) -> rusqlite::Result<Replicas> {
     let raw: u8 = row.get(idx)?;
     Replicas::try_from(raw)
@@ -86,6 +96,8 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         replicas: replicas(row, 6)?,
         health: parse(row, 7)?,
         command: command(row, 8)?,
+        memory: limit(row, 9)?,
+        cpus: limit(row, 10)?,
     })
 }
 

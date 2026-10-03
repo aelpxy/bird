@@ -18,6 +18,8 @@ pub(super) struct Inspect {
 #[serde(rename_all = "PascalCase")]
 struct InspectState {
     status: String,
+    #[serde(default, rename = "OOMKilled")]
+    oom_killed: bool,
 }
 
 #[derive(Deserialize)]
@@ -105,6 +107,7 @@ impl From<Inspect> for ContainerInfo {
             labels: inspect.config.labels.unwrap_or_default(),
             ports,
             aliases,
+            oom_killed: inspect.state.oom_killed,
         }
     }
 }
@@ -129,6 +132,7 @@ impl From<ListEntry> for ContainerInfo {
             labels: entry.labels.unwrap_or_default(),
             ports,
             aliases: Vec::new(),
+            oom_killed: false,
         }
     }
 }
@@ -143,7 +147,7 @@ mod tests {
     fn parses_inspect() {
         let raw = r#"{
             "Id": "abc", "Name": "bird-x",
-            "State": {"Status": "running"},
+            "State": {"Status": "exited", "OOMKilled": true},
             "Config": {"Labels": {"bird.managed": "true"}},
             "NetworkSettings": {
                 "Ports": {
@@ -155,7 +159,8 @@ mod tests {
             }
         }"#;
         let info: ContainerInfo = serde_json::from_str::<Inspect>(raw).unwrap().into();
-        assert_eq!(info.state, ContainerState::Running);
+        assert_eq!(info.state, ContainerState::Exited);
+        assert!(info.oom_killed);
         assert_eq!(
             info.labels.get("bird.managed").map(String::as_str),
             Some("true")

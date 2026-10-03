@@ -17,6 +17,7 @@ pub(super) struct SpecGenerator<'a> {
     networks: BTreeMap<&'a str, NetworkOptions<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     volumes: Vec<NamedVolume<'a>>,
+    resource_limits: ResourceLimits,
     portmappings: [PortMapping; 1],
     restart_policy: &'static str,
 }
@@ -37,6 +38,27 @@ struct NetworkOptions<'a> {
 struct NamedVolume<'a> {
     name: &'a str,
     dest: &'a str,
+}
+
+// cpu limits are a quota of runtime per scheduling period
+const CPU_PERIOD_MICROS: u64 = 100_000;
+
+#[derive(Serialize)]
+struct ResourceLimits {
+    memory: Limit<u64>,
+    cpu: CpuQuota,
+    pids: Limit<u32>,
+}
+
+#[derive(Serialize)]
+struct Limit<T> {
+    limit: T,
+}
+
+#[derive(Serialize)]
+struct CpuQuota {
+    quota: u64,
+    period: u64,
 }
 
 #[derive(Serialize)]
@@ -69,6 +91,18 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                     dest: &mount.destination,
                 })
                 .collect(),
+            resource_limits: ResourceLimits {
+                memory: Limit {
+                    limit: spec.limits.memory_bytes,
+                },
+                cpu: CpuQuota {
+                    quota: u64::from(spec.limits.cpu_millicores) * CPU_PERIOD_MICROS / 1000,
+                    period: CPU_PERIOD_MICROS,
+                },
+                pids: Limit {
+                    limit: spec.limits.pids,
+                },
+            },
             portmappings: [PortMapping {
                 container_port: spec.port.get(),
                 host_ip: "127.0.0.1",
@@ -94,6 +128,11 @@ mod tests {
             network: "bird".to_owned(),
             aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
             mounts: Vec::new(),
+            limits: crate::Limits {
+                memory_bytes: 536_870_912,
+                cpu_millicores: 500,
+                pids: 4096,
+            },
             env: BTreeMap::from([("A".parse().unwrap(), "b".to_owned())]),
             labels: BTreeMap::new(),
         }
@@ -113,6 +152,14 @@ mod tests {
         assert_eq!(json["netns"]["nsmode"], "bridge");
         assert_eq!(json["portmappings"][0]["container_port"], 80);
         assert_eq!(json["portmappings"][0]["host_ip"], "127.0.0.1");
+        assert_eq!(
+            json["resource_limits"],
+            serde_json::json!({
+                "memory": {"limit": 536_870_912},
+                "cpu": {"quota": 50_000, "period": 100_000},
+                "pids": {"limit": 4096}
+            })
+        );
     }
 
     #[test]

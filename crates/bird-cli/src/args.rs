@@ -1,5 +1,8 @@
 use bird_api::VolumeSpec;
-use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port, Replicas};
+use bird_core::{
+    CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
+    Replicas,
+};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -126,6 +129,12 @@ pub(crate) struct DeployArgs {
     /// Persistent volume as `NAME:/path`, repeatable; data survives redeploys
     #[arg(long = "volume", short = 'v', value_parser = parse_volume)]
     pub(crate) volumes: Vec<VolumeSpec>,
+    /// Memory limit per machine, like 512m or 2g (new services default to 1g)
+    #[arg(long)]
+    pub(crate) memory: Option<MemoryLimit>,
+    /// CPU limit per machine in cores, like 0.5 or 2 (new services default to 1)
+    #[arg(long)]
+    pub(crate) cpus: Option<CpuLimit>,
     /// Run an image whose version or base differs from the one that wrote the volume data
     #[arg(long)]
     pub(crate) allow_image_change: bool,

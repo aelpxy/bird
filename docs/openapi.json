@@ -939,6 +939,12 @@
           "type": "string"
         }
       },
+      "CpuLimit": {
+        "type": "integer",
+        "format": "int32",
+        "maximum": 64000,
+        "minimum": 100
+      },
       "CreateFromTemplate": {
         "type": "object",
         "properties": {
@@ -976,6 +982,17 @@
               }
             ]
           },
+          "cpus": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CpuLimit",
+                "description": "CPU limit in thousandths of a core; left out, a new service gets 1000 and an existing one keeps its limit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "domain": {
             "oneOf": [
               {
@@ -1007,6 +1024,17 @@
           },
           "image": {
             "$ref": "#/components/schemas/ImageRef"
+          },
+          "memory": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MemoryLimit",
+                "description": "Memory limit in MiB; left out, a new service gets 1024 and an existing one keeps its limit"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "$ref": "#/components/schemas/Name"
@@ -1207,6 +1235,12 @@
           }
         }
       },
+      "MemoryLimit": {
+        "type": "integer",
+        "format": "int32",
+        "maximum": 262144,
+        "minimum": 32
+      },
       "MountPath": {
         "type": "string"
       },
@@ -1257,11 +1291,16 @@
           "image",
           "port",
           "replicas",
+          "memory",
+          "cpus",
           "health",
           "domains",
           "volumes"
         ],
         "properties": {
+          "cpus": {
+            "$ref": "#/components/schemas/CpuLimit"
+          },
           "deployment": {
             "oneOf": [
               {
@@ -1283,6 +1322,9 @@
           },
           "image": {
             "$ref": "#/components/schemas/ImageRef"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryLimit"
           },
           "name": {
             "$ref": "#/components/schemas/Name"

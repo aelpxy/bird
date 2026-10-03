@@ -10,7 +10,7 @@ mod transport;
 mod volume;
 
 pub use client::{Podman, default_socket};
-pub use container::{ContainerInfo, ContainerSpec, ContainerState, PublishedPort};
+pub use container::{ContainerInfo, ContainerSpec, ContainerState, Limits, PublishedPort};
 pub use error::{Error, Result};
 pub use follow::LogFollower;
 pub use logs::{LogLine, LogStream};

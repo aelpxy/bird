@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use bird_core::{Command, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port};
+use bird_core::{
+    Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name,
+    Port,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::VolumeSpec;
@@ -19,6 +22,12 @@ pub struct DeployRequest {
     pub health: Option<HealthCheck>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Command>,
+    /// Memory limit in MiB; left out, a new service gets 1024 and an existing one keeps its limit
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<MemoryLimit>,
+    /// CPU limit in thousandths of a core; left out, a new service gets 1000 and an existing one keeps its limit
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpus: Option<CpuLimit>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volumes: Vec<VolumeSpec>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
