@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bird_core::{
     Certificate, Deployment, Domain, Environment, Hostname, Machine, MachineId, Port, Project,
-    Service, Variable,
+    Replicas, Service, Variable,
 };
 
 use crate::RouteEntry;
@@ -39,6 +39,12 @@ fn port(row: &Row<'_>, idx: usize) -> rusqlite::Result<Port> {
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
 }
 
+fn replicas(row: &Row<'_>, idx: usize) -> rusqlite::Result<Replicas> {
+    let raw: u8 = row.get(idx)?;
+    Replicas::try_from(raw)
+        .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
+}
+
 pub(crate) fn project(row: &Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
         id: parse(row, 0)?,
@@ -64,6 +70,7 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         image: parse(row, 3)?,
         port: port(row, 4)?,
         created_at: row.get(5)?,
+        replicas: replicas(row, 6)?,
     })
 }
 

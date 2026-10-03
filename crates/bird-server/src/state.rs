@@ -18,6 +18,7 @@ pub(crate) struct AppState {
     pub(crate) network: Arc<str>,
     pub(crate) deploys: DeployGuard,
     pub(crate) domains_changed: Arc<Notify>,
+    pub(crate) reconcile_now: Arc<Notify>,
 }
 
 impl AppState {

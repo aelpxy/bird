@@ -5,6 +5,7 @@ mod list;
 mod login;
 mod logs;
 mod remove;
+mod scale;
 
 use anyhow::Result;
 
@@ -19,6 +20,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::List => list::run(&connect(args.api)?).await,
         Command::Remove { name } => remove::run(&connect(args.api)?, &name).await,
         Command::Domains { command } => domains::run(&connect(args.api)?, command).await,
+        Command::Scale { name, replicas } => scale::run(&connect(args.api)?, &name, replicas).await,
         Command::Env { command } => env::run(&connect(args.api)?, command).await,
         Command::Logs { name, tail } => logs::run(&connect(args.api)?, &name, tail).await,
     }

@@ -32,13 +32,14 @@ impl Store {
             "SELECT m.id, m.deployment_id, m.container_id, m.address, m.state, m.created_at,
                     m.updated_at
              FROM machines m JOIN deployments d ON d.id = m.deployment_id
-             WHERE m.state != ?1 AND (m.state = ?2 OR d.status IN (?3, ?4))
+             WHERE m.state != ?1 AND (m.state IN (?2, ?5) OR d.status IN (?3, ?4))
              ORDER BY m.id",
             params![
                 MachineState::Destroyed.as_str(),
                 MachineState::Failed.as_str(),
                 DeploymentStatus::Superseded.as_str(),
-                DeploymentStatus::Failed.as_str()
+                DeploymentStatus::Failed.as_str(),
+                MachineState::Stopping.as_str()
             ],
             rows::machine,
         )

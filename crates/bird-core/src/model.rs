@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId, Name, Port, ProjectId,
-    ServiceId,
+    Replicas, ServiceId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -92,6 +92,7 @@ pub struct Service {
     pub name: Name,
     pub image: ImageRef,
     pub port: Port,
+    pub replicas: Replicas,
     pub created_at: i64,
 }
 

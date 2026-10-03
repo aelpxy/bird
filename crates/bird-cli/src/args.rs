@@ -1,4 +1,4 @@
-use bird_core::{EnvKey, Hostname, ImageRef, Name, Port};
+use bird_core::{EnvKey, Hostname, ImageRef, Name, Port, Replicas};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -34,6 +34,8 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: DomainsCommand,
     },
+    /// Run a number of machines for a service
+    Scale { name: Name, replicas: Replicas },
     /// Show recent logs of a service
     Logs {
         name: Name,

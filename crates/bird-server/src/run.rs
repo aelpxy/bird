@@ -44,6 +44,7 @@ pub async fn run(config: Config) -> Result<()> {
         network: Arc::from(config.network.as_str()),
         deploys: DeployGuard::default(),
         domains_changed: Arc::new(Notify::new()),
+        reconcile_now: Arc::new(Notify::new()),
     };
     supervisor::recover_interrupted(&state).await?;
     let mut supervisor = Supervisor::new(state.clone());
