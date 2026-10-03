@@ -27,7 +27,8 @@ pub(super) async fn preflight(
 
     let new_volumes = plan(&existing, &request.volumes)?;
     let has_volumes = !existing.is_empty() || !new_volumes.is_empty();
-    if has_volumes && service.is_some_and(|s| s.replicas.get() > 1) {
+    let replicas = request.replicas.or(service.map(|s| s.replicas));
+    if has_volumes && replicas.is_some_and(|r| r.get() > 1) {
         return Err(Error::VolumeNeedsSingleMachine(request.name.clone()));
     }
     check_lineage(&existing, &request.image, request.allow_image_change)?;

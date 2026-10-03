@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bird_core::{EnvironmentId, Name, Service};
 use bird_podman::Podman;
 use bird_proxy::Routes;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Semaphore};
 
 use crate::db::Db;
 use crate::deploy::DeployGuard;
@@ -21,6 +21,7 @@ pub(crate) struct AppState {
     pub(crate) domains_changed: Arc<Notify>,
     pub(crate) reconcile_now: Arc<Notify>,
     pub(crate) shutdown: Shutdown,
+    pub(crate) builds: Arc<Semaphore>,
 }
 
 impl AppState {

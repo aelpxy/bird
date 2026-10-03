@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use bird_core::{
     BuildFile, Command, CpuLimit, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
+    Replicas,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -34,6 +35,8 @@ pub struct Manifest {
     #[serde(default, deserialize_with = "text_or_number")]
     pub cpus: Option<CpuLimit>,
     #[serde(default)]
+    pub replicas: Option<Replicas>,
+    #[serde(default)]
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default)]
     pub volumes: Vec<VolumeSpec>,
@@ -49,6 +52,9 @@ pub struct BuildSpec {
     /// Defaults to Dockerfile in the context
     #[serde(default)]
     pub dockerfile: Option<BuildFile>,
+    /// Dockerfile ARG values; they stay readable in the image, so never put secrets here
+    #[serde(default)]
+    pub args: BTreeMap<EnvKey, String>,
 }
 
 impl Manifest {
@@ -64,6 +70,7 @@ impl Manifest {
             command: None,
             memory: None,
             cpus: None,
+            replicas: None,
             env: BTreeMap::new(),
             volumes: Vec::new(),
         }
@@ -83,6 +90,7 @@ impl Manifest {
             memory: self.memory,
             cpus: self.cpus,
             volumes: self.volumes,
+            replicas: self.replicas,
             allow_image_change: false,
         }
     }

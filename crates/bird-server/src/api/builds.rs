@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
@@ -6,7 +8,7 @@ use axum::http::HeaderMap;
 use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use axum::response::{IntoResponse, Response};
 use bird_api::{BuildEvent, ErrorBody};
-use bird_core::{BuildFile, ImageRef, Name};
+use bird_core::{BuildFile, EnvKey, ImageRef, Name};
 use bird_podman::BuildLine;
 use bytes::Bytes;
 use http_body_util::Limited;
@@ -27,6 +29,8 @@ pub(crate) struct BuildQuery {
     /// Dockerfile path inside the context, Dockerfile by default
     #[param(value_type = Option<String>)]
     dockerfile: Option<BuildFile>,
+    /// Dockerfile ARG values as a JSON object of strings
+    args: Option<String>,
 }
 
 /// Build an image from source
@@ -44,13 +48,24 @@ pub(crate) async fn create(
     if declared.is_some_and(|length| length > MAX_CONTEXT_BYTES) {
         return Err(Error::ContextTooLarge(MAX_CONTEXT_BYTES));
     }
+    let args: BTreeMap<EnvKey, String> = match &query.args {
+        Some(json) => {
+            serde_json::from_str(json).map_err(|err| Error::InvalidBuildArgs(err.to_string()))?
+        }
+        None => BTreeMap::new(),
+    };
     let tag = image_tag(&name)?;
     let dockerfile = query
         .dockerfile
         .map_or_else(|| DEFAULT_DOCKERFILE.to_owned(), |file| file.to_string());
     let (events, receiver) = mpsc::channel(STREAM_BUFFER);
     let context = Limited::new(body, MAX_CONTEXT_BYTES);
-    tokio::spawn(run(state, name, tag, dockerfile, context, events));
+    let build = Build {
+        tag,
+        dockerfile,
+        args,
+    };
+    tokio::spawn(run(state, name, build, context, events));
     Ok((
         [(CONTENT_TYPE, "application/x-ndjson")],
         Body::new(ChannelBody(receiver)),
@@ -66,32 +81,32 @@ fn image_tag(name: &Name) -> Result<ImageRef> {
     Ok(format!("localhost/bird/{name}:{millis}").parse()?)
 }
 
+struct Build {
+    tag: ImageRef,
+    dockerfile: String,
+    args: BTreeMap<EnvKey, String>,
+}
+
 async fn run(
     state: AppState,
     name: Name,
-    tag: ImageRef,
-    dockerfile: String,
+    build: Build,
     context: Limited<Body>,
     events: mpsc::Sender<Bytes>,
 ) {
-    tracing::info!(service = %name, image = %tag, "building");
     let shutdown = state.shutdown.wait();
     let outcome = tokio::select! {
         () = shutdown => Err(Error::BuildFailed("birdd is shutting down".to_owned())),
-        timed = tokio::time::timeout(BUILD_TIMEOUT, build(&state, &tag, &dockerfile, context, &events)) => {
-            timed.unwrap_or_else(|_| Err(Error::BuildFailed(format!(
-                "took longer than {} minutes",
-                BUILD_TIMEOUT.as_secs() / 60
-            ))))
-        }
+        () = events.closed() => Err(Error::BuildFailed("the client disconnected".to_owned())),
+        result = queue_and_build(&state, &name, &build, context, &events) => result,
     };
     let last = match outcome {
         Ok(()) => {
-            tracing::info!(service = %name, image = %tag, "built");
-            BuildEvent::Built { image: tag }
+            tracing::info!(service = %name, image = %build.tag, "built");
+            BuildEvent::Built { image: build.tag }
         }
         Err(err) => {
-            tracing::warn!(service = %name, image = %tag, error = %err, "build failed");
+            tracing::warn!(service = %name, image = %build.tag, error = %err, "build failed");
             BuildEvent::Failed {
                 error: err.to_string(),
             }
@@ -100,14 +115,46 @@ async fn run(
     send(&events, &last).await;
 }
 
-async fn build(
+async fn queue_and_build(
     state: &AppState,
-    tag: &ImageRef,
-    dockerfile: &str,
+    name: &Name,
+    build: &Build,
     context: Limited<Body>,
     events: &mpsc::Sender<Bytes>,
 ) -> Result<()> {
-    let mut output = state.podman.build_image(context, tag, dockerfile).await?;
+    let permit = if let Ok(permit) = Arc::clone(&state.builds).try_acquire_owned() {
+        permit
+    } else {
+        let waiting = "waiting for another build to finish...".to_owned();
+        send(events, &BuildEvent::Log { line: waiting }).await;
+        Arc::clone(&state.builds)
+            .acquire_owned()
+            .await
+            .map_err(|_| Error::BuildFailed("birdd is shutting down".to_owned()))?
+    };
+    tracing::info!(service = %name, image = %build.tag, "building");
+    let outcome = tokio::time::timeout(BUILD_TIMEOUT, run_build(state, build, context, events))
+        .await
+        .unwrap_or_else(|_| {
+            Err(Error::BuildFailed(format!(
+                "took longer than {} minutes",
+                BUILD_TIMEOUT.as_secs() / 60
+            )))
+        });
+    drop(permit);
+    outcome
+}
+
+async fn run_build(
+    state: &AppState,
+    build: &Build,
+    context: Limited<Body>,
+    events: &mpsc::Sender<Bytes>,
+) -> Result<()> {
+    let mut output = state
+        .podman
+        .build_image(context, &build.tag, &build.dockerfile, &build.args)
+        .await?;
     while let Some(line) = output.next().await {
         match line? {
             BuildLine::Log(line) => {

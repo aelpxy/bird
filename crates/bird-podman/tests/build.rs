@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bird_core::ImageRef;
 use bird_podman::{BuildLine, Podman, default_socket};
 use bytes::Bytes;
@@ -24,8 +26,12 @@ fn context(dockerfile: &str) -> Full<Bytes> {
 }
 
 async fn lines(podman: &Podman, dockerfile: &str, tag: &ImageRef) -> Vec<BuildLine> {
+    let args = BTreeMap::from([(
+        "GREETING".parse().expect("a valid key"),
+        "hi & bye".to_owned(),
+    )]);
     let mut output = podman
-        .build_image(context(dockerfile), tag, "Dockerfile")
+        .build_image(context(dockerfile), tag, "Dockerfile", &args)
         .await
         .expect("podman accepts the build");
     let mut lines = Vec::new();
@@ -40,16 +46,15 @@ async fn lines(podman: &Podman, dockerfile: &str, tag: &ImageRef) -> Vec<BuildLi
 async fn builds_and_tags_an_image() {
     let podman = podman();
     let tag: ImageRef = "localhost/bird-test/build:ok".parse().unwrap();
-    let dockerfile = "FROM docker.io/library/alpine:3\nCOPY hello.txt /hello.txt\n";
+    let dockerfile = "FROM docker.io/library/alpine:3\nARG GREETING\nRUN echo \"got $GREETING\"\nCOPY hello.txt /hello.txt\n";
     let lines = lines(&podman, dockerfile, &tag).await;
     assert!(
         !lines.iter().any(|l| matches!(l, BuildLine::Failed(_))),
         "{lines:?}"
     );
     assert!(
-        lines
-            .iter()
-            .any(|l| matches!(l, BuildLine::Log(t) if t.starts_with("STEP 2/2")))
+        lines.contains(&BuildLine::Log("got hi & bye".to_owned())),
+        "{lines:?}"
     );
     assert!(podman.image_exists(&tag).await.unwrap());
     podman.remove_image(&tag).await.unwrap();

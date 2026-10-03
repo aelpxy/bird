@@ -48,6 +48,7 @@ fn status_of(error: &Error) -> StatusCode {
         Error::Podman(bird_podman::Error::Pull { .. })
         | Error::Validation(_)
         | Error::EmptyCredentials
+        | Error::InvalidBuildArgs(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,

@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
 use bird_api::BuildEvent;
-use bird_core::{BuildFile, ImageRef, Name};
+use bird_core::{BuildFile, EnvKey, ImageRef, Name};
 
 use crate::client::ApiClient;
 use crate::context;
@@ -17,6 +19,7 @@ pub(crate) async fn run(
     name: &Name,
     dir: &Path,
     dockerfile: Option<BuildFile>,
+    args: &BTreeMap<EnvKey, String>,
 ) -> Result<ImageRef> {
     let dockerfile = match dockerfile {
         Some(dockerfile) => dockerfile,
@@ -29,7 +32,14 @@ pub(crate) async fn run(
         packed.files,
         mebibytes(packed.archive.len())
     );
-    let path = format!("/v1/services/{name}/builds?dockerfile={dockerfile}");
+    let mut path = format!(
+        "/v1/services/{name}/builds?dockerfile={}",
+        encode(dockerfile.as_str())
+    );
+    if !args.is_empty() {
+        path.push_str("&args=");
+        path.push_str(&encode(&serde_json::to_string(args)?));
+    }
     let mut outcome = None;
     client
         .upload_lines(
@@ -59,10 +69,33 @@ pub(crate) async fn run(
     }
 }
 
+fn encode(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(byte));
+        } else {
+            let _ = write!(out, "%{byte:02X}");
+        }
+    }
+    out
+}
+
 #[allow(
     clippy::cast_precision_loss,
     reason = "an approximate size is all that is shown"
 )]
 fn mebibytes(bytes: usize) -> f64 {
     bytes as f64 / 1024.0 / 1024.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encodes_query_values() {
+        assert_eq!(encode("docker/web.Dockerfile"), "docker%2Fweb.Dockerfile");
+        assert_eq!(encode("a&b=c d#"), "a%26b%3Dc%20d%23");
+    }
 }

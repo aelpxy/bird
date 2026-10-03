@@ -1,10 +1,11 @@
 use std::time::Duration;
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use bird_api::{DeployResponse, MANIFEST_FILE, Manifest};
-use bird_core::{BuildFile, Command, ImageRef};
+use bird_core::{BuildFile, Command, EnvKey, ImageRef};
 
 use super::build;
 use crate::args::DeployArgs;
@@ -20,9 +21,11 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
     let (manifest, source) = merge(loaded, args)?;
     let image = match source {
         Source::Image(image) => image,
-        Source::Build { dir, dockerfile } => {
-            build::run(client, &manifest.name, &dir, dockerfile).await?
-        }
+        Source::Build {
+            dir,
+            dockerfile,
+            args,
+        } => build::run(client, &manifest.name, &dir, dockerfile, &args).await?,
     };
     let mut request = manifest.into_request(image);
     request.allow_image_change = allow_image_change;
@@ -38,6 +41,7 @@ enum Source {
     Build {
         dir: PathBuf,
         dockerfile: Option<BuildFile>,
+        args: BTreeMap<EnvKey, String>,
     },
 }
 
@@ -54,6 +58,12 @@ fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)>
         ),
     };
     let dockerfile = manifest.build.as_ref().and_then(|b| b.dockerfile.clone());
+    let mut build_args = manifest
+        .build
+        .as_ref()
+        .map(|b| b.args.clone())
+        .unwrap_or_default();
+    build_args.extend(args.build_args);
     let source = match (
         args.image,
         args.build,
@@ -64,10 +74,12 @@ fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)>
         (None, Some(build_dir), ..) => Source::Build {
             dir: build_dir,
             dockerfile,
+            args: build_args,
         },
         (None, None, None, Some(build)) => Source::Build {
             dir: context_dir(&dir, build.context),
             dockerfile,
+            args: build_args,
         },
         (None, None, None, None) => {
             bail!(
@@ -94,6 +106,7 @@ fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)>
     manifest.health = args.health.or(manifest.health);
     manifest.memory = args.memory.or(manifest.memory);
     manifest.cpus = args.cpus.or(manifest.cpus);
+    manifest.replicas = args.replicas.or(manifest.replicas);
     Ok((manifest, source))
 }
 
@@ -157,6 +170,9 @@ name = "web"
 [build]
 context = "server"
 dockerfile = "docker/Dockerfile"
+[build.args]
+NODE_ENV = "production"
+MODE = "file"
 "#;
 
     #[test]
@@ -172,6 +188,8 @@ dockerfile = "docker/Dockerfile"
                 "B=flag",
                 "-v",
                 "data:/srv",
+                "--replicas",
+                "2",
                 "--",
                 "serve",
             ]),
@@ -191,6 +209,7 @@ dockerfile = "docker/Dockerfile"
             Some(512)
         );
         assert!(request.command.is_some());
+        assert_eq!(request.replicas.map(bird_core::Replicas::get), Some(2));
     }
 
     #[test]
@@ -203,12 +222,21 @@ dockerfile = "docker/Dockerfile"
 
     #[test]
     fn builds_relative_to_the_manifest() {
-        let (_, source) = merge(Some(loaded(WITH_BUILD)), args(&[])).unwrap();
+        let (_, source) = merge(
+            Some(loaded(WITH_BUILD)),
+            args(&["--build-arg", "MODE=flag"]),
+        )
+        .unwrap();
+        let expected_args = BTreeMap::from([
+            ("MODE".parse().unwrap(), "flag".to_owned()),
+            ("NODE_ENV".parse().unwrap(), "production".to_owned()),
+        ]);
         assert_eq!(
             source,
             Source::Build {
                 dir: PathBuf::from("app/server"),
                 dockerfile: Some("docker/Dockerfile".parse().unwrap()),
+                args: expected_args,
             }
         );
         let (_, source) = merge(Some(loaded(WITH_IMAGE)), args(&["--build"])).unwrap();
@@ -217,6 +245,7 @@ dockerfile = "docker/Dockerfile"
             Source::Build {
                 dir: PathBuf::from("."),
                 dockerfile: None,
+                args: BTreeMap::new(),
             }
         );
         assert!(Args::try_parse_from(["bird", "deploy", "web", "app:1", "--build"]).is_err());

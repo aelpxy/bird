@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use bird_core::{
     Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name,
-    Port,
+    Port, Replicas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,6 +30,9 @@ pub struct DeployRequest {
     pub cpus: Option<CpuLimit>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volumes: Vec<VolumeSpec>,
+    /// Machines to run; left out, a new service gets 1 and an existing one keeps its count
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replicas: Option<Replicas>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub allow_image_change: bool,
 }
