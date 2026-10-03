@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bird_core::Name;
 
 #[derive(Debug, thiserror::Error)]
@@ -10,6 +12,8 @@ pub enum Error {
     Validation(#[from] bird_core::ValidationError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("api token file {0} is invalid, delete it to generate a new token")]
+    InvalidToken(PathBuf),
     #[error("the database worker has stopped")]
     DbClosed,
     #[error("service {0} not found")]
