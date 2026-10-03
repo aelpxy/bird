@@ -57,7 +57,7 @@ async fn proxy() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = bird_proxy::bind(PROXY.parse()?)?;
     println!("proxy on {PROXY} -> {UPSTREAM} for Host: bench.localhost");
-    Proxy::new(routes, ProxyConfig::default())
+    Proxy::new(routes, ProxyConfig::default(), None)
         .serve(listener, async {
             let _ = tokio::signal::ctrl_c().await;
         })

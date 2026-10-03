@@ -7,7 +7,11 @@ use hyper::{Response, StatusCode};
 pub(crate) type ProxyBody = BoxBody<Bytes, hyper::Error>;
 
 pub(crate) fn error_response(status: StatusCode, message: &'static str) -> Response<ProxyBody> {
-    let body = Full::new(Bytes::from_static(message.as_bytes()))
+    text_response(status, Bytes::from_static(message.as_bytes()))
+}
+
+pub(crate) fn text_response(status: StatusCode, body: impl Into<Bytes>) -> Response<ProxyBody> {
+    let body = Full::new(body.into())
         .map_err(|never| match never {})
         .boxed();
     let mut response = Response::new(body);

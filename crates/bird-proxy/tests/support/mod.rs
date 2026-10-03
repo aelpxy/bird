@@ -1,6 +1,8 @@
 // shared fixtures: each test file uses a subset, and a broken fixture should fail the test loudly
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
+pub mod tls;
+
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -15,6 +17,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{HeaderMap, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -128,7 +131,7 @@ pub async fn spawn_proxy(routes: Routes, config: ProxyConfig) -> RunningProxy {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let (tx, rx) = oneshot::channel::<()>();
-    let proxy = Proxy::new(routes, config);
+    let proxy = Proxy::new(routes, config, None);
     let task = tokio::spawn(async move {
         proxy
             .serve(listener, async {
@@ -157,7 +160,14 @@ impl Reply {
 
 pub async fn send(proxy: SocketAddr, request: Request<Full<Bytes>>) -> Reply {
     let stream = TcpStream::connect(proxy).await.unwrap();
-    let (mut sender, conn) = hyper::client::conn::http1::handshake(TokioIo::new(stream))
+    send_on(stream, request).await
+}
+
+pub async fn send_on<I>(io: I, request: Request<Full<Bytes>>) -> Reply
+where
+    I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    let (mut sender, conn) = hyper::client::conn::http1::handshake(TokioIo::new(io))
         .await
         .unwrap();
     tokio::spawn(conn);

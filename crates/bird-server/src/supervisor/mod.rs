@@ -1,4 +1,3 @@
-mod backoff;
 mod check;
 mod cleanup;
 mod verdict;
@@ -10,9 +9,9 @@ use std::time::{Duration, Instant};
 use bird_core::{Deployment, DeploymentId, MachineId, MachineState, Service};
 use tokio::time::{MissedTickBehavior, interval_at};
 
+use crate::backoff::Backoff;
 use crate::state::AppState;
 use crate::{Result, deploy, routing};
-use backoff::Backoff;
 
 const INTERVAL: Duration = Duration::from_secs(10);
 const DESIRED_MACHINES: usize = 1;

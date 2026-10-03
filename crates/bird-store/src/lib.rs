@@ -1,3 +1,4 @@
+mod certificates;
 mod deployments;
 mod domains;
 mod environments;

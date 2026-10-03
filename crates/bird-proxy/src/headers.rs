@@ -5,6 +5,8 @@ use hyper::header::{
     CONNECTION, FORWARDED, HeaderName, HeaderValue, TE, TRAILER, TRANSFER_ENCODING, UPGRADE,
 };
 
+use crate::scheme::Scheme;
+
 const HOP_BY_HOP: [HeaderName; 7] = [
     CONNECTION,
     HeaderName::from_static("keep-alive"),
@@ -48,13 +50,14 @@ pub(crate) fn set_forwarded(
     headers: &mut HeaderMap,
     forwarded_for: Option<HeaderValue>,
     original_host: Option<HeaderValue>,
+    scheme: Scheme,
 ) {
     headers.remove(FORWARDED);
     match forwarded_for {
         Some(value) => headers.insert(X_FORWARDED_FOR, value),
         None => headers.remove(X_FORWARDED_FOR),
     };
-    headers.insert(X_FORWARDED_PROTO, HeaderValue::from_static("http"));
+    headers.insert(X_FORWARDED_PROTO, HeaderValue::from_static(scheme.as_str()));
     match original_host {
         Some(host) => headers.insert(X_FORWARDED_HOST, host),
         None => headers.remove(X_FORWARDED_HOST),
@@ -97,10 +100,11 @@ mod tests {
             &mut headers,
             forwarded_for("10.0.0.1".parse().unwrap()),
             Some(HeaderValue::from_static("web.localhost")),
+            Scheme::Https,
         );
         assert_eq!(headers[X_FORWARDED_FOR], "10.0.0.1");
         assert_eq!(headers[X_FORWARDED_HOST], "web.localhost");
-        assert_eq!(headers[X_FORWARDED_PROTO], "http");
+        assert_eq!(headers[X_FORWARDED_PROTO], "https");
         assert!(!headers.contains_key(FORWARDED));
     }
 }

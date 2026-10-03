@@ -16,6 +16,21 @@ pub struct Config {
     #[arg(long, env = "BIRD_PROXY_ADDR", default_value = "0.0.0.0:8080")]
     pub proxy_addr: SocketAddr,
 
+    #[arg(long, env = "BIRD_HTTPS_ADDR", default_value = "0.0.0.0:8443")]
+    pub https_addr: SocketAddr,
+
+    /// ACME directory URL, enables automatic https when set
+    #[arg(long, env = "BIRD_ACME_DIRECTORY")]
+    pub acme_directory: Option<String>,
+
+    /// Contact email for the ACME account
+    #[arg(long, env = "BIRD_ACME_EMAIL")]
+    pub acme_email: Option<String>,
+
+    /// Extra root CA trusted for the ACME directory, for test CAs like Pebble
+    #[arg(long, env = "BIRD_ACME_CA_CERT")]
+    pub acme_ca_cert: Option<PathBuf>,
+
     #[arg(long, env = "BIRD_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
 

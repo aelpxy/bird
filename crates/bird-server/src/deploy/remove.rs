@@ -29,6 +29,7 @@ pub(crate) async fn remove_service(state: &AppState, name: Name) -> Result<()> {
         .call(move |store| store.delete_service(service_id))
         .await?;
     routing::refresh(state).await?;
+    state.domains_changed.notify_one();
     tracing::info!(service = %name, "service removed");
     Ok(())
 }

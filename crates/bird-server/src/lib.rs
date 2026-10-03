@@ -1,4 +1,5 @@
 mod api;
+mod backoff;
 mod config;
 mod data_dir;
 mod db;
@@ -11,6 +12,7 @@ mod run;
 mod shutdown;
 mod state;
 mod supervisor;
+mod tls;
 mod token;
 
 pub use config::Config;
