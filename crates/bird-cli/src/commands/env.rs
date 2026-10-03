@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use anyhow::Result;
-use bird_api::{UpdateVariables, VariablesResponse};
+use anyhow::{Result, bail};
+use bird_api::{UpdateVariables, VariableValue, VariablesResponse};
 use bird_core::{EnvKey, Name};
 
 use super::deploy::{DEPLOY_TIMEOUT, print_deployed};
@@ -14,6 +14,11 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) async fn run(client: &ApiClient, command: EnvCommand) -> Result<()> {
     match command {
         EnvCommand::List { name } => list(client, &name).await,
+        EnvCommand::Get {
+            name,
+            key,
+            deployed,
+        } => get(client, &name, &key, deployed).await,
         EnvCommand::Set {
             name,
             variables,
@@ -50,6 +55,23 @@ async fn list(client: &ApiClient, name: &Name) -> Result<()> {
     }
     for key in keys {
         println!("{key}");
+    }
+    Ok(())
+}
+
+async fn get(client: &ApiClient, name: &Name, key: &EnvKey, deployed: bool) -> Result<()> {
+    let variable: VariableValue = client
+        .get(&format!("/v1/services/{name}/variables/{key}"), TIMEOUT)
+        .await?;
+    if !deployed {
+        println!("{}", variable.value);
+        return Ok(());
+    }
+    match variable.deployed {
+        Some(value) => println!("{value}"),
+        None => {
+            bail!("{key} is not part of the running deployment of {name}, redeploy to apply it")
+        }
     }
     Ok(())
 }

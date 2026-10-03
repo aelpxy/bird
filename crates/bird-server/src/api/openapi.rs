@@ -94,6 +94,7 @@ mod tests {
             "/v1/services/{name}/logs",
             "/v1/services/{name}/scale",
             "/v1/services/{name}/variables",
+            "/v1/services/{name}/variables/{key}",
             "/v1/templates",
             "/v1/registries",
             "/v1/registries/{host}",

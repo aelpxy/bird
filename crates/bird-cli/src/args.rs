@@ -82,6 +82,14 @@ pub(crate) enum EnvCommand {
     /// List variable names, values are never shown
     #[command(visible_alias = "ls")]
     List { name: Name },
+    /// Print the value of one variable
+    Get {
+        name: Name,
+        key: EnvKey,
+        /// Print what the running deployment received, with references resolved
+        #[arg(long)]
+        deployed: bool,
+    },
     /// Set variables as KEY=VALUE; values may use `${{service.KEY}}`, `${{KEY}}` and `${{secret}}`
     Set {
         name: Name,

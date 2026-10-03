@@ -38,6 +38,24 @@ pub struct VariablesResponse {
     pub deployment: Option<DeployResponse>,
 }
 
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct VariableValue {
+    pub key: EnvKey,
+    /// The stored value, references and all
+    pub value: String,
+    /// What the running deployment received after resolving references, if it has this variable
+    pub deployed: Option<String>,
+}
+
+impl fmt::Debug for VariableValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VariableValue")
+            .field("key", &self.key)
+            .finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
