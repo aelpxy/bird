@@ -5,6 +5,7 @@ use crate::{Error, Result, images, routing};
 
 use super::OPERATION_PATIENCE;
 use super::machine::destroy_container;
+use super::references::dependents;
 
 pub(crate) async fn remove_service(state: &AppState, name: Name, purge: bool) -> Result<()> {
     let _ticket = state.deploys.wait_for(&name, OPERATION_PATIENCE).await?;
@@ -15,6 +16,11 @@ pub(crate) async fn remove_service(state: &AppState, name: Name, purge: bool) ->
         .call(move |store| store.service_by_name(environment_id, &lookup))
         .await?
         .ok_or_else(|| Error::ServiceNotFound(name.clone()))?;
+
+    let dependents = dependents(state, &name).await?;
+    if !dependents.is_empty() {
+        return Err(Error::HasDependents(name, dependents));
+    }
 
     let service_id = service.id;
     let volumes = state

@@ -33,6 +33,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::VolumePathChanged { .. }
         | Error::ImageChange { .. }
         | Error::HasVolumes(_)
+        | Error::HasDependents(..)
         | Error::VolumeMissing(_)
         | Error::ServiceExists(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
@@ -45,6 +46,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NoMachines(_) => StatusCode::NOT_FOUND,
         Error::Podman(bird_podman::Error::Pull { .. })
         | Error::Validation(_)
+        | Error::EmptyCredentials
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,

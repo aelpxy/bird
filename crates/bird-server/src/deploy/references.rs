@@ -40,6 +40,21 @@ pub(crate) async fn check_change(
     Ok(())
 }
 
+// services whose variables read from this one, which would break if it disappeared
+pub(crate) async fn dependents(state: &AppState, service: &Name) -> Result<Vec<Name>> {
+    let variables = load(state).await?;
+    Ok(variables
+        .into_iter()
+        .filter(|(name, vars)| {
+            name != service
+                && vars
+                    .values()
+                    .any(|value| referenced_services(value).contains(service))
+        })
+        .map(|(name, _)| name)
+        .collect())
+}
+
 async fn load(state: &AppState) -> Result<ServiceVariables> {
     let environment_id = state.environment_id;
     state
