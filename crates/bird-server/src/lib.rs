@@ -1,5 +1,6 @@
 mod api;
 mod config;
+mod data_dir;
 mod db;
 mod deploy;
 mod error;

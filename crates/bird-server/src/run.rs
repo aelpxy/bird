@@ -12,14 +12,14 @@ use crate::shutdown::Shutdown;
 use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
 use crate::token::ApiToken;
-use crate::{Config, Result, api};
+use crate::{Config, Result, api, data_dir};
 
 const DEFAULT_PROJECT: &str = "default";
 const DEFAULT_ENVIRONMENT: &str = "production";
 
 pub async fn run(config: Config) -> Result<()> {
     let data_dir = config.data_dir();
-    std::fs::create_dir_all(&data_dir)?;
+    data_dir::prepare(&data_dir)?;
     let db = Db::open(&data_dir.join("bird.db"))?;
     let token_path = data_dir.join("api-token");
     let token = ApiToken::load_or_create(&token_path)?;
