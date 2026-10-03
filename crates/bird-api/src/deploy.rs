@@ -4,6 +4,7 @@ use bird_core::{DeploymentId, EnvKey, Hostname, ImageRef, Name, Port};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeployRequest {
     pub name: Name,
     pub image: ImageRef,
@@ -15,6 +16,7 @@ pub struct DeployRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeployResponse {
     pub service: Name,
     pub deployment_id: DeploymentId,

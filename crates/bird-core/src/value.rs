@@ -25,6 +25,7 @@ pub enum ValidationError {
 macro_rules! validated_string {
     ($name:ident, $parse:path, $variant:ident) => {
         #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
         #[serde(try_from = "String", into = "String")]
         pub struct $name(String);
 
@@ -124,6 +125,8 @@ fn parse_env_key(s: String) -> Result<String, String> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = u16, minimum = 1))]
 #[serde(try_from = "u16", into = "u16")]
 pub struct Port(NonZeroU16);
 

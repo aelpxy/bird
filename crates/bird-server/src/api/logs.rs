@@ -1,3 +1,4 @@
+use bird_api::ErrorBody;
 use std::future::Future;
 
 use axum::Json;
@@ -20,13 +21,17 @@ const DEFAULT_TAIL: u32 = 100;
 const MAX_TAIL: u32 = 10_000;
 const STREAM_BUFFER: usize = 256;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 pub(crate) struct LogsQuery {
+    /// Number of recent lines per machine, default 100, at most 10000
     tail: Option<u32>,
+    /// Keep the response open and stream new lines as they are written
     #[serde(default)]
     follow: bool,
 }
 
+#[utoipa::path(get, path = "/v1/services/{name}/logs", tag = "logs", params(("name" = String, Path, description = "Service name"), LogsQuery), responses((status = 200, description = "Recent log lines; with follow=true a newline-delimited JSON stream of LogEntry", body = Vec<LogEntry>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn logs(
     State(state): State<AppState>,
     Path(name): Path<Name>,

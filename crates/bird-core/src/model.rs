@@ -19,6 +19,7 @@ pub struct ParseEnumError {
 macro_rules! string_enum {
     ($name:ident, $kind:literal { $($variant:ident => $s:literal),+ $(,)? }) => {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
         #[serde(rename_all = "lowercase")]
         pub enum $name {
             $($variant),+
