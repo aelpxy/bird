@@ -20,7 +20,7 @@ pub enum Error {
     ServiceNotFound(Name),
     #[error("service {0} has no running machines")]
     NoMachines(Name),
-    #[error("a deploy or removal of {0} is already in progress")]
+    #[error("another operation on {0} is in progress, try again shortly")]
     Busy(Name),
     #[error("{reason}")]
     Unhealthy { reason: String, logs: Vec<String> },

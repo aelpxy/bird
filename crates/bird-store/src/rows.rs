@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
-use bird_core::{Deployment, Domain, Environment, Machine, Port, Project, Service, Variable};
+use bird_core::{
+    Deployment, Domain, Environment, Machine, MachineId, Port, Project, Service, Variable,
+};
 
 use crate::RouteEntry;
 use rusqlite::Row;
@@ -85,6 +87,10 @@ pub(crate) fn machine(row: &Row<'_>) -> rusqlite::Result<Machine> {
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
     })
+}
+
+pub(crate) fn machine_id(row: &Row<'_>) -> rusqlite::Result<MachineId> {
+    parse(row, 0)
 }
 
 pub(crate) fn domain(row: &Row<'_>) -> rusqlite::Result<Domain> {
