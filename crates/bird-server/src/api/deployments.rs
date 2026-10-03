@@ -108,6 +108,7 @@ mod tests {
             service_id: ServiceId::generate(),
             image: image.parse().unwrap(),
             port: bird_core::Port::try_from(80).unwrap(),
+            command: None,
             status,
             created_at: 0,
         }

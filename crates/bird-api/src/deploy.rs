@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port};
+use bird_core::{Command, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port};
 use serde::{Deserialize, Serialize};
 
 use crate::VolumeSpec;
@@ -17,6 +17,8 @@ pub struct DeployRequest {
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<HealthCheck>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Command>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub volumes: Vec<VolumeSpec>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

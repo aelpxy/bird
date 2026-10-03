@@ -56,6 +56,7 @@ async fn container_lifecycle() {
     let spec = ContainerSpec {
         name: name.clone(),
         image,
+        command: None,
         port,
         network: name.clone(),
         aliases: vec!["lifecycle-alias".to_owned()],

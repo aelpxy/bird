@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use bird_core::{
-    Certificate, Deployment, Domain, EnvKey, Environment, Hostname, Machine, MachineId, Port,
-    Project, Replicas, Service, Variable, Volume,
+    Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname, Machine, MachineId,
+    Port, Project, Replicas, Service, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -39,6 +39,19 @@ fn port(row: &Row<'_>, idx: usize) -> rusqlite::Result<Port> {
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
 }
 
+fn command(row: &Row<'_>, idx: usize) -> rusqlite::Result<Option<Command>> {
+    let raw: Option<String> = row.get(idx)?;
+    raw.map(|raw| {
+        let args: Vec<String> = serde_json::from_str(&raw).map_err(|err| {
+            rusqlite::Error::FromSqlConversionFailure(idx, Type::Text, Box::new(err))
+        })?;
+        Command::try_from(args).map_err(|err| {
+            rusqlite::Error::FromSqlConversionFailure(idx, Type::Text, Box::new(err))
+        })
+    })
+    .transpose()
+}
+
 fn replicas(row: &Row<'_>, idx: usize) -> rusqlite::Result<Replicas> {
     let raw: u8 = row.get(idx)?;
     Replicas::try_from(raw)
@@ -72,6 +85,7 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         created_at: row.get(5)?,
         replicas: replicas(row, 6)?,
         health: parse(row, 7)?,
+        command: command(row, 8)?,
     })
 }
 
@@ -83,6 +97,7 @@ pub(crate) fn deployment(row: &Row<'_>) -> rusqlite::Result<Deployment> {
         port: port(row, 3)?,
         status: parse(row, 4)?,
         created_at: row.get(5)?,
+        command: command(row, 6)?,
     })
 }
 

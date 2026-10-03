@@ -1,3 +1,4 @@
+mod command;
 mod id;
 mod image;
 mod model;
@@ -5,6 +6,7 @@ pub mod reference;
 mod replicas;
 mod value;
 
+pub use command::Command;
 pub use id::{DeploymentId, EnvironmentId, MachineId, ProjectId, ServiceId, VolumeId};
 pub use image::ImageLineage;
 pub use model::{

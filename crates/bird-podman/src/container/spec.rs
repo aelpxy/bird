@@ -9,6 +9,8 @@ use super::ContainerSpec;
 pub(super) struct SpecGenerator<'a> {
     name: &'a str,
     image: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<&'a [String]>,
     env: &'a BTreeMap<EnvKey, String>,
     labels: &'a BTreeMap<String, String>,
     netns: Namespace,
@@ -49,6 +51,7 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
         Self {
             name: &spec.name,
             image: spec.image.qualified(),
+            command: spec.command.as_deref(),
             env: &spec.env,
             labels: &spec.labels,
             netns: Namespace { nsmode: "bridge" },
@@ -86,6 +89,7 @@ mod tests {
         ContainerSpec {
             name: "bird-x".to_owned(),
             image: "nginx:alpine".parse().unwrap(),
+            command: None,
             port: Port::try_from(80).unwrap(),
             network: "bird".to_owned(),
             aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
@@ -100,6 +104,7 @@ mod tests {
         let spec = spec(&["web", "web.internal"]);
         let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
         assert_eq!(json["image"], "docker.io/library/nginx:alpine");
+        assert!(json.get("command").is_none());
         assert_eq!(json["env"]["A"], "b");
         assert_eq!(
             json["networks"]["bird"]["aliases"],

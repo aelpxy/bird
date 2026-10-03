@@ -817,6 +817,12 @@
           }
         }
       },
+      "Command": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
       "DeployRequest": {
         "type": "object",
         "required": [
@@ -827,6 +833,16 @@
         "properties": {
           "allow_image_change": {
             "type": "boolean"
+          },
+          "command": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Command"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "domain": {
             "oneOf": [

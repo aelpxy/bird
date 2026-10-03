@@ -12,7 +12,7 @@ pub struct Interrupted {
 impl Store {
     pub fn list_active_deployments(&self) -> Result<Vec<Deployment>> {
         self.query_all(
-            "SELECT id, service_id, image, port, status, created_at FROM deployments
+            "SELECT id, service_id, image, port, status, created_at, command FROM deployments
              WHERE status = ?1 ORDER BY id",
             [DeploymentStatus::Active.as_str()],
             rows::deployment,

@@ -12,12 +12,13 @@ impl Store {
             service_id: service.id,
             image: service.image.clone(),
             port: service.port,
+            command: service.command.clone(),
             status: DeploymentStatus::Pending,
             created_at: now(),
         };
         self.execute(
-            "INSERT INTO deployments (id, service_id, image, port, status, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO deployments (id, service_id, image, port, status, created_at, command)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, (SELECT command FROM services WHERE id = ?2))",
             params![
                 deployment.id.to_string(),
                 service.id.to_string(),
@@ -33,7 +34,7 @@ impl Store {
 
     pub fn deployment(&self, id: DeploymentId) -> Result<Option<Deployment>> {
         self.query_one(
-            "SELECT id, service_id, image, port, status, created_at FROM deployments WHERE id = ?1",
+            "SELECT id, service_id, image, port, status, created_at, command FROM deployments WHERE id = ?1",
             [id.to_string()],
             rows::deployment,
         )
@@ -41,7 +42,7 @@ impl Store {
 
     pub fn active_deployment(&self, service_id: ServiceId) -> Result<Option<Deployment>> {
         self.query_one(
-            "SELECT id, service_id, image, port, status, created_at FROM deployments
+            "SELECT id, service_id, image, port, status, created_at, command FROM deployments
              WHERE service_id = ?1 AND status = ?2",
             params![service_id.to_string(), DeploymentStatus::Active.as_str()],
             rows::deployment,
@@ -50,7 +51,7 @@ impl Store {
 
     pub fn list_deployments(&self, service_id: ServiceId) -> Result<Vec<Deployment>> {
         self.query_all(
-            "SELECT id, service_id, image, port, status, created_at FROM deployments
+            "SELECT id, service_id, image, port, status, created_at, command FROM deployments
              WHERE service_id = ?1 ORDER BY created_at DESC, id DESC",
             [service_id.to_string()],
             rows::deployment,
@@ -145,6 +146,22 @@ mod tests {
                 .unwrap_err(),
             Error::AlreadyExists(_)
         ));
+    }
+
+    #[test]
+    fn snapshots_the_command() {
+        let (store, service) = setup();
+        let command =
+            bird_core::Command::try_from(vec!["sh".to_owned(), "-c".to_owned(), "run".to_owned()])
+                .unwrap();
+        store.set_command(service.id, &command).unwrap();
+        let service = store.service(service.id).unwrap().unwrap();
+        assert_eq!(service.command.as_ref(), Some(&command));
+        let deployment = store.create_deployment(&service).unwrap();
+        assert_eq!(
+            store.deployment(deployment.id).unwrap().unwrap().command,
+            Some(command)
+        );
     }
 
     #[test]

@@ -1,9 +1,11 @@
-use bird_core::{EnvironmentId, HealthCheck, ImageRef, Name, Port, Replicas, Service, ServiceId};
+use bird_core::{
+    Command, EnvironmentId, HealthCheck, ImageRef, Name, Port, Replicas, Service, ServiceId,
+};
 use rusqlite::params;
 
 use crate::error::{expect_changed, write_error};
 use crate::store::now;
-use crate::{Result, Store, rows};
+use crate::{Error, Result, Store, rows};
 
 impl Store {
     pub fn create_service(
@@ -21,6 +23,7 @@ impl Store {
             port,
             replicas: Replicas::ONE,
             health: HealthCheck::Http,
+            command: None,
             created_at: now(),
         };
         self.execute(
@@ -63,9 +66,19 @@ impl Store {
         expect_changed(changed, "service")
     }
 
+    pub fn set_command(&self, id: ServiceId, command: &Command) -> Result<()> {
+        let encoded = serde_json::to_string(command.args()).map_err(Error::Encode)?;
+        let changed = self.execute(
+            "UPDATE services SET command = ?2 WHERE id = ?1",
+            params![id.to_string(), encoded],
+        )?;
+        expect_changed(changed, "service")
+    }
+
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health FROM services WHERE id = ?1",
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+             FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
         )
@@ -77,7 +90,8 @@ impl Store {
         name: &Name,
     ) -> Result<Option<Service>> {
         self.query_one(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health FROM services
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+             FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
             rows::service,
@@ -86,7 +100,8 @@ impl Store {
 
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health FROM services
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+             FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],
             rows::service,
