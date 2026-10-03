@@ -5,6 +5,7 @@ use crate::{Error, Result};
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_init.sql"),
     include_str!("../migrations/0002_machine_address.sql"),
+    include_str!("../migrations/0003_tls.sql"),
 ];
 
 pub(crate) fn migrate(conn: &mut Connection) -> Result<()> {

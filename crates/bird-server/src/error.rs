@@ -12,6 +12,12 @@ pub enum Error {
     Validation(#[from] bird_core::ValidationError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("acme: {0}")]
+    Acme(#[from] instant_acme::Error),
+    #[error("invalid acme account data: {0}")]
+    AcmeAccount(#[from] serde_json::Error),
+    #[error("invalid certificate: {0}")]
+    Certificate(String),
     #[error("api token file {0} is invalid, delete it to generate a new token")]
     InvalidToken(PathBuf),
     #[error("the database worker has stopped")]

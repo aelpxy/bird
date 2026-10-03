@@ -140,6 +140,24 @@ impl fmt::Debug for Variable {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Certificate {
+    pub hostname: Hostname,
+    pub chain_pem: String,
+    pub key_pem: String,
+    pub not_after: i64,
+}
+
+impl fmt::Debug for Certificate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Certificate")
+            .field("hostname", &self.hostname)
+            .field("not_after", &self.not_after)
+            .field("key_pem", &"<redacted>")
+            .finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

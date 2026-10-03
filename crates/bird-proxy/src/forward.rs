@@ -3,26 +3,28 @@ use std::time::Duration;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::header::{HOST, HeaderValue};
-use hyper::http::uri::{Authority, PathAndQuery, Scheme};
+use hyper::http::uri::{self, Authority, PathAndQuery};
 use hyper::{Request, Response, StatusCode, Uri, Version};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioTimer};
 
-use crate::ProxyConfig;
 use crate::body::{ProxyBody, error_response};
 use crate::headers::{set_forwarded, strip_hop_by_hop};
 use crate::host::request_host;
 use crate::routes::{RouteError, Routes};
+use crate::scheme::Scheme;
+use crate::{ProxyConfig, Tls, edge};
 
 pub(crate) struct Forwarder {
     routes: Routes,
+    tls: Option<Tls>,
     client: Client<HttpConnector, Incoming>,
     response_timeout: Duration,
 }
 
 impl Forwarder {
-    pub(crate) fn new(routes: Routes, config: &ProxyConfig) -> Self {
+    pub(crate) fn new(routes: Routes, tls: Option<Tls>, config: &ProxyConfig) -> Self {
         let mut connector = HttpConnector::new();
         connector.set_nodelay(true);
         connector.set_connect_timeout(Some(config.connect_timeout));
@@ -34,6 +36,7 @@ impl Forwarder {
             .build(connector);
         Self {
             routes,
+            tls,
             client,
             response_timeout: config.response_timeout,
         }
@@ -43,10 +46,20 @@ impl Forwarder {
         &self,
         mut request: Request<Incoming>,
         forwarded_for: Option<HeaderValue>,
+        scheme: Scheme,
     ) -> Response<ProxyBody> {
+        let http_edge = self.tls.as_ref().filter(|_| scheme == Scheme::Http);
+        if let Some(response) =
+            http_edge.and_then(|tls| edge::acme_response(&tls.challenges, request.uri().path()))
+        {
+            return response;
+        }
         let Some(host) = request_host(&request) else {
             return error_response(StatusCode::BAD_REQUEST, "missing or invalid host\n");
         };
+        if let Some(tls) = http_edge.filter(|tls| tls.certificates.contains(&host)) {
+            return edge::https_redirect(&host, request.uri(), tls.https_port);
+        }
         let upstream = match self.routes.pick(&host) {
             Ok(upstream) => upstream,
             Err(RouteError::UnknownHost) => {
@@ -67,7 +80,7 @@ impl Forwarder {
         *request.uri_mut() = uri;
         *request.version_mut() = Version::HTTP_11;
         strip_hop_by_hop(request.headers_mut());
-        set_forwarded(request.headers_mut(), forwarded_for, original_host);
+        set_forwarded(request.headers_mut(), forwarded_for, original_host, scheme);
 
         let method = request.method().clone();
         match tokio::time::timeout(self.response_timeout, self.client.request(request)).await {
@@ -95,7 +108,7 @@ fn upstream_uri(original: &Uri, upstream: Authority) -> Option<Uri> {
         .cloned()
         .unwrap_or_else(|| PathAndQuery::from_static("/"));
     Uri::builder()
-        .scheme(Scheme::HTTP)
+        .scheme(uri::Scheme::HTTP)
         .authority(upstream)
         .path_and_query(path_and_query)
         .build()

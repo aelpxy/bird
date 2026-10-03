@@ -17,6 +17,7 @@ use crate::{Result, routing};
 pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<DeployResponse> {
     let _ticket = state.deploys.begin(&request.name)?;
     let (service, domains, env) = save_config(state, request).await?;
+    state.domains_changed.notify_one();
 
     let snapshot = service.clone();
     let (deployment, previous) = state
