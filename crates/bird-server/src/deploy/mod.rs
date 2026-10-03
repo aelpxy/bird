@@ -5,7 +5,7 @@ pub(crate) mod references;
 mod remove;
 mod volumes;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
 use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service, Volume};
@@ -31,7 +31,7 @@ pub(crate) async fn redeploy(
         name: service.name.clone(),
         image,
         port,
-        domain: None,
+        domains: Vec::new(),
         env: BTreeMap::new(),
         health: None,
         command: None,
@@ -213,12 +213,13 @@ async fn save_config(
                     }
                     None => service,
                 };
-                if let Some(domain) = &request.domain {
-                    let owned = store
-                        .list_domains(service.id)?
-                        .iter()
-                        .any(|d| &d.hostname == domain);
-                    if !owned {
+                let mut owned: BTreeSet<Hostname> = store
+                    .list_domains(service.id)?
+                    .into_iter()
+                    .map(|d| d.hostname)
+                    .collect();
+                for domain in &request.domains {
+                    if owned.insert(domain.clone()) {
                         store.add_domain(service.id, domain)?;
                     }
                 }

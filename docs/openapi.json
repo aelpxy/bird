@@ -1186,15 +1186,11 @@
               }
             ]
           },
-          "domain": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Hostname"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hostname"
+            }
           },
           "env": {
             "type": "object",

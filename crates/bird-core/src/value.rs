@@ -168,6 +168,8 @@ fn parse_mount_path(s: String) -> Result<String, String> {
 pub struct Port(NonZeroU16);
 
 impl Port {
+    pub const HTTP: Self = Self(NonZeroU16::MIN.saturating_add(79));
+
     #[must_use]
     pub const fn get(self) -> u16 {
         self.0.get()
@@ -309,5 +311,6 @@ mod tests {
     fn ports() {
         assert!(Port::try_from(0).is_err());
         assert_eq!(Port::try_from(8080).unwrap().get(), 8080);
+        assert_eq!(Port::HTTP.get(), 80);
     }
 }

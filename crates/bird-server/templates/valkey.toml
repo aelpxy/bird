@@ -10,6 +10,6 @@ command = ["sh", "-c", "exec valkey-server --requirepass \"$VALKEY_PASSWORD\" --
 name = "data"
 path = "/data"
 
-[variables]
+[env]
 VALKEY_PASSWORD = "${{secret}}"
 VALKEY_URL = "redis://default:${{VALKEY_PASSWORD}}@{service}.internal:6379"

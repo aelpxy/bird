@@ -14,8 +14,8 @@ pub struct DeployRequest {
     pub name: Name,
     pub image: ImageRef,
     pub port: Port,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub domain: Option<Hostname>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub domains: Vec<Hostname>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,7 +61,7 @@ mod tests {
     fn optional_fields_default() {
         let minimal = r#"{"name":"web","image":"nginx","port":80}"#;
         let request: DeployRequest = serde_json::from_str(minimal).unwrap();
-        assert_eq!(request.domain, None);
+        assert_eq!(request.domains, Vec::new());
         assert!(request.env.is_empty());
         assert_eq!(request.health, None);
     }

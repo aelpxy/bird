@@ -2,6 +2,7 @@ mod deploy;
 mod domains;
 mod env;
 mod history;
+mod init;
 mod list;
 mod login;
 mod logs;
@@ -21,6 +22,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
     match args.command {
         Command::Login { api } => login::run(api).await,
         Command::Deploy(deploy) => deploy::run(&connect(args.api)?, deploy).await,
+        Command::Init { name, image, port } => init::run(&name, &image, port),
         Command::Registry { command } => registry::run(&connect(args.api)?, command).await,
         Command::Templates => templates::list(&connect(args.api)?).await,
         Command::Add { template, name } => {
