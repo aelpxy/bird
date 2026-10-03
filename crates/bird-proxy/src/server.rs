@@ -7,12 +7,12 @@ use std::time::Duration;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::{TokioIo, TokioTimer};
-use hyper_util::server::graceful::{GracefulShutdown, Watcher};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_rustls::TlsAcceptor;
 
+use crate::drain::{Drain, Watch};
 use crate::forward::Forwarder;
 use crate::headers::forwarded_for;
 use crate::scheme::Scheme;
@@ -63,7 +63,7 @@ impl Proxy {
         shutdown: impl Future<Output = ()>,
         acceptor: Option<TlsAcceptor>,
     ) {
-        let graceful = GracefulShutdown::new();
+        let drain = Drain::new();
         let permits = Arc::new(Semaphore::new(self.config.max_connections));
         tokio::pin!(shutdown);
 
@@ -78,7 +78,7 @@ impl Proxy {
             };
             let connection = Connection {
                 forwarder: Arc::clone(&self.forwarder),
-                watcher: graceful.watcher(),
+                watch: drain.watch(),
                 client_addr,
                 header_read_timeout: self.config.header_read_timeout,
                 max_header_bytes: self.config.max_header_bytes,
@@ -95,7 +95,7 @@ impl Proxy {
 
         tracing::info!("proxy shutting down, draining connections");
         tokio::select! {
-            () = graceful.shutdown() => tracing::info!("proxy drained"),
+            () = drain.shutdown() => tracing::info!("proxy drained"),
             () = tokio::time::sleep(self.config.shutdown_grace) => {
                 tracing::warn!("proxy shutdown grace period elapsed with open connections");
             }
@@ -105,7 +105,7 @@ impl Proxy {
 
 struct Connection {
     forwarder: Arc<Forwarder>,
-    watcher: Watcher,
+    watch: Watch,
     client_addr: SocketAddr,
     header_read_timeout: Duration,
     max_header_bytes: usize,
@@ -128,17 +128,39 @@ impl Connection {
     {
         let forwarder = self.forwarder;
         let forwarded_for = forwarded_for(self.client_addr.ip());
+        let mut shutdown = self.watch.clone();
+        let tunnels = Arc::new(self.watch);
         let service = service_fn(move |request| {
             let forwarder = Arc::clone(&forwarder);
             let forwarded_for = forwarded_for.clone();
-            async move { Ok::<_, Infallible>(forwarder.handle(request, forwarded_for, scheme).await) }
+            let tunnels = Arc::clone(&tunnels);
+            async move {
+                Ok::<_, Infallible>(
+                    forwarder
+                        .handle(request, forwarded_for, scheme, &tunnels)
+                        .await,
+                )
+            }
         });
         let connection = http1::Builder::new()
             .timer(TokioTimer::new())
             .header_read_timeout(self.header_read_timeout)
             .max_buf_size(self.max_header_bytes)
-            .serve_connection(TokioIo::new(io), service);
-        if let Err(err) = self.watcher.watch(connection).await {
+            .serve_connection(TokioIo::new(io), service)
+            .with_upgrades();
+        tokio::pin!(connection);
+
+        let mut draining = false;
+        let result = loop {
+            tokio::select! {
+                result = connection.as_mut() => break result,
+                () = shutdown.signaled(), if !draining => {
+                    draining = true;
+                    connection.as_mut().graceful_shutdown();
+                }
+            }
+        };
+        if let Err(err) = result {
             tracing::debug!(client_addr = %self.client_addr, error = %err, "connection closed with error");
         }
     }
