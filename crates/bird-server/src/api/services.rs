@@ -51,6 +51,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             image: service.image,
             port: service.port,
             replicas: service.replicas,
+            health: service.health,
             domains,
             deployment: None,
         });
@@ -69,6 +70,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         image: active.image,
         port: active.port,
         replicas: service.replicas,
+        health: service.health,
         domains,
         deployment: Some(DeploymentSummary {
             id: active.id,

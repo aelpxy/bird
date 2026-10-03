@@ -1,4 +1,4 @@
-use bird_core::{DeploymentId, EnvKey, Hostname, ImageRef, Name, Port, Replicas};
+use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port, Replicas};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -98,9 +98,13 @@ pub(crate) struct DeployArgs {
     /// Port the app listens on inside the container
     #[arg(long, default_value = "80", value_parser = parse_port)]
     pub(crate) port: Port,
-    /// Domain to route to this service
+    /// Domain to route to this service, leave out for internal-only services
     #[arg(long)]
     pub(crate) domain: Option<Hostname>,
+    /// How to tell the app is ready: http (default for new services) or tcp for databases;
+    /// left out, an existing service keeps its current check
+    #[arg(long)]
+    pub(crate) health: Option<HealthCheck>,
     /// Environment variable as KEY=VALUE, repeatable
     #[arg(long = "env", short = 'e', value_parser = parse_env)]
     pub(crate) env: Vec<(EnvKey, String)>,

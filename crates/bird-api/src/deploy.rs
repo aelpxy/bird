@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bird_core::{DeploymentId, EnvKey, Hostname, ImageRef, Name, Port};
+use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -13,6 +13,8 @@ pub struct DeployRequest {
     pub domain: Option<Hostname>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<EnvKey, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<HealthCheck>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,5 +46,6 @@ mod tests {
         let request: DeployRequest = serde_json::from_str(minimal).unwrap();
         assert_eq!(request.domain, None);
         assert!(request.env.is_empty());
+        assert_eq!(request.health, None);
     }
 }
