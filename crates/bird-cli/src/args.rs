@@ -1,4 +1,4 @@
-use bird_core::{EnvKey, Hostname, ImageRef, Name, Port, Replicas};
+use bird_core::{DeploymentId, EnvKey, Hostname, ImageRef, Name, Port, Replicas};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -33,6 +33,13 @@ pub(crate) enum Command {
     Domains {
         #[command(subcommand)]
         command: DomainsCommand,
+    },
+    /// List the deployments of a service, newest first
+    History { name: Name },
+    /// Redeploy an earlier deployment, the previous one by default
+    Rollback {
+        name: Name,
+        deployment: Option<DeploymentId>,
     },
     /// Run a number of machines for a service
     Scale { name: Name, replicas: Replicas },
