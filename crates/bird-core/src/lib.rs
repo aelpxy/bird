@@ -1,6 +1,7 @@
 mod id;
 mod image;
 mod model;
+pub mod reference;
 mod replicas;
 mod value;
 

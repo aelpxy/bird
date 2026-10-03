@@ -30,11 +30,25 @@ impl Store {
         deployment_id: DeploymentId,
     ) -> Result<BTreeMap<EnvKey, String>> {
         let pairs = self.query_all(
-            "SELECT key, value FROM deployment_variables WHERE deployment_id = ?1",
+            "SELECT key, COALESCE(resolved, value) FROM deployment_variables WHERE deployment_id = ?1",
             [deployment_id.to_string()],
             rows::key_value,
         )?;
         Ok(pairs.into_iter().collect())
+    }
+
+    pub fn set_resolved_variables(
+        &self,
+        deployment_id: DeploymentId,
+        resolved: &BTreeMap<EnvKey, String>,
+    ) -> Result<()> {
+        for (key, value) in resolved {
+            self.execute(
+                "UPDATE deployment_variables SET resolved = ?3 WHERE deployment_id = ?1 AND key = ?2",
+                params![deployment_id.to_string(), key.as_str(), value],
+            )?;
+        }
+        Ok(())
     }
 
     pub fn restore_variables(
@@ -67,6 +81,8 @@ impl Store {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use bird_core::EnvKey;
 
     use crate::Error;
@@ -93,6 +109,26 @@ mod tests {
         let restored = store.list_variables(service.id).unwrap();
         assert_eq!(restored.len(), 1);
         assert_eq!(restored[0].value, "old");
+    }
+
+    #[test]
+    fn launches_resolved_values_but_restores_written_ones() {
+        let (mut store, service) = setup();
+        let key: EnvKey = "URL".parse().unwrap();
+        store.set_variable(service.id, &key, "${{pg.URL}}").unwrap();
+        let deployment = store.create_deployment(&service).unwrap();
+        let resolved = BTreeMap::from([(key.clone(), "postgresql://pg".to_owned())]);
+        store
+            .set_resolved_variables(deployment.id, &resolved)
+            .unwrap();
+        assert_eq!(store.deployment_variables(deployment.id).unwrap(), resolved);
+
+        store.set_variable(service.id, &key, "changed").unwrap();
+        store.restore_variables(service.id, deployment.id).unwrap();
+        assert_eq!(
+            store.list_variables(service.id).unwrap()[0].value,
+            "${{pg.URL}}"
+        );
     }
 
     #[test]
