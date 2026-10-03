@@ -7,6 +7,7 @@ mod deploy;
 mod error;
 mod health;
 mod labels;
+mod listen;
 mod routing;
 mod run;
 mod shutdown;

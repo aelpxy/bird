@@ -13,10 +13,10 @@ pub struct Config {
     #[arg(long, env = "BIRD_API_ADDR", default_value = "127.0.0.1:7070")]
     pub api_addr: SocketAddr,
 
-    #[arg(long, env = "BIRD_PROXY_ADDR", default_value = "0.0.0.0:8080")]
+    #[arg(long, env = "BIRD_PROXY_ADDR", default_value = "0.0.0.0:80")]
     pub proxy_addr: SocketAddr,
 
-    #[arg(long, env = "BIRD_HTTPS_ADDR", default_value = "0.0.0.0:8443")]
+    #[arg(long, env = "BIRD_HTTPS_ADDR", default_value = "0.0.0.0:443")]
     pub https_addr: SocketAddr,
 
     /// ACME directory URL, enables automatic https when set

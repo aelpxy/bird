@@ -14,7 +14,7 @@ use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
 use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
-use crate::{Config, Error, Result, api, data_dir};
+use crate::{Config, Error, Result, api, data_dir, listen};
 
 const DEFAULT_PROJECT: &str = "default";
 const DEFAULT_ENVIRONMENT: &str = "production";
@@ -67,10 +67,10 @@ pub async fn run(config: Config) -> Result<()> {
         None => None,
     };
 
-    let api_listener = bird_proxy::bind(config.api_addr)?;
-    let proxy_listener = bird_proxy::bind(config.proxy_addr)?;
+    let api_listener = listen::bind(config.api_addr)?;
+    let proxy_listener = listen::bind(config.proxy_addr)?;
     let https_listener = match edge {
-        Some(_) => Some(bird_proxy::bind(config.https_addr)?),
+        Some(_) => Some(listen::bind(config.https_addr)?),
         None => None,
     };
     tracing::info!(

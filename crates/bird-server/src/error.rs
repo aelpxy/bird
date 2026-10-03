@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use bird_core::Name;
@@ -12,6 +13,15 @@ pub enum Error {
     Validation(#[from] bird_core::ValidationError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(
+        "cannot listen on {0}: ports below 1024 need `sysctl net.ipv4.ip_unprivileged_port_start=80`, or pick a port like 8080"
+    )]
+    PrivilegedPort(SocketAddr),
+    #[error("cannot listen on {addr}: {source}")]
+    Bind {
+        addr: SocketAddr,
+        source: std::io::Error,
+    },
     #[error("acme: {0}")]
     Acme(#[from] instant_acme::Error),
     #[error("invalid acme account data: {0}")]
