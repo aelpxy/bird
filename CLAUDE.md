@@ -13,7 +13,8 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Build: `cargo build --release` produces `target/release/birdd` (daemon) and `target/release/bird` (CLI).
 * Check: `cargo fmt --check && cargo clippy --all-targets -- -D warnings`
 * Test: `cargo test -- --include-ignored` (ignored tests need a running Podman socket).
-* Run: `birdd --data-dir <dir>` then `bird deploy <name> <image> --domain <host>`; the proxy listens on `:8080`, the API on `127.0.0.1:7070`.
+* Run: `birdd --data-dir <dir>`, then `bird login 127.0.0.1:7070 < <dir>/api-token` once, then `bird deploy <name> <image> --domain <host>`; the proxy listens on `:8080`, the API on `127.0.0.1:7070`.
+* Service: `contrib/systemd/birdd.service` is a rootless user unit; install steps are in its header.
 
 ## Architecture
 

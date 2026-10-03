@@ -4,13 +4,9 @@ use clap::{Parser, Subcommand};
 #[derive(Debug, Parser)]
 #[command(name = "bird", version, about = "Deploy apps to your bird server")]
 pub(crate) struct Args {
-    #[arg(
-        long,
-        global = true,
-        env = "BIRD_API",
-        default_value = "127.0.0.1:7070"
-    )]
-    pub(crate) api: String,
+    /// birdd API address, defaults to the logged in server or 127.0.0.1:7070
+    #[arg(long, global = true, env = "BIRD_API")]
+    pub(crate) api: Option<String>,
 
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -18,6 +14,8 @@ pub(crate) struct Args {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Save a birdd address and API token, read from stdin
+    Login { api: String },
     /// Deploy an image as a service, creating it if needed
     Deploy(DeployArgs),
     /// List services and their machines

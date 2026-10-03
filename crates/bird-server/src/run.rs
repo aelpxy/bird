@@ -11,6 +11,7 @@ use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
 use crate::state::AppState;
+use crate::token::ApiToken;
 use crate::{Config, Result, api, reconcile, routing};
 
 const DEFAULT_PROJECT: &str = "default";
@@ -20,6 +21,8 @@ pub async fn run(config: Config) -> Result<()> {
     let data_dir = config.data_dir();
     std::fs::create_dir_all(&data_dir)?;
     let db = Db::open(&data_dir.join("bird.db"))?;
+    let token_path = data_dir.join("api-token");
+    let token = ApiToken::load_or_create(&token_path)?;
 
     let project: Name = DEFAULT_PROJECT.parse()?;
     let environment: Name = DEFAULT_ENVIRONMENT.parse()?;
@@ -48,13 +51,18 @@ pub async fn run(config: Config) -> Result<()> {
         api = %config.api_addr,
         proxy = %config.proxy_addr,
         data = %data_dir.display(),
+        token = %token_path.display(),
         podman = %state.podman.socket().display(),
         "birdd ready"
     );
 
+    if !config.api_addr.ip().is_loopback() {
+        tracing::warn!(api = %config.api_addr, "api is reachable over the network without tls, the token is sent in plain text");
+    }
+
     let shutdown = Shutdown::on_signal();
     let proxy = Proxy::new(state.routes.clone(), ProxyConfig::default());
-    let api = axum::serve(api_listener, api::router(state))
+    let api = axum::serve(api_listener, api::router(state, token))
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
     let ((), api_result) = tokio::join!(proxy.serve(proxy_listener, shutdown.wait()), api);

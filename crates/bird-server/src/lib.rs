@@ -10,6 +10,7 @@ mod routing;
 mod run;
 mod shutdown;
 mod state;
+mod token;
 
 pub use config::Config;
 pub use error::{Error, Result};

@@ -5,7 +5,7 @@ use anyhow::{Context, Result, anyhow};
 use bird_api::ErrorBody;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
-use hyper::header::{CONTENT_TYPE, HOST};
+use hyper::header::{AUTHORIZATION, CONTENT_TYPE, HOST};
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
@@ -14,6 +14,7 @@ use tokio::net::TcpStream;
 
 pub(crate) struct ApiClient {
     addr: String,
+    token: Option<String>,
 }
 
 #[derive(Debug)]
@@ -25,6 +26,12 @@ struct ApiError {
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} ({})", self.body.error, self.status)?;
+        if self.status == StatusCode::UNAUTHORIZED {
+            write!(
+                f,
+                "\nrun `bird login <host:port>` with the token from birdd's data dir"
+            )?;
+        }
         if !self.body.logs.is_empty() {
             write!(f, "\n--- last logs ---")?;
             for line in &self.body.logs {
@@ -38,8 +45,8 @@ impl fmt::Display for ApiError {
 impl std::error::Error for ApiError {}
 
 impl ApiClient {
-    pub(crate) fn new(addr: String) -> Self {
-        Self { addr }
+    pub(crate) fn new(addr: String, token: Option<String>) -> Self {
+        Self { addr, token }
     }
 
     pub(crate) async fn get<T: DeserializeOwned>(
@@ -97,6 +104,9 @@ impl ApiClient {
             .method(method)
             .uri(path)
             .header(HOST, &self.addr);
+        if let Some(token) = &self.token {
+            request = request.header(AUTHORIZATION, format!("Bearer {token}"));
+        }
         if payload.is_some() {
             request = request.header(CONTENT_TYPE, "application/json");
         }
