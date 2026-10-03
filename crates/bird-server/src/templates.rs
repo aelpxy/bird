@@ -1,8 +1,5 @@
-use std::collections::BTreeMap;
-
-use bird_api::{DeployRequest, TemplateSummary, VolumeSpec};
-use bird_core::{Command, EnvKey, HealthCheck, ImageRef, Name, Port};
-use serde::Deserialize;
+use bird_api::{DeployRequest, Manifest, TemplateSummary};
+use bird_core::{EnvKey, Name};
 
 use crate::{Error, Result};
 
@@ -12,27 +9,38 @@ const BUILT_IN: [&str; 2] = [
     include_str!("../templates/valkey.toml"),
 ];
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
+// a bird.toml manifest plus what the template list shows about it
+#[derive(Debug, Clone)]
 pub(crate) struct Template {
-    name: Name,
     description: String,
-    image: ImageRef,
-    port: Port,
-    health: HealthCheck,
-    #[serde(default)]
     connection: Option<EnvKey>,
-    #[serde(default)]
-    command: Option<Command>,
-    #[serde(default)]
-    volumes: Vec<VolumeSpec>,
-    #[serde(default)]
-    variables: BTreeMap<EnvKey, String>,
+    manifest: Manifest,
 }
 
 impl Template {
+    fn parse(source: &str) -> Result<Self> {
+        let invalid = |err: &dyn std::fmt::Display| Error::Template(err.to_string());
+        let mut table: toml::Table = toml::from_str(source).map_err(|err| invalid(&err))?;
+        let Some(toml::Value::String(description)) = table.remove("description") else {
+            return Err(invalid(&"description must be a string"));
+        };
+        let connection = match table.remove("connection") {
+            Some(toml::Value::String(key)) => Some(key.parse().map_err(|err| invalid(&err))?),
+            Some(_) => return Err(invalid(&"connection must be a string")),
+            None => None,
+        };
+        let manifest = toml::Value::Table(table)
+            .try_into()
+            .map_err(|err| invalid(&err))?;
+        Ok(Self {
+            description,
+            connection,
+            manifest,
+        })
+    }
+
     pub(crate) fn name(&self) -> &Name {
-        &self.name
+        &self.manifest.name
     }
 
     pub(crate) fn connection(&self) -> Option<&EnvKey> {
@@ -41,57 +49,40 @@ impl Template {
 
     pub(crate) fn summary(&self) -> TemplateSummary {
         TemplateSummary {
-            name: self.name.clone(),
+            name: self.manifest.name.clone(),
             description: self.description.clone(),
-            image: self.image.clone(),
+            image: self.manifest.image.clone(),
         }
     }
 
     // {service} becomes the new service's name so urls point at its private address
     pub(crate) fn request(&self, service: &Name) -> DeployRequest {
-        let env = self
-            .variables
-            .iter()
-            .map(|(key, value)| {
-                (
-                    key.clone(),
-                    value.replace(SERVICE_PLACEHOLDER, service.as_str()),
-                )
-            })
-            .collect();
-        DeployRequest {
-            name: service.clone(),
-            image: self.image.clone(),
-            port: self.port,
-            domain: None,
-            env,
-            health: Some(self.health),
-            command: self.command.clone(),
-            memory: None,
-            cpus: None,
-            volumes: self.volumes.clone(),
-            allow_image_change: false,
+        let mut manifest = self.manifest.clone();
+        manifest.name = service.clone();
+        for value in manifest.env.values_mut() {
+            *value = value.replace(SERVICE_PLACEHOLDER, service.as_str());
         }
+        manifest.into_request()
     }
 }
 
 pub(crate) fn built_in() -> Result<Vec<Template>> {
     BUILT_IN
         .iter()
-        .map(|source| toml::from_str(source).map_err(|err| Error::Template(err.to_string())))
+        .map(|source| Template::parse(source))
         .collect()
 }
 
 pub(crate) fn find(name: &Name) -> Result<Template> {
     built_in()?
         .into_iter()
-        .find(|template| &template.name == name)
+        .find(|template| template.name() == name)
         .ok_or_else(|| Error::TemplateNotFound(name.clone()))
 }
 
 #[cfg(test)]
 mod tests {
-    use bird_core::reference;
+    use bird_core::{HealthCheck, reference};
 
     use super::*;
 
@@ -105,7 +96,8 @@ mod tests {
                 reference::validate(value).unwrap();
             }
             let connection = template.connection().unwrap();
-            assert!(request.env.contains_key(connection), "{}", template.name);
+            assert!(request.env.contains_key(connection), "{}", template.name());
+            assert!(request.health.is_some(), "{}", template.name());
             assert_ne!(request.volumes, Vec::new());
         }
     }
@@ -126,6 +118,12 @@ mod tests {
         let request = valkey.request(&"cache".parse().unwrap());
         let url = &request.env[&"VALKEY_URL".parse().unwrap()];
         assert!(url.starts_with("redis://default:"), "{url}");
+    }
+
+    #[test]
+    fn rejects_unknown_fields() {
+        let typo = "name = \"x\"\ndescription = \"d\"\nimage = \"x:1\"\nmemroy = \"1g\"\n";
+        assert!(matches!(Template::parse(typo), Err(Error::Template(_))));
     }
 
     #[test]

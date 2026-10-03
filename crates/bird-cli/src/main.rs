@@ -1,6 +1,7 @@
 mod args;
 mod client;
 mod commands;
+mod manifest;
 mod profile;
 
 use std::process::ExitCode;

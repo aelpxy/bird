@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bird_api::VolumeSpec;
 use bird_core::{
     CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
@@ -20,8 +22,15 @@ pub(crate) struct Args {
 pub(crate) enum Command {
     /// Save a birdd address and API token, read from stdin
     Login { api: String },
-    /// Deploy an image as a service, creating it if needed
+    /// Deploy an image as a service, creating it if needed; reads ./bird.toml when present
     Deploy(DeployArgs),
+    /// Write a starter bird.toml in the current directory
+    Init {
+        name: Name,
+        image: ImageRef,
+        #[arg(long, default_value = "80", value_parser = parse_port)]
+        port: Port,
+    },
     /// Manage credentials for private image registries
     Registry {
         #[command(subcommand)]
@@ -142,14 +151,19 @@ pub(crate) enum DomainsCommand {
 
 #[derive(Debug, clap::Args)]
 pub(crate) struct DeployArgs {
-    pub(crate) name: Name,
-    pub(crate) image: ImageRef,
-    /// Port the app listens on inside the container
-    #[arg(long, default_value = "80", value_parser = parse_port)]
-    pub(crate) port: Port,
-    /// Domain to route to this service, leave out for internal-only services
-    #[arg(long)]
-    pub(crate) domain: Option<Hostname>,
+    /// Service name, overrides bird.toml
+    pub(crate) name: Option<Name>,
+    /// Image to run, overrides bird.toml
+    pub(crate) image: Option<ImageRef>,
+    /// Service manifest to read instead of ./bird.toml
+    #[arg(long, short = 'c')]
+    pub(crate) config: Option<PathBuf>,
+    /// Port the app listens on inside the container [default: 80]
+    #[arg(long, value_parser = parse_port)]
+    pub(crate) port: Option<Port>,
+    /// Domain to route to this service, repeatable; leave out for internal-only services
+    #[arg(long = "domain")]
+    pub(crate) domains: Vec<Hostname>,
     /// How to tell the app is ready: http (default for new services) or tcp for databases;
     /// left out, an existing service keeps its current check
     #[arg(long)]
@@ -221,8 +235,9 @@ mod tests {
         let Command::Deploy(deploy) = args.command else {
             panic!("expected deploy");
         };
-        assert_eq!(deploy.name.as_str(), "web");
-        assert_eq!(deploy.port.get(), 80);
+        assert_eq!(deploy.name.unwrap().as_str(), "web");
+        assert_eq!(deploy.port, None);
+        assert_eq!(deploy.domains.len(), 1);
         assert_eq!(deploy.env[0].1, "1=2");
     }
 
