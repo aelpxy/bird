@@ -14,6 +14,7 @@ async fn unknown_host_is_not_found() {
     let proxy = spawn_proxy(routes(&[]), ProxyConfig::default()).await;
     let reply = get(proxy.addr, "nope.localhost", "/").await;
     assert_eq!(reply.status, StatusCode::NOT_FOUND);
+    assert_eq!(reply.headers["x-server"], "Bird");
     proxy.stop().await;
 }
 

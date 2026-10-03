@@ -5,6 +5,8 @@ pub mod tls;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use bird_core::Hostname;
@@ -12,7 +14,7 @@ use bird_proxy::{Proxy, ProxyConfig, RouteTable, Routes};
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
-use hyper::body::Incoming;
+use hyper::body::{Frame, Incoming};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{HeaderMap, Request, Response, StatusCode};
@@ -53,6 +55,24 @@ async fn upstream_handler(
     match request.uri().path() {
         "/echo" => Ok(Response::new(request.into_body().boxed())),
         "/ws" => Ok(echo_tunnel(request)),
+        "/count" => {
+            let length = request
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .len();
+            Ok(text(format!("length={length}\n")))
+        }
+        "/stall" => Ok(Response::new(Stall { sent: false }.boxed())),
+        "/branded" => {
+            let mut response = text(String::new());
+            let headers = response.headers_mut();
+            headers.append("x-server", "custom".parse().unwrap());
+            headers.append("x-server", "other".parse().unwrap());
+            Ok(response)
+        }
         "/slow" => {
             tokio::time::sleep(SLOW_DELAY).await;
             Ok(text(format!("upstream={name}\nslow=done\n")))
@@ -93,6 +113,27 @@ fn echo_tunnel(request: Request<Incoming>) -> Response<Body> {
         .header("upgrade", "websocket")
         .body(Full::new(Bytes::new()).map_err(|n| match n {}).boxed())
         .unwrap()
+}
+
+// sends one chunk, then never finishes
+struct Stall {
+    sent: bool,
+}
+
+impl hyper::body::Body for Stall {
+    type Data = Bytes;
+    type Error = hyper::Error;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Bytes>, hyper::Error>>> {
+        if self.sent {
+            return Poll::Pending;
+        }
+        self.sent = true;
+        Poll::Ready(Some(Ok(Frame::data(Bytes::from_static(b"partial")))))
+    }
 }
 
 fn text(body: String) -> Response<Body> {
@@ -224,6 +265,17 @@ pub async fn assert_echoes<I: AsyncRead + AsyncWrite + Unpin>(io: &mut I) {
         io.read_exact(&mut echoed).await.unwrap();
         assert_eq!(echoed, message);
     }
+}
+
+pub async fn raw_exchange(proxy: SocketAddr, request: &[u8]) -> String {
+    let mut stream = TcpStream::connect(proxy).await.unwrap();
+    stream.write_all(request).await.unwrap();
+    let mut reply = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), stream.read_to_end(&mut reply))
+        .await
+        .expect("the proxy should close the connection")
+        .ok();
+    String::from_utf8_lossy(&reply).into_owned()
 }
 
 pub async fn get(proxy: SocketAddr, host: &str, path: &str) -> Reply {

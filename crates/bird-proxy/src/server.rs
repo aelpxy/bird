@@ -14,7 +14,7 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::drain::{Drain, Watch};
 use crate::forward::Forwarder;
-use crate::headers::forwarded_for;
+use crate::headers::{forwarded_for, set_server};
 use crate::scheme::Scheme;
 use crate::tls::server_config;
 use crate::{ProxyConfig, Routes, Tls};
@@ -80,6 +80,7 @@ impl Proxy {
                 forwarder: Arc::clone(&self.forwarder),
                 watch: drain.watch(),
                 client_addr,
+                permit,
                 header_read_timeout: self.config.header_read_timeout,
                 max_header_bytes: self.config.max_header_bytes,
             };
@@ -89,7 +90,6 @@ impl Proxy {
                     None => connection.serve(stream, Scheme::Http).await,
                     Some(acceptor) => connection.serve_tls(&acceptor, stream).await,
                 }
-                drop(permit);
             });
         }
 
@@ -107,6 +107,7 @@ struct Connection {
     forwarder: Arc<Forwarder>,
     watch: Watch,
     client_addr: SocketAddr,
+    permit: OwnedSemaphorePermit,
     header_read_timeout: Duration,
     max_header_bytes: usize,
 }
@@ -130,16 +131,18 @@ impl Connection {
         let forwarded_for = forwarded_for(self.client_addr.ip());
         let mut shutdown = self.watch.clone();
         let tunnels = Arc::new(self.watch);
+        let permit = Arc::new(self.permit);
         let service = service_fn(move |request| {
             let forwarder = Arc::clone(&forwarder);
             let forwarded_for = forwarded_for.clone();
             let tunnels = Arc::clone(&tunnels);
+            let permit = Arc::clone(&permit);
             async move {
-                Ok::<_, Infallible>(
-                    forwarder
-                        .handle(request, forwarded_for, scheme, &tunnels)
-                        .await,
-                )
+                let mut response = forwarder
+                    .handle(request, forwarded_for, scheme, &tunnels, &permit)
+                    .await;
+                set_server(response.headers_mut());
+                Ok::<_, Infallible>(response)
             }
         });
         let connection = http1::Builder::new()

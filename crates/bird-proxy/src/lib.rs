@@ -6,6 +6,7 @@ mod edge;
 mod forward;
 mod headers;
 mod host;
+mod idle;
 mod listener;
 mod routes;
 mod scheme;

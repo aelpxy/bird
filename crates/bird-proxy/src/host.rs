@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use hyper::Request;
-use hyper::header::HOST;
+use hyper::header::{HOST, HeaderValue};
 
 pub(crate) fn request_host<B>(request: &Request<B>) -> Option<Cow<'_, str>> {
     let raw = match request.uri().authority() {
@@ -9,6 +9,16 @@ pub(crate) fn request_host<B>(request: &Request<B>) -> Option<Cow<'_, str>> {
         None => request.headers().get(HOST)?.to_str().ok()?,
     };
     normalize(raw)
+}
+
+// routing uses an absolute target over Host (RFC 9112), so the app must see that same host
+pub(crate) fn host_from_target<B>(request: &mut Request<B>) {
+    let Some(authority) = request.uri().authority() else {
+        return;
+    };
+    if let Ok(value) = HeaderValue::from_str(authority.as_str()) {
+        request.headers_mut().insert(HOST, value);
+    }
 }
 
 fn normalize(raw: &str) -> Option<Cow<'_, str>> {
@@ -72,6 +82,24 @@ mod tests {
             .uri("http://api.localhost/x")
             .header(HOST, "web.localhost");
         assert_eq!(host_of(builder).as_deref(), Some("api.localhost"));
+    }
+
+    #[test]
+    fn absolute_target_replaces_host_header() {
+        let mut request = Request::builder()
+            .uri("http://api.localhost:8080/x")
+            .header(HOST, "evil.example")
+            .body(())
+            .unwrap();
+        host_from_target(&mut request);
+        assert_eq!(request.headers()[HOST], "api.localhost:8080");
+        let mut request = Request::builder()
+            .uri("/x")
+            .header(HOST, "web.localhost")
+            .body(())
+            .unwrap();
+        host_from_target(&mut request);
+        assert_eq!(request.headers()[HOST], "web.localhost");
     }
 
     #[test]

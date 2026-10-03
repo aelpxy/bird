@@ -20,6 +20,7 @@ const HOP_BY_HOP: [HeaderName; 7] = [
 const X_FORWARDED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
 const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host");
 const X_FORWARDED_PROTO: HeaderName = HeaderName::from_static("x-forwarded-proto");
+const X_SERVER: HeaderName = HeaderName::from_static("x-server");
 
 pub(crate) fn strip_hop_by_hop(headers: &mut HeaderMap) {
     // one cheap pass instead of seven hashed removals, since these headers are rarely present
@@ -64,6 +65,11 @@ pub(crate) fn set_forwarded(
     };
 }
 
+// replaces whatever the app sent, so every response is marked as served by bird
+pub(crate) fn set_server(headers: &mut HeaderMap) {
+    headers.insert(X_SERVER, HeaderValue::from_static("Bird"));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,5 +112,17 @@ mod tests {
         assert_eq!(headers[X_FORWARDED_HOST], "web.localhost");
         assert_eq!(headers[X_FORWARDED_PROTO], "https");
         assert!(!headers.contains_key(FORWARDED));
+    }
+
+    #[test]
+    fn overrides_app_server_header() {
+        let mut headers = HeaderMap::new();
+        headers.append(X_SERVER, HeaderValue::from_static("custom"));
+        headers.append(X_SERVER, HeaderValue::from_static("other"));
+        set_server(&mut headers);
+        assert_eq!(
+            headers.get_all(X_SERVER).iter().collect::<Vec<_>>(),
+            ["Bird"]
+        );
     }
 }

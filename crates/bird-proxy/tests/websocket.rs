@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bird_proxy::ProxyConfig;
 use support::tls::{SECURE, spawn_edge, tls_stream};
-use support::{assert_echoes, open_tunnel, routes, spawn_proxy, spawn_upstream};
+use support::{assert_echoes, get, open_tunnel, routes, spawn_proxy, spawn_upstream};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
@@ -59,4 +59,37 @@ async fn shutdown_closes_open_tunnels() {
         matches!(read, Ok(Ok(0) | Err(_))),
         "tunnel should be closed: {read:?}"
     );
+}
+
+#[tokio::test]
+async fn tunnels_count_against_the_connection_limit() {
+    let upstream = spawn_upstream("a").await;
+    let config = ProxyConfig {
+        max_connections: 1,
+        ..ProxyConfig::default()
+    };
+    let proxy = spawn_proxy(routes(&[("web.localhost", &[upstream])]), config).await;
+    let mut stream = TcpStream::connect(proxy.addr).await.unwrap();
+    open_tunnel(&mut stream, "web.localhost").await;
+    assert_echoes(&mut stream).await;
+
+    let blocked = tokio::time::timeout(
+        Duration::from_millis(300),
+        get(proxy.addr, "web.localhost", "/"),
+    )
+    .await;
+    assert!(
+        blocked.is_err(),
+        "a second connection was served while the tunnel was open"
+    );
+
+    drop(stream);
+    let reply = tokio::time::timeout(
+        Duration::from_secs(2),
+        get(proxy.addr, "web.localhost", "/"),
+    )
+    .await
+    .expect("the slot should free up once the tunnel closes");
+    assert_eq!(reply.status, hyper::StatusCode::OK);
+    proxy.stop().await;
 }
