@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::error::check;
 use crate::query::encode;
-use crate::{Error, Podman, Result};
+use crate::{Error, Podman, RegistryAuth, Result};
 
 const PULL_TIMEOUT: Duration = Duration::from_secs(600);
 
@@ -19,10 +19,23 @@ struct PullReport {
 }
 
 impl Podman {
-    pub async fn pull_image(&self, image: &ImageRef) -> Result<String> {
+    pub async fn pull_image(
+        &self,
+        image: &ImageRef,
+        auth: Option<&RegistryAuth>,
+    ) -> Result<String> {
         let reference = image.qualified();
-        let path = format!("/images/pull?reference={}&quiet=true", encode(&reference));
-        let response = self.send(Method::POST, &path, PULL_TIMEOUT).await?;
+        let mut path = format!("/images/pull?reference={}&quiet=true", encode(&reference));
+        let response = match auth {
+            Some(auth) => {
+                if !auth.tls_verify {
+                    path.push_str("&tlsVerify=false");
+                }
+                self.send_with_registry_auth(Method::POST, &path, auth.header()?, PULL_TIMEOUT)
+                    .await?
+            }
+            None => self.send(Method::POST, &path, PULL_TIMEOUT).await?,
+        };
         let body = check(response, || format!("image {reference}"))?;
 
         let mut id = None;

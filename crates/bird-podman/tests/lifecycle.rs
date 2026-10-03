@@ -49,7 +49,7 @@ async fn container_lifecycle() {
     podman.ensure_volume(&name, &labels).await.unwrap();
 
     let image: ImageRef = IMAGE.parse().unwrap();
-    assert_ne!(podman.pull_image(&image).await.unwrap(), "");
+    assert_ne!(podman.pull_image(&image, None).await.unwrap(), "");
     assert!(podman.image_exists(&image).await.unwrap());
 
     let port = Port::try_from(80).unwrap();
@@ -144,7 +144,7 @@ async fn pulling_missing_image_fails() {
         Error::NotFound { .. }
     ));
     assert!(matches!(
-        podman().pull_image(&image).await.unwrap_err(),
+        podman().pull_image(&image, None).await.unwrap_err(),
         Error::Pull { .. }
     ));
 }

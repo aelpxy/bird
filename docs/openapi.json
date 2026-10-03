@@ -81,6 +81,138 @@
         }
       }
     },
+    "/v1/registries": {
+      "get": {
+        "tags": [
+          "registries"
+        ],
+        "summary": "List registries bird can pull private images from",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "Registries with stored credentials; passwords are never returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegistrySummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/registries/{host}": {
+      "put": {
+        "tags": [
+          "registries"
+        ],
+        "summary": "Store credentials for a registry",
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "path",
+            "description": "Registry host, like ghcr.io",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistryLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Credentials stored, used for every pull from this host"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "registries"
+        ],
+        "summary": "Forget the credentials of a registry",
+        "operationId": "logout",
+        "parameters": [
+          {
+            "name": "host",
+            "in": "path",
+            "description": "Registry host, like ghcr.io",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Credentials removed"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No credentials for this host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services": {
       "get": {
         "tags": [
@@ -1252,6 +1384,47 @@
         "format": "int32",
         "minimum": 1
       },
+      "RegistryHost": {
+        "type": "string"
+      },
+      "RegistryLogin": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "insecure": {
+            "type": "boolean",
+            "description": "Talk plain http and skip certificate checks, only for registries on a private network"
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "RegistrySummary": {
+        "type": "object",
+        "required": [
+          "host",
+          "username",
+          "insecure"
+        ],
+        "properties": {
+          "host": {
+            "$ref": "#/components/schemas/RegistryHost"
+          },
+          "insecure": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
       "Replicas": {
         "type": "integer",
         "format": "int32",
@@ -1483,6 +1656,10 @@
     {
       "name": "templates",
       "description": "Ready-made services such as Postgres and Valkey"
+    },
+    {
+      "name": "registries",
+      "description": "Credentials for pulling private images"
     }
   ]
 }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId,
-    MemoryLimit, MountPath, Name, Port, ProjectId, Replicas, ServiceId, VolumeId,
+    MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost, Replicas, ServiceId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -149,6 +149,25 @@ impl Volume {
     #[must_use]
     pub fn podman_name(&self) -> String {
         format!("bird-volume-{}", self.id)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Registry {
+    pub host: RegistryHost,
+    pub username: String,
+    pub password: String,
+    pub insecure: bool,
+}
+
+impl fmt::Debug for Registry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Registry")
+            .field("host", &self.host)
+            .field("username", &self.username)
+            .field("password", &"<redacted>")
+            .field("insecure", &self.insecure)
+            .finish()
     }
 }
 

@@ -19,6 +19,7 @@ const TOKEN_SCHEME: &str = "api_token";
         (name = "variables", description = "Environment variables, versioned with each deployment"),
         (name = "logs", description = "Recent and live logs of running machines"),
         (name = "templates", description = "Ready-made services such as Postgres and Valkey"),
+        (name = "registries", description = "Credentials for pulling private images"),
     )
 )]
 struct ApiDoc;
@@ -94,6 +95,8 @@ mod tests {
             "/v1/services/{name}/scale",
             "/v1/services/{name}/variables",
             "/v1/templates",
+            "/v1/registries",
+            "/v1/registries/{host}",
             "/v1/templates/{template}/deploy",
         ] {
             assert!(

@@ -49,6 +49,18 @@ impl Podman {
             .await
     }
 
+    pub(crate) async fn send_with_registry_auth(
+        &self,
+        method: Method,
+        path: &str,
+        registry_auth: String,
+        timeout: Duration,
+    ) -> Result<Response> {
+        self.transport
+            .send_with_registry_auth(method, path, registry_auth, timeout)
+            .await
+    }
+
     pub(crate) async fn stream(&self, path: &str) -> Result<Streamed> {
         self.transport.stream(path, DEFAULT_TIMEOUT).await
     }

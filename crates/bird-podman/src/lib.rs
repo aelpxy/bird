@@ -1,3 +1,4 @@
+mod auth;
 mod client;
 mod container;
 mod error;
@@ -9,6 +10,7 @@ mod query;
 mod transport;
 mod volume;
 
+pub use auth::RegistryAuth;
 pub use client::{Podman, default_socket};
 pub use container::{ContainerInfo, ContainerSpec, ContainerState, Limits, PublishedPort};
 pub use error::{Error, Result};

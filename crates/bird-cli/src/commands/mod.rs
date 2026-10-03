@@ -5,6 +5,7 @@ mod history;
 mod list;
 mod login;
 mod logs;
+mod registry;
 mod remove;
 mod scale;
 mod table;
@@ -20,6 +21,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
     match args.command {
         Command::Login { api } => login::run(api).await,
         Command::Deploy(deploy) => deploy::run(&connect(args.api)?, deploy).await,
+        Command::Registry { command } => registry::run(&connect(args.api)?, command).await,
         Command::Templates => templates::list(&connect(args.api)?).await,
         Command::Add { template, name } => {
             templates::add(&connect(args.api)?, &template, name).await

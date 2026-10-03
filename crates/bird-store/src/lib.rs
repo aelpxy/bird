@@ -6,6 +6,7 @@ mod error;
 mod machines;
 mod migrate;
 mod projects;
+mod registries;
 mod routes;
 mod rows;
 mod services;

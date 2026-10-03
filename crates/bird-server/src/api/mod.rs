@@ -6,6 +6,7 @@ mod domains;
 mod error;
 mod logs;
 mod openapi;
+mod registries;
 mod scale;
 mod services;
 mod stream;
@@ -55,6 +56,8 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(logs::logs))
         .routes(routes!(scale::update))
         .routes(routes!(variables::list, variables::update))
+        .routes(routes!(registries::list))
+        .routes(routes!(registries::login, registries::logout))
         .routes(routes!(templates::list))
         .routes(routes!(templates::deploy))
 }

@@ -6,7 +6,7 @@ use bird_core::{
     Deployment, DeploymentId, EnvKey, HealthCheck, MachineId, MachineState, MemoryLimit, Port,
     Service,
 };
-use bird_podman::{ContainerSpec, ContainerState, Limits};
+use bird_podman::{ContainerSpec, ContainerState, Limits, RegistryAuth};
 use tokio::time::Instant;
 
 use crate::state::AppState;
@@ -25,7 +25,20 @@ pub(crate) async fn launch(
     deployment: &Deployment,
     env: BTreeMap<EnvKey, String>,
 ) -> Result<()> {
-    state.podman.pull_image(&deployment.image).await?;
+    let host = deployment.image.registry();
+    let auth = state
+        .db
+        .call(move |store| store.registry(&host))
+        .await?
+        .map(|registry| RegistryAuth {
+            username: registry.username,
+            password: registry.password,
+            tls_verify: !registry.insecure,
+        });
+    state
+        .podman
+        .pull_image(&deployment.image, auth.as_ref())
+        .await?;
 
     let service_id = service.id;
     let attached = state

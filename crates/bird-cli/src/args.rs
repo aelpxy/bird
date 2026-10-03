@@ -1,7 +1,7 @@
 use bird_api::VolumeSpec;
 use bird_core::{
     CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
-    Replicas,
+    RegistryHost, Replicas,
 };
 use clap::{Parser, Subcommand};
 
@@ -22,6 +22,11 @@ pub(crate) enum Command {
     Login { api: String },
     /// Deploy an image as a service, creating it if needed
     Deploy(DeployArgs),
+    /// Manage credentials for private image registries
+    Registry {
+        #[command(subcommand)]
+        command: RegistryCommand,
+    },
     /// List templates for ready-made services like postgres and valkey
     Templates,
     /// Create a service from a template, such as `bird add postgres`
@@ -95,6 +100,24 @@ pub(crate) enum EnvCommand {
         #[arg(long)]
         no_deploy: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum RegistryCommand {
+    /// List registries with stored credentials
+    #[command(visible_alias = "ls")]
+    List,
+    /// Store credentials for a registry; the password or token is read from stdin
+    Login {
+        host: RegistryHost,
+        #[arg(long)]
+        username: String,
+        /// Plain http without certificate checks, only for registries on a private network
+        #[arg(long)]
+        insecure: bool,
+    },
+    /// Forget the credentials of a registry
+    Logout { host: RegistryHost },
 }
 
 #[derive(Debug, Subcommand)]
