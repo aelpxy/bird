@@ -3,6 +3,7 @@ name = "bird-api"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [features]
 openapi = ["dep:utoipa", "bird-core/openapi"]
