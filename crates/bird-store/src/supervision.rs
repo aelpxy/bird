@@ -1,4 +1,4 @@
-use bird_core::{Deployment, DeploymentStatus, Machine, MachineId, MachineState};
+use bird_core::{Deployment, DeploymentStatus, ImageRef, Machine, MachineId, MachineState};
 use rusqlite::params;
 
 use crate::{Result, Store, rows};
@@ -42,6 +42,26 @@ impl Store {
                 MachineState::Stopping.as_str()
             ],
             rows::machine,
+        )
+    }
+
+    // every image bird deployed, and whether a live or recent deployment still needs it
+    pub fn list_deployed_images(&self, keep_recent: u32) -> Result<Vec<(ImageRef, bool)>> {
+        self.query_all(
+            "WITH ranked AS (
+                 SELECT image, status, ROW_NUMBER() OVER (
+                     PARTITION BY service_id ORDER BY created_at DESC, id DESC
+                 ) AS recency
+                 FROM deployments
+             )
+             SELECT image, MAX(recency <= ?1 OR status IN (?2, ?3, ?4)) FROM ranked GROUP BY image",
+            params![
+                keep_recent,
+                DeploymentStatus::Active.as_str(),
+                DeploymentStatus::Deploying.as_str(),
+                DeploymentStatus::Pending.as_str()
+            ],
+            rows::image_use,
         )
     }
 
@@ -126,6 +146,38 @@ mod tests {
             .unwrap();
         let tracked = store.list_tracked_machine_ids().unwrap();
         assert_eq!(tracked, vec![healthy.id, broken.id]);
+    }
+
+    #[test]
+    fn keeps_images_of_live_and_recent_deployments() {
+        let (mut store, service) = setup();
+        let deploy_image = |store: &mut crate::Store, image: &str| {
+            store
+                .update_service(service.id, &image.parse().unwrap(), service.port)
+                .unwrap();
+            let current = store.service(service.id).unwrap().unwrap();
+            let deployment = store.create_deployment(&current).unwrap();
+            store.activate_deployment(deployment.id).unwrap();
+        };
+        for tag in ["app:1", "app:2", "app:3", "app:4"] {
+            deploy_image(&mut store, tag);
+        }
+        let mut images: Vec<(String, bool)> = store
+            .list_deployed_images(2)
+            .unwrap()
+            .into_iter()
+            .map(|(image, keep)| (image.to_string(), keep))
+            .collect();
+        images.sort();
+        assert_eq!(
+            images,
+            [
+                ("app:1".to_owned(), false),
+                ("app:2".to_owned(), false),
+                ("app:3".to_owned(), true),
+                ("app:4".to_owned(), true),
+            ]
+        );
     }
 
     #[test]

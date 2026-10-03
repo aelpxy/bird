@@ -140,6 +140,10 @@ async fn container_lifecycle() {
 async fn pulling_missing_image_fails() {
     let image: ImageRef = "bird-does-not-exist-xyz:latest".parse().unwrap();
     assert!(matches!(
+        podman().remove_image(&image).await.unwrap_err(),
+        Error::NotFound { .. }
+    ));
+    assert!(matches!(
         podman().pull_image(&image).await.unwrap_err(),
         Error::Pull { .. }
     ));
