@@ -42,6 +42,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Data model: `project → environment → service → deployment → machine`, plus `domains` and `variables` on services.
 * Private network: every machine joins the `bird` Podman network with aliases `<service>` and `<service>.internal`, so services call each other directly by name. DNS returns every replica's address in a fixed order, so spreading internal traffic across replicas is up to the client.
 * Volumes: a service with volumes runs exactly one machine and deploys by stopping the old machine (state `Stopped`, kept for a restore if the new one fails) before starting the new one. Each volume records the image lineage (repository, major version, variant) that first used it and refuses another without `allow_image_change`. Volumes are only deleted by `bird rm --purge`.
+* Variable references: values may contain `${{service.KEY}}`, `${{KEY}}` (same service) and `${{secret}}`/`${{secret(N)}}`. Secrets are generated once when set and stored as plain values; references are stored as written and resolved when a deploy starts, into the deployment snapshot's `resolved` column that machines run with. Changes are dry-run resolved, including services that depend on the changed one, before anything is saved.
 * Desired state lives in SQLite; the server reconciles actual state (Podman) toward it. Reconciliation must be idempotent.
 
 ## Rust

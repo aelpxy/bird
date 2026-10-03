@@ -13,6 +13,8 @@ pub enum Error {
     Validation(#[from] bird_core::ValidationError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    Reference(#[from] bird_core::reference::ReferenceError),
     #[error(
         "cannot listen on {0}: ports below 1024 need `sysctl net.ipv4.ip_unprivileged_port_start=80`, or pick a port like 8080"
     )]

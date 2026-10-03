@@ -65,7 +65,7 @@ pub(crate) enum EnvCommand {
     /// List variable names, values are never shown
     #[command(visible_alias = "ls")]
     List { name: Name },
-    /// Set variables as KEY=VALUE
+    /// Set variables as KEY=VALUE; values may use `${{service.KEY}}`, `${{KEY}}` and `${{secret}}`
     Set {
         name: Name,
         #[arg(required = true, value_parser = parse_env)]

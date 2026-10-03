@@ -10,6 +10,7 @@ mod labels;
 mod listen;
 mod routing;
 mod run;
+mod secrets;
 mod shutdown;
 mod state;
 mod supervisor;

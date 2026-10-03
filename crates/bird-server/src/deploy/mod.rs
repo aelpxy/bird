@@ -1,6 +1,7 @@
 mod guard;
 mod machine;
 mod recreate;
+pub(crate) mod references;
 mod remove;
 mod volumes;
 
@@ -18,7 +19,7 @@ use crate::state::AppState;
 
 // longer than a supervisor replacement takes, so user requests rarely see a busy error
 pub(crate) const OPERATION_PATIENCE: std::time::Duration = std::time::Duration::from_mins(2);
-use crate::{Result, routing};
+use crate::{Result, routing, secrets};
 
 pub(crate) async fn redeploy(
     state: &AppState,
@@ -39,7 +40,9 @@ pub(crate) async fn redeploy(
     deploy(state, request).await
 }
 
-pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<DeployResponse> {
+pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Result<DeployResponse> {
+    request.env = secrets::expand_all(request.env)?;
+    references::check_change(state, &request.name, &request.env, &[]).await?;
     let _ticket = state
         .deploys
         .wait_for(&request.name, OPERATION_PATIENCE)
@@ -48,6 +51,7 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
     let (service, domains, attached) = save_config(state, request, new_volumes).await?;
     state.domains_changed.notify_one();
 
+    let resolved = references::resolve_for(state, &service.name).await?;
     let snapshot = service.clone();
     let (deployment, previous, env) = state
         .db
@@ -56,6 +60,7 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
                 let previous = store.active_deployment(snapshot.id)?;
                 let deployment = store.create_deployment(&snapshot)?;
                 store.set_deployment_status(deployment.id, DeploymentStatus::Deploying)?;
+                store.set_resolved_variables(deployment.id, &resolved)?;
                 let env = store.deployment_variables(deployment.id)?;
                 Ok((deployment, previous, env))
             })

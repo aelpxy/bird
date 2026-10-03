@@ -5,7 +5,7 @@ use bird_api::{UpdateVariables, VariablesResponse};
 use bird_core::{EnvKey, Name, ServiceId};
 
 use crate::state::AppState;
-use crate::{Result, deploy};
+use crate::{Result, deploy, secrets};
 
 /// List variable names
 #[utoipa::path(get, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
@@ -40,6 +40,8 @@ async fn apply(
     let service = state.service(name).await?;
     let service_id = service.id;
     let UpdateVariables { set, unset, deploy } = update;
+    let set = secrets::expand_all(set)?;
+    deploy::references::check_change(state, name, &set, &unset).await?;
     state
         .db
         .call(move |store| {

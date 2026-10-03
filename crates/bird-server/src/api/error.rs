@@ -40,9 +40,9 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::DeploymentNotFound(_)
         | Error::NoRollbackTarget(_)
         | Error::NoMachines(_) => StatusCode::NOT_FOUND,
-        Error::Podman(bird_podman::Error::Pull { .. }) | Error::Validation(_) => {
-            StatusCode::BAD_REQUEST
-        }
+        Error::Podman(bird_podman::Error::Pull { .. })
+        | Error::Validation(_)
+        | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
