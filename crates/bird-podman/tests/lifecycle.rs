@@ -53,6 +53,7 @@ async fn container_lifecycle() {
         image,
         port,
         network: name.clone(),
+        aliases: vec!["lifecycle-alias".to_owned()],
         env: BTreeMap::from([("GREETING".parse().unwrap(), "hi".to_owned())]),
         labels: BTreeMap::from([("bird.test".to_owned(), name.clone())]),
     };
@@ -67,6 +68,11 @@ async fn container_lifecycle() {
 
     let info = podman.inspect_container(&id).await.unwrap();
     assert_eq!(info.state, ContainerState::Running);
+    assert!(
+        info.aliases.contains(&"lifecycle-alias".to_owned()),
+        "{:?}",
+        info.aliases
+    );
     let host_port = info.host_port(port).expect("port should be published");
     let response = wait_for_http(host_port)
         .await

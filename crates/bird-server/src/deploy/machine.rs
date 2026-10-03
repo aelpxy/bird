@@ -32,6 +32,7 @@ pub(crate) async fn launch(
         image: deployment.image.clone(),
         port: deployment.port,
         network: state.network.to_string(),
+        aliases: labels::aliases(service),
         env,
         labels: labels::for_machine(service, deployment.id, machine.id),
     };

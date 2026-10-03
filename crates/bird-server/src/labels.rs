@@ -5,6 +5,14 @@ use bird_core::{DeploymentId, EnvironmentId, MachineId, Service};
 pub(crate) const MACHINE: &str = "bird.machine";
 const ENVIRONMENT: &str = "bird.environment-id";
 
+// other services reach this one as `<name>` or `<name>.internal` on the private network
+pub(crate) fn aliases(service: &Service) -> Vec<String> {
+    vec![
+        service.name.to_string(),
+        format!("{}.internal", service.name),
+    ]
+}
+
 pub(crate) fn environment_filter(environment: EnvironmentId) -> String {
     format!("{ENVIRONMENT}={environment}")
 }
