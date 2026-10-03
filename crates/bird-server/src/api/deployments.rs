@@ -12,7 +12,18 @@ pub(crate) async fn list(
 ) -> Result<Json<Vec<DeploymentInfo>>> {
     let service = state.service(&name).await?;
     let deployments = history(&state, service.id).await?;
-    Ok(Json(deployments.into_iter().map(info).collect()))
+    let ids: Vec<_> = deployments.iter().map(|d| d.id).collect();
+    let counts = state
+        .db
+        .call(move |store| {
+            ids.iter()
+                .map(|id| Ok(store.deployment_variables(*id)?.len()))
+                .collect::<bird_store::Result<Vec<_>>>()
+        })
+        .await?;
+    Ok(Json(
+        deployments.into_iter().zip(counts).map(info).collect(),
+    ))
 }
 
 pub(crate) async fn rollback(
@@ -26,6 +37,11 @@ pub(crate) async fn rollback(
         let deployments = history(&state, service.id).await?;
         let target = pick_target(&deployments, request.deployment_id, &name)?;
         tracing::info!(service = %name, target = %target.id, image = %target.image, "rolling back");
+        let (service_id, target_id) = (service.id, target.id);
+        state
+            .db
+            .call(move |store| store.restore_variables(service_id, target_id))
+            .await?;
         deploy::redeploy(&state, &service, target.image.clone(), target.port).await
     });
     match task.await {
@@ -64,12 +80,13 @@ fn pick_target<'a>(
     }
 }
 
-fn info(deployment: Deployment) -> DeploymentInfo {
+fn info((deployment, variables): (Deployment, usize)) -> DeploymentInfo {
     DeploymentInfo {
         id: deployment.id,
         image: deployment.image,
         port: deployment.port,
         status: deployment.status,
+        variables,
         created_at: deployment.created_at,
     }
 }

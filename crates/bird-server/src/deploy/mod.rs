@@ -33,18 +33,19 @@ pub(crate) async fn redeploy(
 
 pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<DeployResponse> {
     let _ticket = state.deploys.begin(&request.name)?;
-    let (service, domains, env) = save_config(state, request).await?;
+    let (service, domains) = save_config(state, request).await?;
     state.domains_changed.notify_one();
 
     let snapshot = service.clone();
-    let (deployment, previous) = state
+    let (deployment, previous, env) = state
         .db
         .call(move |store| {
             store.transaction(|store| {
                 let previous = store.active_deployment(snapshot.id)?;
                 let deployment = store.create_deployment(&snapshot)?;
                 store.set_deployment_status(deployment.id, DeploymentStatus::Deploying)?;
-                Ok((deployment, previous))
+                let env = store.deployment_variables(deployment.id)?;
+                Ok((deployment, previous, env))
             })
         })
         .await?;
@@ -107,10 +108,7 @@ async fn launch_all(
     first_error.map_or(Ok(()), Err)
 }
 
-async fn save_config(
-    state: &AppState,
-    request: DeployRequest,
-) -> Result<(Service, Vec<Hostname>, BTreeMap<EnvKey, String>)> {
+async fn save_config(state: &AppState, request: DeployRequest) -> Result<(Service, Vec<Hostname>)> {
     let environment_id = state.environment_id;
     state
         .db
@@ -149,12 +147,7 @@ async fn save_config(
                     .into_iter()
                     .map(|d| d.hostname)
                     .collect();
-                let env = store
-                    .list_variables(service.id)?
-                    .into_iter()
-                    .map(|v| (v.key, v.value))
-                    .collect();
-                Ok((service, domains, env))
+                Ok((service, domains))
             })
         })
         .await
