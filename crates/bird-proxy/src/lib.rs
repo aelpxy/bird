@@ -1,6 +1,7 @@
 mod body;
 mod challenges;
 mod config;
+mod drain;
 mod edge;
 mod forward;
 mod headers;
@@ -10,6 +11,7 @@ mod routes;
 mod scheme;
 mod server;
 mod tls;
+mod upgrade;
 
 pub use challenges::Challenges;
 pub use config::ProxyConfig;

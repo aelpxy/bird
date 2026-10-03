@@ -11,6 +11,7 @@ use rustls::pki_types::{CertificateDer, ServerName};
 use rustls::{ClientConfig, RootCertStore};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
+use tokio_rustls::client::TlsStream;
 
 use super::{Reply, send_on};
 
@@ -75,7 +76,7 @@ pub fn spawn_edge(routes: Routes) -> Edge {
     }
 }
 
-pub async fn https_get(edge: &Edge, sni: &str, path: &str) -> Result<Reply, std::io::Error> {
+pub async fn tls_stream(edge: &Edge, sni: &str) -> std::io::Result<TlsStream<TcpStream>> {
     let mut roots = RootCertStore::empty();
     roots.add(edge.ca.clone()).unwrap();
     let config =
@@ -86,9 +87,13 @@ pub async fn https_get(edge: &Edge, sni: &str, path: &str) -> Result<Reply, std:
             .with_no_client_auth();
     let tcp = TcpStream::connect(edge.https).await?;
     let name = ServerName::try_from(sni.to_owned()).unwrap();
-    let stream = TlsConnector::from(Arc::new(config))
+    TlsConnector::from(Arc::new(config))
         .connect(name, tcp)
-        .await?;
+        .await
+}
+
+pub async fn https_get(edge: &Edge, sni: &str, path: &str) -> std::io::Result<Reply> {
+    let stream = tls_stream(edge, sni).await?;
     let request = Request::get(path)
         .header("host", sni)
         .body(Full::new(Bytes::new()))

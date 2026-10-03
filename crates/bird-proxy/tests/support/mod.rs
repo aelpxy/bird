@@ -17,7 +17,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{HeaderMap, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -38,6 +38,7 @@ pub async fn spawn_upstream(name: &'static str) -> SocketAddr {
                 let service = service_fn(move |request| upstream_handler(name, request));
                 let _ = http1::Builder::new()
                     .serve_connection(TokioIo::new(stream), service)
+                    .with_upgrades()
                     .await;
             });
         }
@@ -51,6 +52,7 @@ async fn upstream_handler(
 ) -> Result<Response<Body>, Infallible> {
     match request.uri().path() {
         "/echo" => Ok(Response::new(request.into_body().boxed())),
+        "/ws" => Ok(echo_tunnel(request)),
         "/slow" => {
             tokio::time::sleep(SLOW_DELAY).await;
             Ok(text(format!("upstream={name}\nslow=done\n")))
@@ -76,6 +78,21 @@ async fn upstream_handler(
             )))
         }
     }
+}
+
+fn echo_tunnel(request: Request<Incoming>) -> Response<Body> {
+    tokio::spawn(async move {
+        if let Ok(upgraded) = hyper::upgrade::on(request).await {
+            let (mut reader, mut writer) = tokio::io::split(TokioIo::new(upgraded));
+            let _ = tokio::io::copy(&mut reader, &mut writer).await;
+        }
+    });
+    Response::builder()
+        .status(StatusCode::SWITCHING_PROTOCOLS)
+        .header("connection", "upgrade")
+        .header("upgrade", "websocket")
+        .body(Full::new(Bytes::new()).map_err(|n| match n {}).boxed())
+        .unwrap()
 }
 
 fn text(body: String) -> Response<Body> {
@@ -179,6 +196,33 @@ where
         status,
         headers,
         body,
+    }
+}
+
+pub const UPGRADE_REQUEST: &str =
+    "GET /ws HTTP/1.1\r\nhost: web.localhost\r\nconnection: Upgrade\r\nupgrade: websocket\r\n\r\n";
+
+pub async fn open_tunnel<I>(io: &mut I, host: &str) -> String
+where
+    I: AsyncRead + AsyncWrite + Unpin,
+{
+    let request = UPGRADE_REQUEST.replace("web.localhost", host);
+    io.write_all(request.as_bytes()).await.unwrap();
+    let mut head = Vec::new();
+    let mut byte = [0_u8; 1];
+    while !head.ends_with(b"\r\n\r\n") {
+        io.read_exact(&mut byte).await.unwrap();
+        head.push(byte[0]);
+    }
+    String::from_utf8(head).unwrap()
+}
+
+pub async fn assert_echoes<I: AsyncRead + AsyncWrite + Unpin>(io: &mut I) {
+    for message in [&b"ping"[..], b"second message", &[0_u8, 255, 7]] {
+        io.write_all(message).await.unwrap();
+        let mut echoed = vec![0_u8; message.len()];
+        io.read_exact(&mut echoed).await.unwrap();
+        assert_eq!(echoed, message);
     }
 }
 

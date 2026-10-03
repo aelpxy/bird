@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::header::{HOST, HeaderValue};
+use hyper::header::{HOST, HeaderValue, UPGRADE};
 use hyper::http::uri::{self, Authority, PathAndQuery};
 use hyper::{Request, Response, StatusCode, Uri, Version};
 use hyper_util::client::legacy::Client;
@@ -10,11 +10,12 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioTimer};
 
 use crate::body::{ProxyBody, error_response};
+use crate::drain::Watch;
 use crate::headers::{set_forwarded, strip_hop_by_hop};
 use crate::host::request_host;
 use crate::routes::{RouteError, Routes};
 use crate::scheme::Scheme;
-use crate::{ProxyConfig, Tls, edge};
+use crate::{ProxyConfig, Tls, edge, upgrade};
 
 pub(crate) struct Forwarder {
     routes: Routes,
@@ -47,6 +48,7 @@ impl Forwarder {
         mut request: Request<Incoming>,
         forwarded_for: Option<HeaderValue>,
         scheme: Scheme,
+        watch: &Watch,
     ) -> Response<ProxyBody> {
         let http_edge = self.tls.as_ref().filter(|_| scheme == Scheme::Http);
         if let Some(response) =
@@ -77,16 +79,33 @@ impl Forwarder {
             return error_response(StatusCode::BAD_REQUEST, "invalid request target\n");
         };
         let original_host = request.headers().get(HOST).cloned();
+        let protocol = upgrade::requested_protocol(&request);
+        let downstream = protocol.is_some().then(|| hyper::upgrade::on(&mut request));
         *request.uri_mut() = uri;
         *request.version_mut() = Version::HTTP_11;
         strip_hop_by_hop(request.headers_mut());
+        if let Some(protocol) = protocol {
+            upgrade::restore_headers(request.headers_mut(), protocol);
+        }
         set_forwarded(request.headers_mut(), forwarded_for, original_host, scheme);
 
         let method = request.method().clone();
         match tokio::time::timeout(self.response_timeout, self.client.request(request)).await {
-            Ok(Ok(response)) => {
+            Ok(Ok(mut response)) => {
+                let tunnel =
+                    downstream.filter(|_| response.status() == StatusCode::SWITCHING_PROTOCOLS);
+                let accepted = response.headers().get(UPGRADE).cloned();
+                if let Some(downstream) = tunnel {
+                    let upstream = hyper::upgrade::on(&mut response);
+                    upgrade::spawn_tunnel(downstream, upstream, watch.clone());
+                }
                 let (mut parts, body) = response.into_parts();
                 strip_hop_by_hop(&mut parts.headers);
+                if let Some(accepted) =
+                    accepted.filter(|_| parts.status == StatusCode::SWITCHING_PROTOCOLS)
+                {
+                    upgrade::restore_headers(&mut parts.headers, accepted);
+                }
                 tracing::debug!(%method, %upstream, status = %parts.status, "proxied");
                 Response::from_parts(parts, body.boxed())
             }
