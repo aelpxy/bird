@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bird_core::{ImageRef, Port};
 use bird_podman::{
-    ContainerSpec, ContainerState, Error, LogStream, Podman, VolumeMount, default_socket,
+    ContainerSpec, ContainerState, Error, Limits, LogStream, Podman, VolumeMount, default_socket,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -60,6 +60,11 @@ async fn container_lifecycle() {
         port,
         network: name.clone(),
         aliases: vec!["lifecycle-alias".to_owned()],
+        limits: Limits {
+            memory_bytes: 256 * 1024 * 1024,
+            cpu_millicores: 500,
+            pids: 512,
+        },
         mounts: vec![VolumeMount {
             volume: name.clone(),
             destination: "/usr/share/nginx/html/data".to_owned(),

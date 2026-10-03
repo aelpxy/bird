@@ -54,7 +54,11 @@ pub(super) async fn check_machine(
         }
         Verdict::Start { strikes: count } => {
             strikes.insert(machine.id, count);
-            tracing::warn!(service = %service.name, machine = %machine.id, strikes = count, max = MAX_STRIKES, "container stopped, starting it");
+            if info.oom_killed {
+                tracing::warn!(service = %service.name, machine = %machine.id, memory = %service.memory, "machine ran out of memory, starting it again");
+            } else {
+                tracing::warn!(service = %service.name, machine = %machine.id, strikes = count, max = MAX_STRIKES, "container stopped, starting it");
+            }
             if let Err(err) = state.podman.start_container(container_id).await {
                 tracing::warn!(machine = %machine.id, error = %err, "could not start container");
             }

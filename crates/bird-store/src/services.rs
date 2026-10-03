@@ -1,5 +1,6 @@
 use bird_core::{
-    Command, EnvironmentId, HealthCheck, ImageRef, Name, Port, Replicas, Service, ServiceId,
+    Command, CpuLimit, EnvironmentId, HealthCheck, ImageRef, MemoryLimit, Name, Port, Replicas,
+    Service, ServiceId,
 };
 use rusqlite::params;
 
@@ -24,6 +25,8 @@ impl Store {
             replicas: Replicas::ONE,
             health: HealthCheck::Http,
             command: None,
+            memory: MemoryLimit::DEFAULT,
+            cpus: CpuLimit::DEFAULT,
             created_at: now(),
         };
         self.execute(
@@ -75,9 +78,18 @@ impl Store {
         expect_changed(changed, "service")
     }
 
+    pub fn set_resources(&self, id: ServiceId, memory: MemoryLimit, cpus: CpuLimit) -> Result<()> {
+        let changed = self.execute(
+            "UPDATE services SET memory_mb = ?2, cpu_millicores = ?3 WHERE id = ?1",
+            params![id.to_string(), memory.mebibytes(), cpus.millicores()],
+        )?;
+        expect_changed(changed, "service")
+    }
+
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
+                    memory_mb, cpu_millicores
              FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
@@ -90,7 +102,8 @@ impl Store {
         name: &Name,
     ) -> Result<Option<Service>> {
         self.query_one(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
+                    memory_mb, cpu_millicores
              FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
@@ -100,7 +113,8 @@ impl Store {
 
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
-            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command
+            "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
+                    memory_mb, cpu_millicores
              FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],
@@ -186,6 +200,17 @@ mod tests {
         let three = Replicas::try_from(3).unwrap();
         store.set_replicas(service.id, three).unwrap();
         assert_eq!(store.service(service.id).unwrap().unwrap().replicas, three);
+    }
+
+    #[test]
+    fn stores_resource_limits() {
+        let (store, service) = setup();
+        assert_eq!(service.memory, bird_core::MemoryLimit::DEFAULT);
+        let memory = "512m".parse().unwrap();
+        let cpus = "0.5".parse().unwrap();
+        store.set_resources(service.id, memory, cpus).unwrap();
+        let stored = store.service(service.id).unwrap().unwrap();
+        assert_eq!((stored.memory, stored.cpus), (memory, cpus));
     }
 
     #[test]

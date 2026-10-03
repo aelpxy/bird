@@ -24,8 +24,16 @@ pub struct ContainerSpec {
     pub network: String,
     pub aliases: Vec<String>,
     pub mounts: Vec<VolumeMount>,
+    pub limits: Limits,
     pub env: BTreeMap<EnvKey, String>,
     pub labels: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    pub memory_bytes: u64,
+    pub cpu_millicores: u32,
+    pub pids: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +76,7 @@ pub struct ContainerInfo {
     pub labels: BTreeMap<String, String>,
     pub ports: Vec<PublishedPort>,
     pub aliases: Vec<String>,
+    pub oom_killed: bool,
 }
 
 impl ContainerInfo {

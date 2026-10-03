@@ -5,8 +5,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Command, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId, MountPath, Name,
-    Port, ProjectId, Replicas, ServiceId, VolumeId,
+    Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId,
+    MemoryLimit, MountPath, Name, Port, ProjectId, Replicas, ServiceId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -101,6 +101,8 @@ pub struct Service {
     pub replicas: Replicas,
     pub health: HealthCheck,
     pub command: Option<Command>,
+    pub memory: MemoryLimit,
+    pub cpus: CpuLimit,
     pub created_at: i64,
 }
 

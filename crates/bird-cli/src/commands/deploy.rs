@@ -25,6 +25,8 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
         env: args.env.into_iter().collect(),
         health: args.health,
         command,
+        memory: args.memory,
+        cpus: args.cpus,
         volumes: args.volumes,
         allow_image_change: args.allow_image_change,
     };

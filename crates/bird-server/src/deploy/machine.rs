@@ -3,14 +3,17 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use bird_core::{
-    Deployment, DeploymentId, EnvKey, HealthCheck, MachineId, MachineState, Port, Service,
+    Deployment, DeploymentId, EnvKey, HealthCheck, MachineId, MachineState, MemoryLimit, Port,
+    Service,
 };
-use bird_podman::{ContainerSpec, ContainerState};
+use bird_podman::{ContainerSpec, ContainerState, Limits};
 use tokio::time::Instant;
 
 use crate::state::AppState;
 use crate::{Error, Result, health, labels};
 
+// enough for any real app, low enough that a fork bomb cannot exhaust the host
+const MAX_PROCESSES: u32 = 4096;
 const READY_TIMEOUT: Duration = Duration::from_secs(60);
 const READY_POLL: Duration = Duration::from_millis(250);
 const STOP_GRACE: Duration = Duration::from_secs(10);
@@ -44,6 +47,11 @@ pub(crate) async fn launch(
         network: state.network.to_string(),
         aliases: labels::aliases(service),
         mounts,
+        limits: Limits {
+            memory_bytes: service.memory.bytes(),
+            cpu_millicores: service.cpus.millicores(),
+            pids: MAX_PROCESSES,
+        },
         env,
         labels: labels::for_machine(service, deployment.id, machine.id),
     };
@@ -64,7 +72,15 @@ pub(crate) async fn launch(
         })
         .await?;
 
-    match boot(state, &container_id, deployment.port, service.health).await {
+    match boot(
+        state,
+        &container_id,
+        deployment.port,
+        service.health,
+        service.memory,
+    )
+    .await
+    {
         Ok(address) => {
             state
                 .db
@@ -89,6 +105,7 @@ async fn boot(
     container_id: &str,
     port: Port,
     check: HealthCheck,
+    memory: MemoryLimit,
 ) -> Result<SocketAddr> {
     state.podman.start_container(container_id).await?;
     let info = state.podman.inspect_container(container_id).await?;
@@ -109,7 +126,11 @@ async fn boot(
         }
         let info = state.podman.inspect_container(container_id).await?;
         if info.state != ContainerState::Running {
-            let reason = format!("app exited before it started accepting {check} connections");
+            let reason = if info.oom_killed {
+                format!("app ran out of memory, raise the limit with --memory (now {memory})")
+            } else {
+                format!("app exited before it started accepting {check} connections")
+            };
             return Err(unhealthy(state, container_id, reason).await);
         }
         if Instant::now() >= deadline {

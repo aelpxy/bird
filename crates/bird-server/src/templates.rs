@@ -67,6 +67,8 @@ impl Template {
             env,
             health: Some(self.health),
             command: self.command.clone(),
+            memory: None,
+            cpus: None,
             volumes: self.volumes.clone(),
             allow_image_change: false,
         }

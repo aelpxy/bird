@@ -22,6 +22,10 @@ pub enum ValidationError {
     MountPath(String),
     #[error("invalid command: give a program and up to 63 arguments, without NUL bytes")]
     Command,
+    #[error("invalid memory limit {0:?}: use 32m to 256g, like 512m or 2g")]
+    Memory(String),
+    #[error("invalid cpu limit {0:?}: use 0.1 to 64 cores, like 0.5 or 2")]
+    Cpu(String),
     #[error("invalid replica count: use 1-32 machines")]
     Replicas(u8),
     #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]
