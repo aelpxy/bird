@@ -2,7 +2,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use bird_api::ErrorBody;
 use bird_api::{DeployResponse, DeploymentInfo, RollbackRequest};
-use bird_core::{Deployment, DeploymentStatus, Name, ServiceId};
+use bird_core::{Deployment, DeploymentStatus, Name, Service, ServiceId};
 
 use crate::state::AppState;
 use crate::{Error, Result, deploy};
@@ -43,9 +43,18 @@ pub(crate) async fn rollback(
         let target = pick_target(&deployments, request.deployment_id, &name)?;
         tracing::info!(service = %name, target = %target.id, image = %target.image, "rolling back");
         let (service_id, target_id) = (service.id, target.id);
+        let settings = Service {
+            image: target.image.clone(),
+            port: target.port,
+            command: target.command.clone(),
+            ..service.clone()
+        };
         state
             .db
-            .call(move |store| store.restore_variables(service_id, target_id))
+            .call(move |store| {
+                store.restore_settings(&settings)?;
+                store.restore_variables(service_id, target_id)
+            })
             .await?;
         deploy::redeploy(&state, &service, target.image.clone(), target.port).await
     });

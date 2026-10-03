@@ -51,7 +51,8 @@ pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Resu
         .wait_for(&request.name, OPERATION_PATIENCE)
         .await?;
     let new_volumes = volumes::preflight(state, &request).await?;
-    let (service, domains, attached) = save_config(state, request, new_volumes).await?;
+    let (service, previous_settings, domains, attached) =
+        save_config(state, request, new_volumes).await?;
     state.domains_changed.notify_one();
 
     let resolved = references::resolve_for(state, &service.name).await?;
@@ -78,6 +79,7 @@ pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Resu
     };
     if let Err(err) = launch_all(state, &service, &deployment, &env).await {
         recreate::restore(state, &stopped).await;
+        restore_settings(state, previous_settings).await;
         tracing::warn!(service = %service.name, deployment = %deployment.id, error = %err, "deploy failed");
         let id = deployment.id;
         state
@@ -137,17 +139,33 @@ async fn launch_all(
     first_error.map_or(Ok(()), Err)
 }
 
+// a failed deploy must not leave its image, port, command or limits for the next one to inherit
+async fn restore_settings(state: &AppState, previous: Option<Service>) {
+    let Some(previous) = previous else {
+        return;
+    };
+    let name = previous.name.clone();
+    let restored = state
+        .db
+        .call(move |store| store.restore_settings(&previous))
+        .await;
+    if let Err(err) = restored {
+        tracing::error!(service = %name, error = %err, "could not restore service settings");
+    }
+}
+
 async fn save_config(
     state: &AppState,
     request: DeployRequest,
     new_volumes: Vec<VolumeSpec>,
-) -> Result<(Service, Vec<Hostname>, Vec<Volume>)> {
+) -> Result<(Service, Option<Service>, Vec<Hostname>, Vec<Volume>)> {
     let environment_id = state.environment_id;
     state
         .db
         .call(move |store| {
             store.transaction(|store| {
-                let service = match store.service_by_name(environment_id, &request.name)? {
+                let previous = store.service_by_name(environment_id, &request.name)?;
+                let service = match previous.clone() {
                     Some(existing) => {
                         store.update_service(existing.id, &request.image, request.port)?;
                         Service {
@@ -213,7 +231,7 @@ async fn save_config(
                     .map(|d| d.hostname)
                     .collect();
                 let attached = store.list_volumes(service.id)?;
-                Ok((service, domains, attached))
+                Ok((service, previous, domains, attached))
             })
         })
         .await

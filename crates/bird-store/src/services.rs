@@ -86,6 +86,30 @@ impl Store {
         expect_changed(changed, "service")
     }
 
+    // puts back what a deploy changed, so a failed deploy leaves no settings behind
+    pub fn restore_settings(&self, service: &Service) -> Result<()> {
+        let command = service
+            .command
+            .as_ref()
+            .map(|command| serde_json::to_string(command.args()))
+            .transpose()
+            .map_err(Error::Encode)?;
+        let changed = self.execute(
+            "UPDATE services SET image = ?2, port = ?3, health = ?4, command = ?5,
+             memory_mb = ?6, cpu_millicores = ?7 WHERE id = ?1",
+            params![
+                service.id.to_string(),
+                service.image.as_str(),
+                service.port.get(),
+                service.health.as_str(),
+                command,
+                service.memory.mebibytes(),
+                service.cpus.millicores()
+            ],
+        )?;
+        expect_changed(changed, "service")
+    }
+
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
@@ -222,6 +246,19 @@ mod tests {
             store.service(service.id).unwrap().unwrap().health,
             HealthCheck::Tcp
         );
+    }
+
+    #[test]
+    fn restores_settings() {
+        let (store, service) = setup();
+        let command = bird_core::Command::try_from(vec!["sh".to_owned()]).unwrap();
+        store.set_command(service.id, &command).unwrap();
+        store.set_health(service.id, HealthCheck::Tcp).unwrap();
+        store
+            .update_service(service.id, &"x:1".parse().unwrap(), service.port)
+            .unwrap();
+        store.restore_settings(&service).unwrap();
+        assert_eq!(store.service(service.id).unwrap(), Some(service));
     }
 
     #[test]
