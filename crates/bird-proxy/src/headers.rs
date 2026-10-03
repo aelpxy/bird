@@ -20,6 +20,10 @@ const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host")
 const X_FORWARDED_PROTO: HeaderName = HeaderName::from_static("x-forwarded-proto");
 
 pub(crate) fn strip_hop_by_hop(headers: &mut HeaderMap) {
+    // one cheap pass instead of seven hashed removals, since these headers are rarely present
+    if !headers.keys().any(|name| HOP_BY_HOP.contains(name)) {
+        return;
+    }
     let listed: Vec<HeaderName> = headers
         .get_all(CONNECTION)
         .iter()
@@ -35,16 +39,20 @@ pub(crate) fn strip_hop_by_hop(headers: &mut HeaderMap) {
     }
 }
 
+pub(crate) fn forwarded_for(client_ip: IpAddr) -> Option<HeaderValue> {
+    HeaderValue::try_from(client_ip.to_string()).ok()
+}
+
 // we are the edge, so client-supplied forwarding headers are untrusted and replaced
 pub(crate) fn set_forwarded(
     headers: &mut HeaderMap,
-    client_ip: IpAddr,
+    forwarded_for: Option<HeaderValue>,
     original_host: Option<HeaderValue>,
 ) {
     headers.remove(FORWARDED);
-    match HeaderValue::try_from(client_ip.to_string()) {
-        Ok(value) => headers.insert(X_FORWARDED_FOR, value),
-        Err(_) => headers.remove(X_FORWARDED_FOR),
+    match forwarded_for {
+        Some(value) => headers.insert(X_FORWARDED_FOR, value),
+        None => headers.remove(X_FORWARDED_FOR),
     };
     headers.insert(X_FORWARDED_PROTO, HeaderValue::from_static("http"));
     match original_host {
@@ -71,6 +79,15 @@ mod tests {
     }
 
     #[test]
+    fn leaves_clean_headers_untouched() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-keep", HeaderValue::from_static("1"));
+        headers.insert(hyper::header::ACCEPT, HeaderValue::from_static("*/*"));
+        strip_hop_by_hop(&mut headers);
+        assert_eq!(headers.len(), 2);
+    }
+
+    #[test]
     fn replaces_spoofed_forwarding_headers() {
         let mut headers = HeaderMap::new();
         headers.insert(X_FORWARDED_FOR, HeaderValue::from_static("6.6.6.6"));
@@ -78,7 +95,7 @@ mod tests {
         headers.insert(X_FORWARDED_HOST, HeaderValue::from_static("evil"));
         set_forwarded(
             &mut headers,
-            "10.0.0.1".parse().unwrap(),
+            forwarded_for("10.0.0.1".parse().unwrap()),
             Some(HeaderValue::from_static("web.localhost")),
         );
         assert_eq!(headers[X_FORWARDED_FOR], "10.0.0.1");

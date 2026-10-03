@@ -21,7 +21,7 @@ impl Default for ProxyConfig {
             connect_timeout: Duration::from_secs(5),
             response_timeout: Duration::from_secs(60),
             pool_idle_timeout: Duration::from_secs(90),
-            pool_max_idle_per_host: 32,
+            pool_max_idle_per_host: usize::MAX,
             shutdown_grace: Duration::from_secs(30),
         }
     }

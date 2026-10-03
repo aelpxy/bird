@@ -12,6 +12,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use crate::forward::Forwarder;
+use crate::headers::forwarded_for;
 use crate::{ProxyConfig, Routes};
 
 const ACCEPT_ERROR_BACKOFF: Duration = Duration::from_millis(100);
@@ -64,9 +65,11 @@ impl Proxy {
         permit: OwnedSemaphorePermit,
     ) {
         let forwarder = Arc::clone(&self.forwarder);
+        let forwarded_for = forwarded_for(client_addr.ip());
         let service = service_fn(move |request| {
             let forwarder = Arc::clone(&forwarder);
-            async move { Ok::<_, Infallible>(forwarder.handle(request, client_addr).await) }
+            let forwarded_for = forwarded_for.clone();
+            async move { Ok::<_, Infallible>(forwarder.handle(request, forwarded_for).await) }
         });
         let connection = http1::Builder::new()
             .timer(TokioTimer::new())

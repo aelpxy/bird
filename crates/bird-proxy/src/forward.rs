@@ -1,9 +1,8 @@
-use std::net::SocketAddr;
 use std::time::Duration;
 
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::header::HOST;
+use hyper::header::{HOST, HeaderValue};
 use hyper::http::uri::{Authority, PathAndQuery, Scheme};
 use hyper::{Request, Response, StatusCode, Uri, Version};
 use hyper_util::client::legacy::Client;
@@ -43,7 +42,7 @@ impl Forwarder {
     pub(crate) async fn handle(
         &self,
         mut request: Request<Incoming>,
-        client_addr: SocketAddr,
+        forwarded_for: Option<HeaderValue>,
     ) -> Response<ProxyBody> {
         let Some(host) = request_host(&request) else {
             return error_response(StatusCode::BAD_REQUEST, "missing or invalid host\n");
@@ -68,7 +67,7 @@ impl Forwarder {
         *request.uri_mut() = uri;
         *request.version_mut() = Version::HTTP_11;
         strip_hop_by_hop(request.headers_mut());
-        set_forwarded(request.headers_mut(), client_addr.ip(), original_host);
+        set_forwarded(request.headers_mut(), forwarded_for, original_host);
 
         let method = request.method().clone();
         match tokio::time::timeout(self.response_timeout, self.client.request(request)).await {
