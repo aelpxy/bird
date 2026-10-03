@@ -5,7 +5,8 @@ mod remove;
 use std::collections::BTreeMap;
 
 use bird_api::{DeployRequest, DeployResponse};
-use bird_core::{DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service};
+use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service};
+use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
 pub(crate) use machine::{destroy_container, launch, set_state};
@@ -49,13 +50,15 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
         .await?;
     tracing::info!(service = %service.name, deployment = %deployment.id, image = %deployment.image, "deploying");
 
-    if let Err(err) = machine::launch(state, &service, &deployment, env).await {
+    if let Err(err) = launch_all(state, &service, &deployment, &env).await {
         tracing::warn!(service = %service.name, deployment = %deployment.id, error = %err, "deploy failed");
         let id = deployment.id;
         state
             .db
             .call(move |store| store.set_deployment_status(id, DeploymentStatus::Failed))
             .await?;
+        // machines that did start belong to a failed deployment now, the supervisor retires them
+        state.reconcile_now.notify_one();
         return Err(err);
     }
 
@@ -76,6 +79,32 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
         image: deployment.image,
         domains,
     })
+}
+
+async fn launch_all(
+    state: &AppState,
+    service: &Service,
+    deployment: &Deployment,
+    env: &BTreeMap<EnvKey, String>,
+) -> Result<()> {
+    let mut launches = JoinSet::new();
+    for _ in 0..service.replicas.get() {
+        let (state, service, deployment, env) = (
+            state.clone(),
+            service.clone(),
+            deployment.clone(),
+            env.clone(),
+        );
+        launches.spawn(async move { machine::launch(&state, &service, &deployment, env).await });
+    }
+    let mut first_error = None;
+    while let Some(joined) = launches.join_next().await {
+        let result = joined.unwrap_or_else(|err| Err(std::io::Error::other(err).into()));
+        if let Err(err) = result {
+            first_error.get_or_insert(err);
+        }
+    }
+    first_error.map_or(Ok(()), Err)
 }
 
 async fn save_config(

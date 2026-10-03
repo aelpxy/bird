@@ -3,13 +3,14 @@ mod deploy;
 mod domains;
 mod error;
 mod logs;
+mod scale;
 mod services;
 mod variables;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::middleware;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 
 use crate::state::AppState;
 use crate::token::ApiToken;
@@ -30,6 +31,7 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
             delete(domains::remove),
         )
         .route("/v1/services/{name}/logs", get(logs::tail))
+        .route("/v1/services/{name}/scale", put(scale::update))
         .route(
             "/v1/services/{name}/variables",
             get(variables::list).patch(variables::update),

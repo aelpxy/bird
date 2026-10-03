@@ -30,7 +30,7 @@ fn row(service: &ServiceSummary) -> [String; 5] {
                 .count();
             (
                 deployment.status.to_string(),
-                format!("{running}/{}", deployment.machines.len()),
+                format!("{running}/{}", service.replicas),
             )
         }
         None => ("not deployed".to_owned(), "0/0".to_owned()),

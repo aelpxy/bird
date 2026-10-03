@@ -84,6 +84,17 @@ impl ApiClient {
         serde_json::from_slice(&body).context("birdd sent an unexpected response")
     }
 
+    pub(crate) async fn put<B: Serialize>(
+        &self,
+        path: &str,
+        payload: &B,
+        timeout: Duration,
+    ) -> Result<()> {
+        let payload = serde_json::to_vec(payload)?;
+        self.send(Method::PUT, path, Some(payload), timeout).await?;
+        Ok(())
+    }
+
     pub(crate) async fn delete(&self, path: &str, timeout: Duration) -> Result<()> {
         self.send(Method::DELETE, path, None, timeout).await?;
         Ok(())

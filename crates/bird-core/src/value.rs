@@ -16,6 +16,8 @@ pub enum ValidationError {
     Image(String),
     #[error("invalid port {0}: must be 1-65535")]
     Port(u16),
+    #[error("invalid replica count: use 1-32 machines")]
+    Replicas(u8),
     #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]
     EnvKey(String),
 }
