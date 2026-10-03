@@ -1,6 +1,13 @@
 use std::collections::BTreeMap;
 
-use bird_core::{DeploymentId, MachineId, Service};
+use bird_core::{DeploymentId, EnvironmentId, MachineId, Service};
+
+pub(crate) const MACHINE: &str = "bird.machine";
+const ENVIRONMENT: &str = "bird.environment-id";
+
+pub(crate) fn environment_filter(environment: EnvironmentId) -> String {
+    format!("{ENVIRONMENT}={environment}")
+}
 
 pub(crate) fn for_machine(
     service: &Service,
@@ -12,6 +19,7 @@ pub(crate) fn for_machine(
         ("bird.service".to_owned(), service.name.to_string()),
         ("bird.service-id".to_owned(), service.id.to_string()),
         ("bird.deployment".to_owned(), deployment.to_string()),
-        ("bird.machine".to_owned(), machine.to_string()),
+        (ENVIRONMENT.to_owned(), service.environment_id.to_string()),
+        (MACHINE.to_owned(), machine.to_string()),
     ])
 }

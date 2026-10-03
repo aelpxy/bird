@@ -9,6 +9,7 @@ mod routes;
 mod rows;
 mod services;
 mod store;
+mod supervision;
 #[cfg(test)]
 mod testing;
 mod variables;
@@ -16,3 +17,4 @@ mod variables;
 pub use error::{Error, Result};
 pub use routes::RouteEntry;
 pub use store::Store;
+pub use supervision::Interrupted;

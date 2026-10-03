@@ -76,18 +76,6 @@ impl Store {
             rows::machine,
         )
     }
-
-    pub fn list_live_machines(&self) -> Result<Vec<Machine>> {
-        self.query_all(
-            "SELECT id, deployment_id, container_id, address, state, created_at, updated_at
-             FROM machines WHERE state IN (?1, ?2) ORDER BY id",
-            params![
-                MachineState::Starting.as_str(),
-                MachineState::Running.as_str()
-            ],
-            rows::machine,
-        )
-    }
 }
 
 #[cfg(test)]
@@ -117,27 +105,6 @@ mod tests {
         assert_eq!(machines[0].address, Some(address));
         assert_eq!(machines[0].state, MachineState::Running);
         assert_eq!(store.list_service_machines(service.id).unwrap(), machines);
-    }
-
-    #[test]
-    fn lists_only_live_machines() {
-        let (store, service) = setup();
-        let deployment = store.create_deployment(&service).unwrap();
-        let running = store.create_machine(deployment.id).unwrap();
-        let failed = store.create_machine(deployment.id).unwrap();
-        store
-            .set_machine_state(running.id, MachineState::Running)
-            .unwrap();
-        store
-            .set_machine_state(failed.id, MachineState::Failed)
-            .unwrap();
-        let live: Vec<_> = store
-            .list_live_machines()
-            .unwrap()
-            .into_iter()
-            .map(|m| m.id)
-            .collect();
-        assert_eq!(live, vec![running.id]);
     }
 
     #[test]

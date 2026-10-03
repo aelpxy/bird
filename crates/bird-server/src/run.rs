@@ -11,8 +11,9 @@ use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
 use crate::state::AppState;
+use crate::supervisor::{self, Supervisor};
 use crate::token::ApiToken;
-use crate::{Config, Result, api, reconcile, routing};
+use crate::{Config, Result, api};
 
 const DEFAULT_PROJECT: &str = "default";
 const DEFAULT_ENVIRONMENT: &str = "production";
@@ -42,8 +43,9 @@ pub async fn run(config: Config) -> Result<()> {
         network: Arc::from(config.network.as_str()),
         deploys: DeployGuard::default(),
     };
-    reconcile::run(&state).await;
-    routing::refresh(&state).await?;
+    supervisor::recover_interrupted(&state).await?;
+    let mut supervisor = Supervisor::new(state.clone());
+    supervisor.sweep().await;
 
     let api_listener = TcpListener::bind(config.api_addr).await?;
     let proxy_listener = TcpListener::bind(config.proxy_addr).await?;
@@ -65,7 +67,11 @@ pub async fn run(config: Config) -> Result<()> {
     let api = axum::serve(api_listener, api::router(state, token))
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
-    let ((), api_result) = tokio::join!(proxy.serve(proxy_listener, shutdown.wait()), api);
+    let ((), api_result, ()) = tokio::join!(
+        proxy.serve(proxy_listener, shutdown.wait()),
+        api,
+        supervisor.run(shutdown.wait())
+    );
     api_result?;
     tracing::info!("birdd stopped");
     Ok(())

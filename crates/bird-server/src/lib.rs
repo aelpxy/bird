@@ -5,11 +5,11 @@ mod deploy;
 mod error;
 mod health;
 mod labels;
-mod reconcile;
 mod routing;
 mod run;
 mod shutdown;
 mod state;
+mod supervisor;
 mod token;
 
 pub use config::Config;

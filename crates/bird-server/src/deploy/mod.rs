@@ -8,7 +8,7 @@ use bird_api::{DeployRequest, DeployResponse};
 use bird_core::{DeploymentStatus, EnvKey, Hostname, Service};
 
 pub(crate) use guard::DeployGuard;
-pub(crate) use machine::set_state;
+pub(crate) use machine::{destroy_container, launch, set_state};
 pub(crate) use remove::remove_service;
 
 use crate::state::AppState;

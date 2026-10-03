@@ -2,7 +2,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use bird_api::{DeploymentSummary, MachineSummary, ServiceSummary};
-use bird_core::Name;
+use bird_core::{MachineState, Name};
 use bird_store::Store;
 
 use crate::state::AppState;
@@ -52,6 +52,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
     let machines = store
         .list_machines(active.id)?
         .into_iter()
+        .filter(|m| m.state != MachineState::Destroyed)
         .map(|m| MachineSummary {
             id: m.id,
             state: m.state,
