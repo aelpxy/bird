@@ -1,11 +1,13 @@
 mod deploy;
 mod domains;
 mod env;
+mod history;
 mod list;
 mod login;
 mod logs;
 mod remove;
 mod scale;
+mod table;
 
 use anyhow::Result;
 
@@ -20,6 +22,10 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::List => list::run(&connect(args.api)?).await,
         Command::Remove { name } => remove::run(&connect(args.api)?, &name).await,
         Command::Domains { command } => domains::run(&connect(args.api)?, command).await,
+        Command::History { name } => history::history(&connect(args.api)?, &name).await,
+        Command::Rollback { name, deployment } => {
+            history::rollback(&connect(args.api)?, &name, deployment).await
+        }
         Command::Scale { name, replicas } => scale::run(&connect(args.api)?, &name, replicas).await,
         Command::Env { command } => env::run(&connect(args.api)?, command).await,
         Command::Logs { name, tail } => logs::run(&connect(args.api)?, &name, tail).await,

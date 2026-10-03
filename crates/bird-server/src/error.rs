@@ -34,6 +34,15 @@ pub enum Error {
     DbClosed,
     #[error("service {0} not found")]
     ServiceNotFound(Name),
+    #[error("deployment {0} not found")]
+    DeploymentNotFound(bird_core::DeploymentId),
+    #[error("deployment {id} is {status}, only active or superseded deployments can be restored")]
+    NotRollbackable {
+        id: bird_core::DeploymentId,
+        status: bird_core::DeploymentStatus,
+    },
+    #[error("service {0} has no earlier deployment to roll back to")]
+    NoRollbackTarget(Name),
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
     #[error("domain {0} is not attached to this service")]
