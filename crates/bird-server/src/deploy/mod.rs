@@ -5,7 +5,7 @@ mod remove;
 use std::collections::BTreeMap;
 
 use bird_api::{DeployRequest, DeployResponse};
-use bird_core::{DeploymentStatus, EnvKey, Hostname, Service};
+use bird_core::{DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service};
 
 pub(crate) use guard::DeployGuard;
 pub(crate) use machine::{destroy_container, launch, set_state};
@@ -13,6 +13,22 @@ pub(crate) use remove::remove_service;
 
 use crate::state::AppState;
 use crate::{Result, routing};
+
+pub(crate) async fn redeploy(
+    state: &AppState,
+    service: &Service,
+    image: ImageRef,
+    port: Port,
+) -> Result<DeployResponse> {
+    let request = DeployRequest {
+        name: service.name.clone(),
+        image,
+        port,
+        domain: None,
+        env: BTreeMap::new(),
+    };
+    deploy(state, request).await
+}
 
 pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<DeployResponse> {
     let _ticket = state.deploys.begin(&request.name)?;
