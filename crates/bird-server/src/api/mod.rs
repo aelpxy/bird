@@ -56,6 +56,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(logs::logs))
         .routes(routes!(scale::update))
         .routes(routes!(variables::list, variables::update))
+        .routes(routes!(variables::get))
         .routes(routes!(registries::list))
         .routes(routes!(registries::login, registries::logout))
         .routes(routes!(templates::list))

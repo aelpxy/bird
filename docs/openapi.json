@@ -935,6 +935,67 @@
         }
       }
     },
+    "/v1/services/{name}/variables/{key}": {
+      "get": {
+        "tags": [
+          "variables"
+        ],
+        "summary": "Reveal one variable",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Variable name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored value and what the running deployment received",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariableValue"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or variable not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/templates": {
       "get": {
         "tags": [
@@ -1577,6 +1638,29 @@
             "items": {
               "$ref": "#/components/schemas/EnvKey"
             }
+          }
+        }
+      },
+      "VariableValue": {
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "deployed": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What the running deployment received after resolving references, if it has this variable"
+          },
+          "key": {
+            "$ref": "#/components/schemas/EnvKey"
+          },
+          "value": {
+            "type": "string",
+            "description": "The stored value, references and all"
           }
         }
       },

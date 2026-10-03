@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bird_core::Name;
+use bird_core::{EnvKey, Name};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -73,6 +73,8 @@ pub enum Error {
     ServiceExists(Name),
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
+    #[error("{0} has no variable {1}")]
+    VariableNotFound(Name, EnvKey),
     #[error("domain {0} is not attached to this service")]
     DomainNotFound(bird_core::Hostname),
     #[error("service {0} has no running machines")]

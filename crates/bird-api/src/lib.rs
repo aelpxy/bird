@@ -19,5 +19,5 @@ pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
-pub use variables::{UpdateVariables, VariablesResponse};
+pub use variables::{UpdateVariables, VariableValue, VariablesResponse};
 pub use volumes::VolumeSpec;

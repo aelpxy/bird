@@ -38,6 +38,7 @@ fn status_of(error: &Error) -> StatusCode {
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
         | Error::DomainNotFound(_)
+        | Error::VariableNotFound(..)
         | Error::DeploymentNotFound(_)
         | Error::NoRollbackTarget(_)
         | Error::TemplateNotFound(_)

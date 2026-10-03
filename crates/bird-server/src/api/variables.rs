@@ -1,11 +1,13 @@
+use std::collections::BTreeMap;
+
 use axum::Json;
 use axum::extract::{Path, State};
 use bird_api::ErrorBody;
-use bird_api::{UpdateVariables, VariablesResponse};
+use bird_api::{UpdateVariables, VariableValue, VariablesResponse};
 use bird_core::{EnvKey, Name, ServiceId};
 
 use crate::state::AppState;
-use crate::{Result, deploy, secrets};
+use crate::{Error, Result, deploy, secrets};
 
 /// List variable names
 #[utoipa::path(get, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
@@ -15,6 +17,38 @@ pub(crate) async fn list(
 ) -> Result<Json<Vec<EnvKey>>> {
     let service = state.service(&name).await?;
     Ok(Json(keys(&state, service.id).await?))
+}
+
+/// Reveal one variable
+#[utoipa::path(get, path = "/v1/services/{name}/variables/{key}", tag = "variables", params(("name" = String, Path, description = "Service name"), ("key" = String, Path, description = "Variable name")), responses((status = 200, description = "The stored value and what the running deployment received", body = VariableValue), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or variable not found", body = ErrorBody)))]
+pub(crate) async fn get(
+    State(state): State<AppState>,
+    Path((name, key)): Path<(Name, EnvKey)>,
+) -> Result<Json<VariableValue>> {
+    let service = state.service(&name).await?;
+    let service_id = service.id;
+    let (stored, deployed) = state
+        .db
+        .call(move |store| {
+            let stored = store.list_variables(service_id)?;
+            let deployed = match store.active_deployment(service_id)? {
+                Some(active) => store.deployment_variables(active.id)?,
+                None => BTreeMap::new(),
+            };
+            Ok((stored, deployed))
+        })
+        .await?;
+    let value = stored
+        .into_iter()
+        .find(|v| v.key == key)
+        .map(|v| v.value)
+        .ok_or_else(|| Error::VariableNotFound(name, key.clone()))?;
+    tracing::info!(service = %service.name, %key, "variable revealed");
+    Ok(Json(VariableValue {
+        deployed: deployed.get(&key).cloned(),
+        key,
+        value,
+    }))
 }
 
 /// Set or unset variables
