@@ -34,6 +34,10 @@ pub enum Error {
     DbClosed,
     #[error("service {0} not found")]
     ServiceNotFound(Name),
+    #[error("domain {0} is already routed to a service")]
+    DomainTaken(bird_core::Hostname),
+    #[error("domain {0} is not attached to this service")]
+    DomainNotFound(bird_core::Hostname),
     #[error("service {0} has no running machines")]
     NoMachines(Name),
     #[error("another operation on {0} is in progress, try again shortly")]

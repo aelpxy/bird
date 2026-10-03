@@ -1,4 +1,5 @@
 mod deploy;
+mod domains;
 mod env;
 mod list;
 mod login;
@@ -17,6 +18,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Deploy(deploy) => deploy::run(&connect(args.api)?, deploy).await,
         Command::List => list::run(&connect(args.api)?).await,
         Command::Remove { name } => remove::run(&connect(args.api)?, &name).await,
+        Command::Domains { command } => domains::run(&connect(args.api)?, command).await,
         Command::Env { command } => env::run(&connect(args.api)?, command).await,
         Command::Logs { name, tail } => logs::run(&connect(args.api)?, &name, tail).await,
     }

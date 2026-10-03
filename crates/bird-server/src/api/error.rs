@@ -25,9 +25,12 @@ impl IntoResponse for Error {
 
 fn status_of(error: &Error) -> StatusCode {
     match error {
-        Error::Store(bird_store::Error::AlreadyExists(_)) | Error::Busy(_) => StatusCode::CONFLICT,
+        Error::Store(bird_store::Error::AlreadyExists(_))
+        | Error::Busy(_)
+        | Error::DomainTaken(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
+        | Error::DomainNotFound(_)
         | Error::NoMachines(_) => StatusCode::NOT_FOUND,
         Error::Podman(bird_podman::Error::Pull { .. }) | Error::Validation(_) => {
             StatusCode::BAD_REQUEST

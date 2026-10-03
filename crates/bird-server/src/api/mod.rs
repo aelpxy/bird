@@ -1,5 +1,6 @@
 mod auth;
 mod deploy;
+mod domains;
 mod error;
 mod logs;
 mod services;
@@ -20,6 +21,14 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
         .route("/v1/deploy", post(deploy::create))
         .route("/v1/services", get(services::list))
         .route("/v1/services/{name}", delete(services::remove))
+        .route(
+            "/v1/services/{name}/domains",
+            get(domains::list).post(domains::add),
+        )
+        .route(
+            "/v1/services/{name}/domains/{hostname}",
+            delete(domains::remove),
+        )
         .route("/v1/services/{name}/logs", get(logs::tail))
         .route(
             "/v1/services/{name}/variables",
