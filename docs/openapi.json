@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "bird",
-    "description": "Deploy and run containers on a bird server. Every endpoint except this document needs the API token from birdd's data directory as a bearer token.",
+    "description": "Deploy and run containers on a bird server. Browse these docs at /docs. Every endpoint except the docs needs the API token from birdd's data directory as a bearer token.",
     "license": {
       "name": "Apache-2.0",
       "identifier": "Apache-2.0"
@@ -15,6 +15,7 @@
         "tags": [
           "deployments"
         ],
+        "summary": "Deploy an image, creating the service on first deploy",
         "operationId": "create",
         "requestBody": {
           "content": {
@@ -85,6 +86,7 @@
         "tags": [
           "services"
         ],
+        "summary": "List services",
         "operationId": "list",
         "responses": {
           "200": {
@@ -118,6 +120,7 @@
         "tags": [
           "services"
         ],
+        "summary": "Remove a service and its machines",
         "operationId": "remove",
         "parameters": [
           {
@@ -172,6 +175,7 @@
         "tags": [
           "deployments"
         ],
+        "summary": "List deployments",
         "operationId": "list",
         "parameters": [
           {
@@ -226,6 +230,7 @@
         "tags": [
           "domains"
         ],
+        "summary": "List domains of a service",
         "operationId": "list",
         "parameters": [
           {
@@ -278,6 +283,7 @@
         "tags": [
           "domains"
         ],
+        "summary": "Route a domain to a service",
         "operationId": "add",
         "parameters": [
           {
@@ -362,6 +368,7 @@
         "tags": [
           "domains"
         ],
+        "summary": "Stop routing a domain to a service",
         "operationId": "remove",
         "parameters": [
           {
@@ -415,6 +422,7 @@
         "tags": [
           "logs"
         ],
+        "summary": "Read or follow logs",
         "operationId": "logs",
         "parameters": [
           {
@@ -489,6 +497,7 @@
         "tags": [
           "deployments"
         ],
+        "summary": "Roll back to an earlier deployment",
         "operationId": "rollback",
         "parameters": [
           {
@@ -570,6 +579,7 @@
         "tags": [
           "services"
         ],
+        "summary": "Set the number of machines",
         "operationId": "update",
         "parameters": [
           {
@@ -634,6 +644,7 @@
         "tags": [
           "variables"
         ],
+        "summary": "List variable names",
         "operationId": "list",
         "parameters": [
           {
@@ -686,6 +697,7 @@
         "tags": [
           "variables"
         ],
+        "summary": "Set or unset variables",
         "operationId": "update",
         "parameters": [
           {

@@ -7,6 +7,7 @@ use bird_core::{EnvKey, Name, ServiceId};
 use crate::state::AppState;
 use crate::{Result, deploy};
 
+/// List variable names
 #[utoipa::path(get, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
@@ -16,6 +17,7 @@ pub(crate) async fn list(
     Ok(Json(keys(&state, service.id).await?))
 }
 
+/// Set or unset variables
 #[utoipa::path(patch, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), request_body = UpdateVariables, responses((status = 200, description = "Variables updated, redeployed unless deploy is false", body = VariablesResponse), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
 pub(crate) async fn update(
     State(state): State<AppState>,

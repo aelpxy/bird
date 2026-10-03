@@ -31,6 +31,7 @@ pub(crate) struct LogsQuery {
     follow: bool,
 }
 
+/// Read or follow logs
 #[utoipa::path(get, path = "/v1/services/{name}/logs", tag = "logs", params(("name" = String, Path, description = "Service name"), LogsQuery), responses((status = 200, description = "Recent log lines; with follow=true a newline-delimited JSON stream of LogEntry", body = Vec<LogEntry>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn logs(
     State(state): State<AppState>,
