@@ -66,6 +66,25 @@ async fn strips_hop_by_hop_and_spoofed_headers() {
 }
 
 #[tokio::test]
+async fn forwards_the_host_it_routed_on() {
+    let upstream = spawn_upstream("a").await;
+    let proxy = spawn_proxy(
+        routes(&[("web.localhost", &[upstream])]),
+        ProxyConfig::default(),
+    )
+    .await;
+
+    let request = Request::get("http://web.localhost/x")
+        .header("host", "evil.example")
+        .body(Full::new(Bytes::new()))
+        .unwrap();
+    let body = send(proxy.addr, request).await.text();
+    assert!(body.contains("host=web.localhost\n"), "{body}");
+    assert!(body.contains("xfh=web.localhost\n"), "{body}");
+    proxy.stop().await;
+}
+
+#[tokio::test]
 async fn balances_across_machines() {
     let a = spawn_upstream("a").await;
     let b = spawn_upstream("b").await;
@@ -131,5 +150,21 @@ async fn streams_large_bodies() {
     assert_eq!(reply.body.len(), payload.len());
     let first_mismatch = reply.body.iter().zip(&payload).position(|(a, b)| a != b);
     assert_eq!(first_mismatch, None);
+    proxy.stop().await;
+}
+
+#[tokio::test]
+async fn marks_responses_as_served_by_bird() {
+    let upstream = spawn_upstream("a").await;
+    let proxy = spawn_proxy(
+        routes(&[("web.localhost", &[upstream])]),
+        ProxyConfig::default(),
+    )
+    .await;
+    for path in ["/", "/branded"] {
+        let reply = get(proxy.addr, "web.localhost", path).await;
+        let values: Vec<_> = reply.headers.get_all("x-server").iter().collect();
+        assert_eq!(values, ["Bird"], "{path}");
+    }
     proxy.stop().await;
 }

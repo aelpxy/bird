@@ -1,7 +1,10 @@
+use std::sync::Arc;
+
 use hyper::header::{CONNECTION, HeaderValue, UPGRADE};
 use hyper::upgrade::OnUpgrade;
 use hyper::{HeaderMap, Request, Version};
 use hyper_util::rt::TokioIo;
+use tokio::sync::OwnedSemaphorePermit;
 
 use crate::drain::Watch;
 
@@ -27,8 +30,15 @@ pub(crate) fn restore_headers(headers: &mut HeaderMap, protocol: HeaderValue) {
     headers.insert(UPGRADE, protocol);
 }
 
-pub(crate) fn spawn_tunnel(downstream: OnUpgrade, upstream: OnUpgrade, mut watch: Watch) {
+// the tunnel outlives its http connection, so it keeps that connection's slot until it closes
+pub(crate) fn spawn_tunnel(
+    downstream: OnUpgrade,
+    upstream: OnUpgrade,
+    mut watch: Watch,
+    permit: Arc<OwnedSemaphorePermit>,
+) {
     tokio::spawn(async move {
+        let _permit = permit;
         let (downstream, upstream) = match tokio::try_join!(downstream, upstream) {
             Ok(pair) => pair,
             Err(err) => {

@@ -1,18 +1,22 @@
+use std::error::Error;
+use std::sync::Arc;
 use std::time::Duration;
 
-use http_body_util::BodyExt;
-use hyper::body::Incoming;
+use http_body_util::{BodyExt, LengthLimitError, Limited};
+use hyper::body::{Body, Incoming};
 use hyper::header::{HOST, HeaderValue, UPGRADE};
 use hyper::http::uri::{self, Authority, PathAndQuery};
 use hyper::{Request, Response, StatusCode, Uri, Version};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioTimer};
+use tokio::sync::OwnedSemaphorePermit;
 
 use crate::body::{ProxyBody, error_response};
 use crate::drain::Watch;
 use crate::headers::{set_forwarded, strip_hop_by_hop};
-use crate::host::request_host;
+use crate::host::{host_from_target, request_host};
+use crate::idle::IdleTimeout;
 use crate::routes::{RouteError, Routes};
 use crate::scheme::Scheme;
 use crate::{ProxyConfig, Tls, edge, upgrade};
@@ -20,8 +24,10 @@ use crate::{ProxyConfig, Tls, edge, upgrade};
 pub(crate) struct Forwarder {
     routes: Routes,
     tls: Option<Tls>,
-    client: Client<HttpConnector, Incoming>,
+    client: Client<HttpConnector, Limited<Incoming>>,
     response_timeout: Duration,
+    body_idle_timeout: Duration,
+    max_body_bytes: usize,
 }
 
 impl Forwarder {
@@ -40,6 +46,8 @@ impl Forwarder {
             tls,
             client,
             response_timeout: config.response_timeout,
+            body_idle_timeout: config.body_idle_timeout,
+            max_body_bytes: config.max_body_bytes,
         }
     }
 
@@ -49,7 +57,9 @@ impl Forwarder {
         forwarded_for: Option<HeaderValue>,
         scheme: Scheme,
         watch: &Watch,
+        permit: &Arc<OwnedSemaphorePermit>,
     ) -> Response<ProxyBody> {
+        host_from_target(&mut request);
         let http_edge = self.tls.as_ref().filter(|_| scheme == Scheme::Http);
         if let Some(response) =
             http_edge.and_then(|tls| edge::acme_response(&tls.challenges, request.uri().path()))
@@ -75,6 +85,11 @@ impl Forwarder {
             }
         };
 
+        if usize::try_from(request.body().size_hint().lower())
+            .map_or(true, |length| length > self.max_body_bytes)
+        {
+            return error_response(StatusCode::PAYLOAD_TOO_LARGE, "request body too large\n");
+        }
         let Some(uri) = upstream_uri(request.uri(), upstream.clone()) else {
             return error_response(StatusCode::BAD_REQUEST, "invalid request target\n");
         };
@@ -90,6 +105,7 @@ impl Forwarder {
         set_forwarded(request.headers_mut(), forwarded_for, original_host, scheme);
 
         let method = request.method().clone();
+        let request = request.map(|body| Limited::new(body, self.max_body_bytes));
         match tokio::time::timeout(self.response_timeout, self.client.request(request)).await {
             Ok(Ok(mut response)) => {
                 let tunnel =
@@ -97,7 +113,7 @@ impl Forwarder {
                 let accepted = response.headers().get(UPGRADE).cloned();
                 if let Some(downstream) = tunnel {
                     let upstream = hyper::upgrade::on(&mut response);
-                    upgrade::spawn_tunnel(downstream, upstream, watch.clone());
+                    upgrade::spawn_tunnel(downstream, upstream, watch.clone(), Arc::clone(permit));
                 }
                 let (mut parts, body) = response.into_parts();
                 strip_hop_by_hop(&mut parts.headers);
@@ -107,7 +123,13 @@ impl Forwarder {
                     upgrade::restore_headers(&mut parts.headers, accepted);
                 }
                 tracing::debug!(%method, %upstream, status = %parts.status, "proxied");
-                Response::from_parts(parts, body.boxed())
+                Response::from_parts(
+                    parts,
+                    IdleTimeout::new(body, self.body_idle_timeout).boxed(),
+                )
+            }
+            Ok(Err(err)) if exceeded_body_limit(&err) => {
+                error_response(StatusCode::PAYLOAD_TOO_LARGE, "request body too large\n")
             }
             Ok(Err(err)) => {
                 tracing::warn!(%method, %upstream, error = %err, "upstream request failed");
@@ -119,6 +141,10 @@ impl Forwarder {
             }
         }
     }
+}
+
+fn exceeded_body_limit(err: &(dyn Error + 'static)) -> bool {
+    std::iter::successors(Some(err), |&err| err.source()).any(<dyn Error>::is::<LengthLimitError>)
 }
 
 fn upstream_uri(original: &Uri, upstream: Authority) -> Option<Uri> {

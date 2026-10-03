@@ -4,7 +4,8 @@ use http_body_util::{BodyExt, Full};
 use hyper::header::{CONTENT_TYPE, HeaderValue};
 use hyper::{Response, StatusCode};
 
-pub(crate) type ProxyBody = BoxBody<Bytes, hyper::Error>;
+pub(crate) type BoxError = Box<dyn std::error::Error + Send + Sync>;
+pub(crate) type ProxyBody = BoxBody<Bytes, BoxError>;
 
 pub(crate) fn error_response(status: StatusCode, message: &'static str) -> Response<ProxyBody> {
     text_response(status, Bytes::from_static(message.as_bytes()))
