@@ -16,6 +16,8 @@ After=podman.socket
 Type=exec
 ExecStart=%h/.local/bin/birdd
 Environment=RUST_LOG=info
+# every proxied request holds two sockets; the default soft limit of 1024 starves clients under load
+LimitNOFILE=524288
 Restart=on-failure
 RestartSec=2
 TimeoutStopSec=45
