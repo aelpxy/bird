@@ -14,6 +14,7 @@ mod secrets;
 mod shutdown;
 mod state;
 mod supervisor;
+mod templates;
 mod tls;
 mod token;
 

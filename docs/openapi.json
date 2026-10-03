@@ -802,6 +802,122 @@
           }
         }
       }
+    },
+    "/v1/templates": {
+      "get": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "List built-in templates",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "Templates that can create a service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/templates/{template}/deploy": {
+      "post": {
+        "tags": [
+          "templates"
+        ],
+        "summary": "Create a service from a template",
+        "operationId": "deploy",
+        "parameters": [
+          {
+            "name": "template",
+            "in": "path",
+            "description": "Template name, like postgres",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFromTemplate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Service created and running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateDeployResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A service with that name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The service did not become healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -821,6 +937,22 @@
         "type": "array",
         "items": {
           "type": "string"
+        }
+      },
+      "CreateFromTemplate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Name",
+                "description": "Service name, defaults to the template name"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
         }
       },
       "DeployRequest": {
@@ -1169,6 +1301,47 @@
           }
         }
       },
+      "TemplateDeployResponse": {
+        "type": "object",
+        "required": [
+          "deployment"
+        ],
+        "properties": {
+          "connection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EnvKey",
+                "description": "Variable other services reference to connect, like `DATABASE_URL`"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/DeployResponse"
+          }
+        }
+      },
+      "TemplateSummary": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "image"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "$ref": "#/components/schemas/ImageRef"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        }
+      },
       "UpdateVariables": {
         "type": "object",
         "properties": {
@@ -1264,6 +1437,10 @@
     {
       "name": "logs",
       "description": "Recent and live logs of running machines"
+    },
+    {
+      "name": "templates",
+      "description": "Ready-made services such as Postgres and Valkey"
     }
   ]
 }

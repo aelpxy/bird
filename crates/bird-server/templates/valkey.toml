@@ -1,0 +1,15 @@
+name = "valkey"
+description = "Valkey 9.2 (Alpine) with a password, append-only persistence and a volume"
+image = "docker.io/valkey/valkey:9.2-alpine"
+port = 6379
+health = "tcp"
+connection = "VALKEY_URL"
+command = ["sh", "-c", "exec valkey-server --requirepass \"$VALKEY_PASSWORD\" --appendonly yes"]
+
+[[volumes]]
+name = "data"
+path = "/data"
+
+[variables]
+VALKEY_PASSWORD = "${{secret}}"
+VALKEY_URL = "redis://default:${{VALKEY_PASSWORD}}@{service}.internal:6379"

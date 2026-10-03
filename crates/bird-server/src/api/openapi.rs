@@ -18,6 +18,7 @@ const TOKEN_SCHEME: &str = "api_token";
         (name = "domains", description = "Route domains to services"),
         (name = "variables", description = "Environment variables, versioned with each deployment"),
         (name = "logs", description = "Recent and live logs of running machines"),
+        (name = "templates", description = "Ready-made services such as Postgres and Valkey"),
     )
 )]
 struct ApiDoc;
@@ -92,6 +93,8 @@ mod tests {
             "/v1/services/{name}/logs",
             "/v1/services/{name}/scale",
             "/v1/services/{name}/variables",
+            "/v1/templates",
+            "/v1/templates/{template}/deploy",
         ] {
             assert!(
                 spec.paths.paths.contains_key(path),
