@@ -6,6 +6,9 @@
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now podman.socket birdd
 #   loginctl enable-linger "$USER"   # start at boot without a login session
+#
+# birdd listens on ports 80 and 443; let unprivileged users bind them (once, as root):
+#   echo net.ipv4.ip_unprivileged_port_start=80 > /etc/sysctl.d/90-bird.conf && sysctl --system
 
 [Unit]
 Description=bird daemon (API, proxy and machine supervisor)

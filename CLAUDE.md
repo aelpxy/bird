@@ -13,10 +13,10 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Build: `cargo build --release` produces `target/release/birdd` (daemon) and `target/release/bird` (CLI).
 * Check: `cargo fmt --check && cargo clippy --all-targets -- -D warnings`
 * Test: `cargo test -- --include-ignored` (ignored tests need a running Podman socket).
-* Run: `birdd --data-dir <dir>`, then `bird login 127.0.0.1:7070 < <dir>/api-token` once, then `bird deploy <name> <image> --domain <host>`; the proxy listens on `:8080`, the API on `127.0.0.1:7070`.
+* Run: `birdd --data-dir <dir>`, then `bird login 127.0.0.1:7070 < <dir>/api-token` once, then `bird deploy <name> <image> --domain <host>`; the proxy listens on `:80` (HTTPS `:443`), the API on `127.0.0.1:7070`. Rootless needs `net.ipv4.ip_unprivileged_port_start=80`, or pass `--proxy-addr`/`--https-addr` with high ports.
 * Service: `contrib/systemd/birdd.service` is a rootless user unit; install steps are in its header.
-* TLS: `birdd --acme-directory <url> [--acme-email <email>]` enables automatic certificates (HTTP-01 on the proxy port, HTTPS on `--https-addr`, default `:8443`). Without it no HTTPS listener runs. `*.localhost` domains never get certificates.
-* Testing TLS without a public IP: run Let's Encrypt's Pebble and pebble-challtestsrv in Podman, point challtestsrv at `host.containers.internal`, set Pebble's `httpPort` to the proxy port, and pass `--acme-ca-cert pebble.minica.pem`.
+* TLS: `birdd --acme-directory <url> [--acme-email <email>]` enables automatic certificates (HTTP-01 on the proxy port, HTTPS on `--https-addr`, default `:443`). Without it no HTTPS listener runs. `*.localhost` domains never get certificates.
+* Testing TLS without a public IP: run Let's Encrypt's Pebble and pebble-challtestsrv in Podman, point challtestsrv at `host.containers.internal`, set Pebble's `httpPort` to the proxy port (80), and pass `--acme-ca-cert pebble.minica.pem`.
 * Benchmark the proxy with `crates/bird-proxy/examples/bench.rs` (usage in its header); compare proxied against direct before claiming a speedup.
 
 ## Architecture
