@@ -44,6 +44,9 @@ pub(crate) async fn redeploy(
 }
 
 pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Result<DeployResponse> {
+    if !request.image.has_lowercase_repository() {
+        return Err(bird_core::ValidationError::Image(request.image.to_string()).into());
+    }
     request.env = secrets::expand_all(request.env)?;
     references::check_change(state, &request.name, &request.env, &[]).await?;
     let _ticket = state

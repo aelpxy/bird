@@ -61,6 +61,8 @@ pub enum Error {
         was: String,
         now: String,
     },
+    #[error("{} is referenced by the variables of {}, remove those references first", .0, .1.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    HasDependents(Name, Vec<Name>),
     #[error("{0} has volumes, pass --purge to delete them together with their data")]
     HasVolumes(Name),
     #[error("volume {0} no longer exists in podman, its data was removed outside bird")]
@@ -75,6 +77,8 @@ pub enum Error {
     DomainTaken(bird_core::Hostname),
     #[error("{0} has no variable {1}")]
     VariableNotFound(Name, EnvKey),
+    #[error("registry username and password must not be empty")]
+    EmptyCredentials,
     #[error("domain {0} is not attached to this service")]
     DomainNotFound(bird_core::Hostname),
     #[error("service {0} has no running machines")]

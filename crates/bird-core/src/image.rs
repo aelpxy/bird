@@ -16,6 +16,23 @@ impl ImageRef {
         }
     }
 
+    // registries reject uppercase repositories, while hosts and tags may use any case
+    #[must_use]
+    pub fn has_lowercase_repository(&self) -> bool {
+        let raw = self.as_str();
+        let name = raw.split_once('@').map_or(raw, |(name, _)| name);
+        let name_start = name.rfind('/').map_or(0, |i| i + 1);
+        let name = match name.get(name_start..).and_then(|last| last.rfind(':')) {
+            Some(colon) => name.get(..name_start + colon).unwrap_or(name),
+            None => name,
+        };
+        let path = match name.split_once('/') {
+            Some((first, rest)) if first.contains(['.', ':']) || first == "localhost" => rest,
+            _ => name,
+        };
+        !path.bytes().any(|c| c.is_ascii_uppercase())
+    }
+
     #[must_use]
     pub fn registry(&self) -> String {
         let qualified = self.qualified();
@@ -95,6 +112,17 @@ mod tests {
         assert_eq!(qualify("ghcr.io/org/app"), "ghcr.io/org/app");
         assert_eq!(qualify("localhost/app"), "localhost/app");
         assert_eq!(qualify("registry:5000/app"), "registry:5000/app");
+    }
+
+    #[test]
+    fn checks_repository_case() {
+        let lowercase = |raw: &str| raw.parse::<ImageRef>().unwrap().has_lowercase_repository();
+        assert!(lowercase("nginx:1"));
+        assert!(lowercase("Registry.Example.com:5000/app:V1-RC"));
+        assert!(lowercase("localhost:5000/app@sha256:abc"));
+        assert!(!lowercase("UPPER/Case"));
+        assert!(!lowercase("Nginx:1"));
+        assert!(!lowercase("ghcr.io/Org/app"));
     }
 
     #[test]

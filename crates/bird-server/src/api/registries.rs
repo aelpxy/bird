@@ -4,8 +4,8 @@ use axum::http::StatusCode;
 use bird_api::{ErrorBody, RegistryLogin, RegistrySummary};
 use bird_core::{Registry, RegistryHost};
 
-use crate::Result;
 use crate::state::AppState;
+use crate::{Error, Result};
 
 /// List registries bird can pull private images from
 #[utoipa::path(get, path = "/v1/registries", tag = "registries", responses((status = 200, description = "Registries with stored credentials; passwords are never returned", body = Vec<RegistrySummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
@@ -30,6 +30,9 @@ pub(crate) async fn login(
     Path(host): Path<RegistryHost>,
     Json(login): Json<RegistryLogin>,
 ) -> Result<StatusCode> {
+    if login.username.trim().is_empty() || login.password.is_empty() {
+        return Err(Error::EmptyCredentials);
+    }
     let registry = Registry {
         host: host.clone(),
         username: login.username,
