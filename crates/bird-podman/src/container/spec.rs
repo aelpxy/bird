@@ -4,7 +4,6 @@ use bird_core::EnvKey;
 use serde::Serialize;
 
 use super::ContainerSpec;
-use crate::image::qualify_image;
 
 #[derive(Serialize)]
 pub(super) struct SpecGenerator<'a> {
@@ -14,6 +13,8 @@ pub(super) struct SpecGenerator<'a> {
     labels: &'a BTreeMap<String, String>,
     netns: Namespace,
     networks: BTreeMap<&'a str, NetworkOptions<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    volumes: Vec<NamedVolume<'a>>,
     portmappings: [PortMapping; 1],
     restart_policy: &'static str,
 }
@@ -30,6 +31,13 @@ struct NetworkOptions<'a> {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "PascalCase")]
+struct NamedVolume<'a> {
+    name: &'a str,
+    dest: &'a str,
+}
+
+#[derive(Serialize)]
 struct PortMapping {
     container_port: u16,
     host_ip: &'static str,
@@ -40,7 +48,7 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
     fn from(spec: &'a ContainerSpec) -> Self {
         Self {
             name: &spec.name,
-            image: qualify_image(&spec.image),
+            image: spec.image.qualified(),
             env: &spec.env,
             labels: &spec.labels,
             netns: Namespace { nsmode: "bridge" },
@@ -50,6 +58,14 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                     aliases: &spec.aliases,
                 },
             )]),
+            volumes: spec
+                .mounts
+                .iter()
+                .map(|mount| NamedVolume {
+                    name: &mount.volume,
+                    dest: &mount.destination,
+                })
+                .collect(),
             portmappings: [PortMapping {
                 container_port: spec.port.get(),
                 host_ip: "127.0.0.1",
@@ -73,6 +89,7 @@ mod tests {
             port: Port::try_from(80).unwrap(),
             network: "bird".to_owned(),
             aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
+            mounts: Vec::new(),
             env: BTreeMap::from([("A".parse().unwrap(), "b".to_owned())]),
             labels: BTreeMap::new(),
         }
@@ -94,9 +111,24 @@ mod tests {
     }
 
     #[test]
+    fn mounts_named_volumes() {
+        let mut spec = spec(&[]);
+        spec.mounts.push(crate::VolumeMount {
+            volume: "bird-volume-1".to_owned(),
+            destination: "/var/lib/postgresql".to_owned(),
+        });
+        let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
+        assert_eq!(
+            json["volumes"],
+            serde_json::json!([{"Name": "bird-volume-1", "Dest": "/var/lib/postgresql"}])
+        );
+    }
+
+    #[test]
     fn omits_empty_aliases() {
         let spec = spec(&[]);
         let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
         assert_eq!(json["networks"]["bird"], serde_json::json!({}));
+        assert!(json.get("volumes").is_none());
     }
 }

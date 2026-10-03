@@ -4,6 +4,8 @@ use bird_core::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::VolumeSpec;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ServiceSummary {
@@ -13,6 +15,7 @@ pub struct ServiceSummary {
     pub replicas: Replicas,
     pub health: HealthCheck,
     pub domains: Vec<Hostname>,
+    pub volumes: Vec<VolumeSpec>,
     pub deployment: Option<DeploymentSummary>,
 }
 

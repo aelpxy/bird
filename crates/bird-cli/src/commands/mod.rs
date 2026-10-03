@@ -20,7 +20,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Login { api } => login::run(api).await,
         Command::Deploy(deploy) => deploy::run(&connect(args.api)?, deploy).await,
         Command::List => list::run(&connect(args.api)?).await,
-        Command::Remove { name } => remove::run(&connect(args.api)?, &name).await,
+        Command::Remove { name, purge } => remove::run(&connect(args.api)?, &name, purge).await,
         Command::Domains { command } => domains::run(&connect(args.api)?, command).await,
         Command::History { name } => history::history(&connect(args.api)?, &name).await,
         Command::Rollback { name, deployment } => {

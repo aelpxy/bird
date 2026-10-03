@@ -1,11 +1,13 @@
 mod guard;
 mod machine;
+mod recreate;
 mod remove;
+mod volumes;
 
 use std::collections::BTreeMap;
 
-use bird_api::{DeployRequest, DeployResponse};
-use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service};
+use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
+use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service, Volume};
 use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
@@ -13,6 +15,9 @@ pub(crate) use machine::{destroy_container, launch, set_state};
 pub(crate) use remove::remove_service;
 
 use crate::state::AppState;
+
+// longer than a supervisor replacement takes, so user requests rarely see a busy error
+pub(crate) const OPERATION_PATIENCE: std::time::Duration = std::time::Duration::from_mins(2);
 use crate::{Result, routing};
 
 pub(crate) async fn redeploy(
@@ -28,13 +33,19 @@ pub(crate) async fn redeploy(
         domain: None,
         env: BTreeMap::new(),
         health: None,
+        volumes: Vec::new(),
+        allow_image_change: false,
     };
     deploy(state, request).await
 }
 
 pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<DeployResponse> {
-    let _ticket = state.deploys.begin(&request.name)?;
-    let (service, domains) = save_config(state, request).await?;
+    let _ticket = state
+        .deploys
+        .wait_for(&request.name, OPERATION_PATIENCE)
+        .await?;
+    let new_volumes = volumes::preflight(state, &request).await?;
+    let (service, domains, attached) = save_config(state, request, new_volumes).await?;
     state.domains_changed.notify_one();
 
     let snapshot = service.clone();
@@ -52,7 +63,13 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
         .await?;
     tracing::info!(service = %service.name, deployment = %deployment.id, image = %deployment.image, "deploying");
 
+    let stopped = if attached.is_empty() {
+        Vec::new()
+    } else {
+        recreate::stop_previous(state, previous.as_ref()).await
+    };
     if let Err(err) = launch_all(state, &service, &deployment, &env).await {
+        recreate::restore(state, &stopped).await;
         tracing::warn!(service = %service.name, deployment = %deployment.id, error = %err, "deploy failed");
         let id = deployment.id;
         state
@@ -73,6 +90,7 @@ pub(crate) async fn deploy(state: &AppState, request: DeployRequest) -> Result<D
     if let Some(previous) = previous {
         machine::retire(state, previous.id).await;
     }
+    volumes::record_lineage(state, &attached, &deployment.image).await;
     tracing::info!(service = %service.name, deployment = %deployment.id, "deployed");
 
     Ok(DeployResponse {
@@ -109,7 +127,11 @@ async fn launch_all(
     first_error.map_or(Ok(()), Err)
 }
 
-async fn save_config(state: &AppState, request: DeployRequest) -> Result<(Service, Vec<Hostname>)> {
+async fn save_config(
+    state: &AppState,
+    request: DeployRequest,
+    new_volumes: Vec<VolumeSpec>,
+) -> Result<(Service, Vec<Hostname>, Vec<Volume>)> {
     let environment_id = state.environment_id;
     state
         .db
@@ -150,12 +172,16 @@ async fn save_config(state: &AppState, request: DeployRequest) -> Result<(Servic
                 for (key, value) in &request.env {
                     store.set_variable(service.id, key, value)?;
                 }
+                for volume in &new_volumes {
+                    store.create_volume(service.id, &volume.name, &volume.path)?;
+                }
                 let domains = store
                     .list_domains(service.id)?
                     .into_iter()
                     .map(|d| d.hostname)
                     .collect();
-                Ok((service, domains))
+                let attached = store.list_volumes(service.id)?;
+                Ok((service, domains, attached))
             })
         })
         .await

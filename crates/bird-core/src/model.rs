@@ -5,8 +5,8 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId, Name, Port, ProjectId,
-    Replicas, ServiceId,
+    DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId, MountPath, Name, Port,
+    ProjectId, Replicas, ServiceId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -129,6 +129,23 @@ pub struct Domain {
     pub hostname: Hostname,
     pub service_id: ServiceId,
     pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Volume {
+    pub id: VolumeId,
+    pub service_id: ServiceId,
+    pub name: Name,
+    pub mount_path: MountPath,
+    pub lineage: Option<String>,
+    pub created_at: i64,
+}
+
+impl Volume {
+    #[must_use]
+    pub fn podman_name(&self) -> String {
+        format!("bird-volume-{}", self.id)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

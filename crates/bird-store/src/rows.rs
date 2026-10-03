@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bird_core::{
     Certificate, Deployment, Domain, EnvKey, Environment, Hostname, Machine, MachineId, Port,
-    Project, Replicas, Service, Variable,
+    Project, Replicas, Service, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -139,5 +139,16 @@ pub(crate) fn certificate(row: &Row<'_>) -> rusqlite::Result<Certificate> {
         chain_pem: row.get(1)?,
         key_pem: row.get(2)?,
         not_after: row.get(3)?,
+    })
+}
+
+pub(crate) fn volume(row: &Row<'_>) -> rusqlite::Result<Volume> {
+    Ok(Volume {
+        id: parse(row, 0)?,
+        service_id: parse(row, 1)?,
+        name: parse(row, 2)?,
+        mount_path: parse(row, 3)?,
+        lineage: row.get(4)?,
+        created_at: row.get(5)?,
     })
 }

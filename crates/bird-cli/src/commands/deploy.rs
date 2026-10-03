@@ -18,6 +18,8 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
         domain: args.domain,
         env: args.env.into_iter().collect(),
         health: args.health,
+        volumes: args.volumes,
+        allow_image_change: args.allow_image_change,
     };
     let response: DeployResponse = client.post("/v1/deploy", &request, DEPLOY_TIMEOUT).await?;
     print_deployed(&response);

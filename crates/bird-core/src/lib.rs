@@ -1,12 +1,14 @@
 mod id;
+mod image;
 mod model;
 mod replicas;
 mod value;
 
-pub use id::{DeploymentId, EnvironmentId, MachineId, ProjectId, ServiceId};
+pub use id::{DeploymentId, EnvironmentId, MachineId, ProjectId, ServiceId, VolumeId};
+pub use image::ImageLineage;
 pub use model::{
     Certificate, Deployment, DeploymentStatus, Domain, Environment, HealthCheck, Machine,
-    MachineState, ParseEnumError, Project, Service, Variable,
+    MachineState, ParseEnumError, Project, Service, Variable, Volume,
 };
 pub use replicas::Replicas;
-pub use value::{EnvKey, Hostname, ImageRef, Name, Port, ValidationError};
+pub use value::{EnvKey, Hostname, ImageRef, MountPath, Name, Port, ValidationError};

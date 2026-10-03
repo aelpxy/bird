@@ -131,11 +131,24 @@ impl Supervisor {
         }
         let desired = usize::from(service.replicas.get());
         if let Some(missing) = desired.checked_sub(available.len()).filter(|n| *n > 0) {
+            if self.uses_volumes(service).await {
+                // a failed machine may still hold the volume, so it has to go before its replacement
+                cleanup::retire_machines(&self.state).await;
+            }
             self.replace(service, deployment, missing).await;
         } else if let Some(extra) = available.get(desired..) {
             scale::retire_extra(&self.state, service, extra).await;
         }
         Ok(())
+    }
+
+    async fn uses_volumes(&self, service: &Service) -> bool {
+        let service_id = service.id;
+        self.state
+            .db
+            .call(move |store| store.list_volumes(service_id))
+            .await
+            .is_ok_and(|volumes| !volumes.is_empty())
     }
 
     async fn replace(&mut self, service: &Service, deployment: &Deployment, missing: usize) {

@@ -28,7 +28,12 @@ fn status_of(error: &Error) -> StatusCode {
         Error::Store(bird_store::Error::AlreadyExists(_))
         | Error::Busy(_)
         | Error::DomainTaken(_)
-        | Error::NotRollbackable { .. } => StatusCode::CONFLICT,
+        | Error::NotRollbackable { .. }
+        | Error::VolumeNeedsSingleMachine(_)
+        | Error::VolumePathChanged { .. }
+        | Error::ImageChange { .. }
+        | Error::HasVolumes(_)
+        | Error::VolumeMissing(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
         | Error::DomainNotFound(_)

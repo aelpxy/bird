@@ -6,6 +6,7 @@ mod logs;
 mod scale;
 mod services;
 mod variables;
+mod volumes;
 
 pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};
@@ -15,3 +16,4 @@ pub use logs::{LogEntry, LogStream};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};
 pub use variables::{UpdateVariables, VariablesResponse};
+pub use volumes::VolumeSpec;

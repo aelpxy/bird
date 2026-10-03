@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::time::Duration;
 
 use bird_core::{ImageRef, Port};
-use bird_podman::{ContainerSpec, ContainerState, Error, LogStream, Podman, default_socket};
+use bird_podman::{
+    ContainerSpec, ContainerState, Error, LogStream, Podman, VolumeMount, default_socket,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -42,6 +44,9 @@ async fn container_lifecycle() {
     let name = format!("bird-test-{}", std::process::id());
     podman.ensure_network(&name).await.unwrap();
     podman.ensure_network(&name).await.unwrap();
+    let labels = BTreeMap::from([("bird.test".to_owned(), name.clone())]);
+    podman.ensure_volume(&name, &labels).await.unwrap();
+    podman.ensure_volume(&name, &labels).await.unwrap();
 
     let image: ImageRef = IMAGE.parse().unwrap();
     assert_ne!(podman.pull_image(&image).await.unwrap(), "");
@@ -54,6 +59,10 @@ async fn container_lifecycle() {
         port,
         network: name.clone(),
         aliases: vec!["lifecycle-alias".to_owned()],
+        mounts: vec![VolumeMount {
+            volume: name.clone(),
+            destination: "/usr/share/nginx/html/data".to_owned(),
+        }],
         env: BTreeMap::from([("GREETING".parse().unwrap(), "hi".to_owned())]),
         labels: BTreeMap::from([("bird.test".to_owned(), name.clone())]),
     };
@@ -113,6 +122,11 @@ async fn container_lifecycle() {
         Error::NotFound { .. }
     ));
     podman.remove_network(&name).await.unwrap();
+    podman.remove_volume(&name).await.unwrap();
+    assert!(matches!(
+        podman.remove_volume(&name).await.unwrap_err(),
+        Error::NotFound { .. }
+    ));
 }
 
 #[tokio::test]
