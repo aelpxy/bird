@@ -44,6 +44,19 @@ impl Podman {
         })
     }
 
+    pub async fn remove_image(&self, image: &ImageRef) -> Result<()> {
+        let reference = image.qualified();
+        let response = self
+            .send(
+                Method::DELETE,
+                &format!("/images/{}", encode(&reference)),
+                PULL_TIMEOUT,
+            )
+            .await?;
+        check(response, || format!("image {reference}"))?;
+        Ok(())
+    }
+
     pub async fn image_exists(&self, image: &ImageRef) -> Result<bool> {
         let reference = image.qualified();
         let response = self

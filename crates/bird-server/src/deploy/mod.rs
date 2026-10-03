@@ -19,7 +19,7 @@ use crate::state::AppState;
 
 // longer than a supervisor replacement takes, so user requests rarely see a busy error
 pub(crate) const OPERATION_PATIENCE: std::time::Duration = std::time::Duration::from_mins(2);
-use crate::{Result, routing, secrets};
+use crate::{Result, images, routing, secrets};
 
 pub(crate) async fn redeploy(
     state: &AppState,
@@ -99,6 +99,8 @@ pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Resu
         machine::retire(state, previous.id).await;
     }
     volumes::record_lineage(state, &attached, &deployment.image).await;
+    let cleanup = state.clone();
+    tokio::spawn(async move { images::remove_unused(&cleanup).await });
     tracing::info!(service = %service.name, deployment = %deployment.id, "deployed");
 
     Ok(DeployResponse {

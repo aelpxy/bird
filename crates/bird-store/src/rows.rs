@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use bird_core::{
-    Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname, Machine, MachineId,
-    Port, Project, Replicas, Service, Variable, Volume,
+    Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname, ImageRef, Machine,
+    MachineId, Port, Project, Replicas, Service, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -153,6 +153,10 @@ pub(crate) fn route(row: &Row<'_>) -> rusqlite::Result<RouteEntry> {
 }
 
 pub(crate) fn key_value(row: &Row<'_>) -> rusqlite::Result<(EnvKey, String)> {
+    Ok((parse(row, 0)?, row.get(1)?))
+}
+
+pub(crate) fn image_use(row: &Row<'_>) -> rusqlite::Result<(ImageRef, bool)> {
     Ok((parse(row, 0)?, row.get(1)?))
 }
 

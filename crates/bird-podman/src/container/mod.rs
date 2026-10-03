@@ -129,7 +129,8 @@ impl Podman {
     }
 
     pub async fn remove_container(&self, id: &str) -> Result<()> {
-        let path = format!("/containers/{}?force=true", encode(id));
+        // volumes=true also drops anonymous volumes from VOLUME lines in the image; named ones stay
+        let path = format!("/containers/{}?force=true&volumes=true", encode(id));
         let response = self.send(Method::DELETE, &path, DEFAULT_TIMEOUT).await?;
         check(response, || format!("container {id}"))?;
         Ok(())

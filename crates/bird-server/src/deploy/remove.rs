@@ -1,7 +1,7 @@
 use bird_core::Name;
 
 use crate::state::AppState;
-use crate::{Error, Result, routing};
+use crate::{Error, Result, images, routing};
 
 use super::OPERATION_PATIENCE;
 use super::machine::destroy_container;
@@ -24,6 +24,13 @@ pub(crate) async fn remove_service(state: &AppState, name: Name, purge: bool) ->
     if !volumes.is_empty() && !purge {
         return Err(Error::HasVolumes(name));
     }
+    let images: Vec<_> = state
+        .db
+        .call(move |store| store.list_deployments(service_id))
+        .await?
+        .into_iter()
+        .map(|d| d.image)
+        .collect();
     let machines = state
         .db
         .call(move |store| store.list_service_machines(service_id))
@@ -46,6 +53,7 @@ pub(crate) async fn remove_service(state: &AppState, name: Name, purge: bool) ->
         .await?;
     routing::refresh(state).await?;
     state.domains_changed.notify_one();
+    images::remove_orphaned(state, images).await;
     tracing::info!(service = %name, "service removed");
     Ok(())
 }

@@ -6,6 +6,7 @@ mod db;
 mod deploy;
 mod error;
 mod health;
+mod images;
 mod labels;
 mod listen;
 mod routing;
