@@ -1,8 +1,9 @@
 use crate::error::check;
+use crate::follow::LogFollower;
 use crate::query::encode;
-use crate::{Podman, Result};
+use crate::{Error, Podman, Result};
 
-const FRAME_HEADER_LEN: usize = 8;
+pub(crate) const FRAME_HEADER_LEN: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogStream {
@@ -26,6 +27,23 @@ impl Podman {
         let body = check(response, || format!("container {id}"))?;
         Ok(demux(&body))
     }
+
+    pub async fn follow_logs(&self, id: &str, tail: u32) -> Result<LogFollower> {
+        let path = format!(
+            "/containers/{}/logs?follow=true&stdout=true&stderr=true&tail={tail}",
+            encode(id)
+        );
+        let streamed = self.stream(&path).await?;
+        let status = streamed.status;
+        if !status.is_success() {
+            check(streamed.collect().await?, || format!("container {id}"))?;
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: "unexpected response to a log stream".to_owned(),
+            });
+        }
+        Ok(LogFollower::new(streamed.body))
+    }
 }
 
 fn demux(body: &[u8]) -> Vec<LogLine> {
@@ -42,7 +60,7 @@ fn demux(body: &[u8]) -> Vec<LogLine> {
     lines
 }
 
-fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
+pub(crate) fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
     let (header, body) = buf.split_first_chunk::<FRAME_HEADER_LEN>()?;
     let [kind, 0, 0, 0, a, b, c, d] = *header else {
         return None;
@@ -57,7 +75,7 @@ fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
     Some((stream, payload, next))
 }
 
-fn push_lines(lines: &mut Vec<LogLine>, stream: LogStream, payload: &[u8]) {
+pub(crate) fn push_lines(lines: &mut impl Extend<LogLine>, stream: LogStream, payload: &[u8]) {
     lines.extend(
         String::from_utf8_lossy(payload)
             .lines()

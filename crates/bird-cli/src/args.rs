@@ -48,6 +48,9 @@ pub(crate) enum Command {
         name: Name,
         #[arg(long, default_value_t = 100)]
         tail: u32,
+        /// Keep streaming new lines until interrupted
+        #[arg(short, long)]
+        follow: bool,
     },
 }
 

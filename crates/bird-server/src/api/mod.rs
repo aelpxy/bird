@@ -6,6 +6,7 @@ mod error;
 mod logs;
 mod scale;
 mod services;
+mod stream;
 mod variables;
 
 use axum::Router;
@@ -33,7 +34,7 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
         )
         .route("/v1/services/{name}/deployments", get(deployments::list))
         .route("/v1/services/{name}/rollback", post(deployments::rollback))
-        .route("/v1/services/{name}/logs", get(logs::tail))
+        .route("/v1/services/{name}/logs", get(logs::logs))
         .route("/v1/services/{name}/scale", put(scale::update))
         .route(
             "/v1/services/{name}/variables",

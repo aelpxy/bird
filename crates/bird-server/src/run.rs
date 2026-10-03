@@ -36,6 +36,7 @@ pub async fn run(config: Config) -> Result<()> {
     podman.ping().await?;
     podman.ensure_network(&config.network).await?;
 
+    let shutdown = Shutdown::on_signal();
     let state = AppState {
         db,
         podman,
@@ -45,6 +46,7 @@ pub async fn run(config: Config) -> Result<()> {
         deploys: DeployGuard::default(),
         domains_changed: Arc::new(Notify::new()),
         reconcile_now: Arc::new(Notify::new()),
+        shutdown: shutdown.clone(),
     };
     supervisor::recover_interrupted(&state).await?;
     let mut supervisor = Supervisor::new(state.clone());
@@ -88,7 +90,6 @@ pub async fn run(config: Config) -> Result<()> {
         tracing::warn!(api = %config.api_addr, "api is reachable over the network without tls, the token is sent in plain text");
     }
 
-    let shutdown = Shutdown::on_signal();
     let proxy = Proxy::new(
         state.routes.clone(),
         ProxyConfig::default(),
