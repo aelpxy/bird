@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-use bird_core::{Deployment, DeploymentId, EnvKey, MachineId, MachineState, Port, Service};
+use bird_core::{
+    Deployment, DeploymentId, EnvKey, HealthCheck, MachineId, MachineState, Port, Service,
+};
 use bird_podman::{ContainerSpec, ContainerState};
 use tokio::time::Instant;
 
@@ -53,7 +55,7 @@ pub(crate) async fn launch(
         })
         .await?;
 
-    match boot(state, &container_id, deployment.port).await {
+    match boot(state, &container_id, deployment.port, service.health).await {
         Ok(address) => {
             state
                 .db
@@ -73,7 +75,12 @@ pub(crate) async fn launch(
     }
 }
 
-async fn boot(state: &AppState, container_id: &str, port: Port) -> Result<SocketAddr> {
+async fn boot(
+    state: &AppState,
+    container_id: &str,
+    port: Port,
+    check: HealthCheck,
+) -> Result<SocketAddr> {
     state.podman.start_container(container_id).await?;
     let info = state.podman.inspect_container(container_id).await?;
     let Some(host_port) = info.host_port(port) else {
@@ -88,17 +95,17 @@ async fn boot(state: &AppState, container_id: &str, port: Port) -> Result<Socket
 
     let deadline = Instant::now() + READY_TIMEOUT;
     loop {
-        if health::responds_to_http(address).await {
+        if health::probe(check, address).await {
             return Ok(address);
         }
         let info = state.podman.inspect_container(container_id).await?;
         if info.state != ContainerState::Running {
-            let reason = "app exited before it started answering http".to_owned();
+            let reason = format!("app exited before it started accepting {check} connections");
             return Err(unhealthy(state, container_id, reason).await);
         }
         if Instant::now() >= deadline {
             let reason = format!(
-                "app did not answer http on port {port} within {}s",
+                "app did not accept {check} connections on port {port} within {}s",
                 READY_TIMEOUT.as_secs()
             );
             return Err(unhealthy(state, container_id, reason).await);

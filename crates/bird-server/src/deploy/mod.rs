@@ -27,6 +27,7 @@ pub(crate) async fn redeploy(
         port,
         domain: None,
         env: BTreeMap::new(),
+        health: None,
     };
     deploy(state, request).await
 }
@@ -129,6 +130,13 @@ async fn save_config(state: &AppState, request: DeployRequest) -> Result<(Servic
                         &request.image,
                         request.port,
                     )?,
+                };
+                let service = match request.health {
+                    Some(health) => {
+                        store.set_health(service.id, health)?;
+                        Service { health, ..service }
+                    }
+                    None => service,
                 };
                 if let Some(domain) = &request.domain {
                     let owned = store

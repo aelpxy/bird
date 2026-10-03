@@ -825,6 +825,16 @@
               "type": "string"
             }
           },
+          "health": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HealthCheck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "image": {
             "$ref": "#/components/schemas/ImageRef"
           },
@@ -951,6 +961,13 @@
           }
         }
       },
+      "HealthCheck": {
+        "type": "string",
+        "enum": [
+          "http",
+          "tcp"
+        ]
+      },
       "Hostname": {
         "type": "string"
       },
@@ -1061,6 +1078,7 @@
           "image",
           "port",
           "replicas",
+          "health",
           "domains"
         ],
         "properties": {
@@ -1079,6 +1097,9 @@
             "items": {
               "$ref": "#/components/schemas/Hostname"
             }
+          },
+          "health": {
+            "$ref": "#/components/schemas/HealthCheck"
           },
           "image": {
             "$ref": "#/components/schemas/ImageRef"

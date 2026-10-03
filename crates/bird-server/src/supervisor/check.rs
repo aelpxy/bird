@@ -33,7 +33,9 @@ pub(super) async fn check_machine(
         .host_port(port)
         .map(|host_port| SocketAddr::from((Ipv4Addr::LOCALHOST, host_port)));
     let responded = match (info.state, address) {
-        (ContainerState::Running, Some(address)) => Some(health::responds_to_http(address).await),
+        (ContainerState::Running, Some(address)) => {
+            Some(health::probe(service.health, address).await)
+        }
         _ => None,
     };
     let previous = strikes.get(&machine.id).copied().unwrap_or(0);

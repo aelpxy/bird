@@ -71,6 +71,7 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         port: port(row, 4)?,
         created_at: row.get(5)?,
         replicas: replicas(row, 6)?,
+        health: parse(row, 7)?,
     })
 }
 

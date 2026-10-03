@@ -61,6 +61,11 @@ string_enum!(DeploymentStatus, "deployment status" {
     Failed => "failed",
 });
 
+string_enum!(HealthCheck, "health check" {
+    Http => "http",
+    Tcp => "tcp",
+});
+
 string_enum!(MachineState, "machine state" {
     Created => "created",
     Starting => "starting",
@@ -94,6 +99,7 @@ pub struct Service {
     pub image: ImageRef,
     pub port: Port,
     pub replicas: Replicas,
+    pub health: HealthCheck,
     pub created_at: i64,
 }
 
