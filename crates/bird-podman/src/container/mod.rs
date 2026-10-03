@@ -19,6 +19,7 @@ use spec::SpecGenerator;
 pub struct ContainerSpec {
     pub name: String,
     pub image: ImageRef,
+    pub command: Option<Vec<String>>,
     pub port: Port,
     pub network: String,
     pub aliases: Vec<String>,

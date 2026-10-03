@@ -39,6 +39,7 @@ pub(crate) async fn launch(
     let spec = ContainerSpec {
         name: format!("bird-{}-{}", service.name, machine.id),
         image: deployment.image.clone(),
+        command: deployment.command.clone().map(Into::into),
         port: deployment.port,
         network: state.network.to_string(),
         aliases: labels::aliases(service),

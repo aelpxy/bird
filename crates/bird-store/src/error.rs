@@ -12,6 +12,8 @@ pub enum Error {
     SchemaTooNew { found: i64, supported: usize },
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
+    #[error("could not encode a stored value: {0}")]
+    Encode(serde_json::Error),
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

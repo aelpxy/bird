@@ -303,6 +303,7 @@ version = "0.1.0"
 dependencies = [
  "bird-core",
  "rusqlite",
+ "serde_json",
  "thiserror",
 ]
 

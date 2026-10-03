@@ -20,6 +20,8 @@ pub enum ValidationError {
         "invalid mount path {0:?}: use an absolute path like /var/lib/postgresql, without .. or spaces"
     )]
     MountPath(String),
+    #[error("invalid command: give a program and up to 63 arguments, without NUL bytes")]
+    Command,
     #[error("invalid replica count: use 1-32 machines")]
     Replicas(u8),
     #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]

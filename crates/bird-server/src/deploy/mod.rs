@@ -34,6 +34,7 @@ pub(crate) async fn redeploy(
         domain: None,
         env: BTreeMap::new(),
         health: None,
+        command: None,
         volumes: Vec::new(),
         allow_image_change: false,
     };
@@ -162,6 +163,16 @@ async fn save_config(
                     Some(health) => {
                         store.set_health(service.id, health)?;
                         Service { health, ..service }
+                    }
+                    None => service,
+                };
+                let service = match &request.command {
+                    Some(command) => {
+                        store.set_command(service.id, command)?;
+                        Service {
+                            command: Some(command.clone()),
+                            ..service
+                        }
                     }
                     None => service,
                 };

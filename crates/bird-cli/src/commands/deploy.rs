@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bird_api::{DeployRequest, DeployResponse};
+use bird_core::Command;
 
 use crate::args::DeployArgs;
 use crate::client::ApiClient;
@@ -10,6 +11,11 @@ use crate::client::ApiClient;
 pub(crate) const DEPLOY_TIMEOUT: Duration = Duration::from_mins(15);
 
 pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
+    let command = if args.command.is_empty() {
+        None
+    } else {
+        Some(Command::try_from(args.command)?)
+    };
     println!("deploying {} ({})...", args.name, args.image);
     let request = DeployRequest {
         name: args.name,
@@ -18,6 +24,7 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
         domain: args.domain,
         env: args.env.into_iter().collect(),
         health: args.health,
+        command,
         volumes: args.volumes,
         allow_image_change: args.allow_image_change,
     };
