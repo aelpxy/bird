@@ -81,6 +81,8 @@ pub enum Error {
     LocalImageMissing(bird_core::ImageRef),
     #[error("build context is larger than {} MiB, exclude more with .dockerignore", .0 / 1024 / 1024)]
     ContextTooLarge(usize),
+    #[error("invalid build args: {0}")]
+    InvalidBuildArgs(String),
     #[error("build failed: {0}")]
     BuildFailed(String),
     #[error("registry username and password must not be empty")]

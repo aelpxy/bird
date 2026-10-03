@@ -159,6 +159,9 @@ pub(crate) struct DeployArgs {
     /// Build the image on the server from this directory's Dockerfile instead of pulling one
     #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = ".")]
     pub(crate) build: Option<PathBuf>,
+    /// Dockerfile ARG as KEY=VALUE for --build or [build], repeatable; never put secrets here
+    #[arg(long = "build-arg", value_parser = parse_env)]
+    pub(crate) build_args: Vec<(EnvKey, String)>,
     /// Service manifest to read instead of ./bird.toml
     #[arg(long, short = 'c')]
     pub(crate) config: Option<PathBuf>,
@@ -184,6 +187,9 @@ pub(crate) struct DeployArgs {
     /// CPU limit per machine in cores, like 0.5 or 2 (new services default to 1)
     #[arg(long)]
     pub(crate) cpus: Option<CpuLimit>,
+    /// Machines to run (new services default to 1)
+    #[arg(long)]
+    pub(crate) replicas: Option<Replicas>,
     /// Run an image whose version or base differs from the one that wrote the volume data
     #[arg(long)]
     pub(crate) allow_image_change: bool,

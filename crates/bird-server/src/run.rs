@@ -5,7 +5,7 @@ use bird_core::{EnvironmentId, Name};
 use bird_podman::{Podman, default_socket};
 use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
 use bird_store::Store;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Semaphore};
 
 use crate::db::Db;
 use crate::deploy::DeployGuard;
@@ -18,6 +18,9 @@ use crate::{Config, Error, Result, api, data_dir, listen};
 
 const DEFAULT_PROJECT: &str = "default";
 const DEFAULT_ENVIRONMENT: &str = "production";
+
+// builds use a lot of cpu and memory, one at a time keeps a small server responsive
+const MAX_CONCURRENT_BUILDS: usize = 1;
 
 pub async fn run(config: Config) -> Result<()> {
     let data_dir = config.data_dir();
@@ -47,6 +50,7 @@ pub async fn run(config: Config) -> Result<()> {
         domains_changed: Arc::new(Notify::new()),
         reconcile_now: Arc::new(Notify::new()),
         shutdown: shutdown.clone(),
+        builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
     };
     supervisor::recover_interrupted(&state).await?;
     let mut supervisor = Supervisor::new(state.clone());

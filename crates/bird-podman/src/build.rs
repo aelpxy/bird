@@ -1,7 +1,7 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 
-use bird_core::ImageRef;
+use bird_core::{EnvKey, ImageRef};
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
@@ -42,16 +42,21 @@ impl Podman {
         context: B,
         tag: &ImageRef,
         dockerfile: &str,
+        args: &BTreeMap<EnvKey, String>,
     ) -> Result<BuildOutput>
     where
         B: hyper::body::Body<Data = Bytes> + Send + 'static,
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     {
-        let path = format!(
+        let mut path = format!(
             "/build?t={}&dockerfile={}&rm=true&layers=true",
             encode(&tag.qualified()),
             encode(dockerfile)
         );
+        if !args.is_empty() {
+            path.push_str("&buildargs=");
+            path.push_str(&encode(&serde_json::to_string(args)?));
+        }
         let streamed = self
             .upload(&path, "application/x-tar", context, UPLOAD_TIMEOUT)
             .await?;

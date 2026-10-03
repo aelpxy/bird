@@ -38,6 +38,7 @@ pub(crate) async fn redeploy(
         memory: None,
         cpus: None,
         volumes: Vec::new(),
+        replicas: None,
         allow_image_change: false,
     };
     deploy(state, request).await
@@ -202,6 +203,16 @@ async fn save_config(
                     }
                 } else {
                     service
+                };
+                let service = match request.replicas {
+                    Some(replicas) => {
+                        store.set_replicas(service.id, replicas)?;
+                        Service {
+                            replicas,
+                            ..service
+                        }
+                    }
+                    None => service,
                 };
                 let service = match &request.command {
                     Some(command) => {

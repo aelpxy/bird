@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use bird_api::{MANIFEST_FILE, Manifest};
+use bird_core::EnvKey;
 
 const SECRET_HINTS: [&str; 5] = ["PASSWORD", "SECRET", "TOKEN", "API_KEY", "PRIVATE_KEY"];
 
@@ -36,9 +37,15 @@ pub(crate) fn load(explicit: Option<&Path>) -> Result<Option<Loaded>> {
 
 // bird.toml is usually committed, so literal secrets in it end up in git history
 fn warn_about_secrets(manifest: &Manifest, path: &Path) {
+    let build_args = manifest.build.iter().flat_map(|build| &build.args);
+    for (key, _) in build_args.filter(|(key, _)| looks_secret(key)) {
+        eprintln!(
+            "warning: build arg {key} in {} looks like a secret, build args stay readable in the image",
+            path.display()
+        );
+    }
     for (key, value) in &manifest.env {
-        let looks_secret = SECRET_HINTS.iter().any(|hint| key.as_str().contains(hint));
-        if looks_secret && !value.is_empty() && !value.contains("${{") {
+        if looks_secret(key) && !value.is_empty() && !value.contains("${{") {
             eprintln!(
                 "warning: {key} in {} looks like a secret, set it with `bird env set {} {key}=...` instead",
                 path.display(),
@@ -46,6 +53,10 @@ fn warn_about_secrets(manifest: &Manifest, path: &Path) {
             );
         }
     }
+}
+
+fn looks_secret(key: &EnvKey) -> bool {
+    SECRET_HINTS.iter().any(|hint| key.as_str().contains(hint))
 }
 
 pub(crate) fn starter(name: &str, image: &str, port: u16) -> String {
@@ -57,12 +68,14 @@ port = {port}
 # health = "http"
 # memory = "512m"
 # cpus = 0.5
+# replicas = 2
 # command = ["./server", "--listen", "0.0.0.0:{port}"]
 
 # build from source on the server instead of pulling image; remove image above to use it
 # [build]
 # context = "."
 # dockerfile = "Dockerfile"
+# args = {{ NODE_ENV = "production" }}
 
 # plain settings and references like ${{{{postgres.DATABASE_URL}}}}; set secrets with `bird env set`
 [env]
@@ -98,6 +111,7 @@ health = "tcp"
 command = ["node", "server.js"]
 memory = "512m"
 cpus = 0.5
+replicas = 3
 [env]
 DATABASE_URL = "${{pg.DATABASE_URL}}"
 [[volumes]]
@@ -114,6 +128,7 @@ path = "/data"
         );
         assert_eq!(request.cpus.map(bird_core::CpuLimit::millicores), Some(500));
         assert_eq!(request.volumes.len(), 1);
+        assert_eq!(request.replicas.map(bird_core::Replicas::get), Some(3));
     }
 
     #[test]
@@ -126,6 +141,8 @@ path = "/data"
             "cpus = 0.01",
             "port = 0",
             "health = \"grpc\"",
+            "replicas = 0",
+            "replicas = 99",
         ] {
             assert!(
                 toml::from_str::<Manifest>(&format!("{base}{bad}\n")).is_err(),

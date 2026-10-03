@@ -339,6 +339,18 @@
                 "null"
               ]
             }
+          },
+          {
+            "name": "args",
+            "in": "path",
+            "description": "Dockerfile ARG values as a JSON object of strings",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         ],
         "requestBody": {
@@ -1378,6 +1390,17 @@
           },
           "port": {
             "$ref": "#/components/schemas/Port"
+          },
+          "replicas": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Replicas",
+                "description": "Machines to run; left out, a new service gets 1 and an existing one keeps its count"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "volumes": {
             "type": "array",
