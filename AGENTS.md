@@ -46,6 +46,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * `bird.toml`: one service per file, parsed by the CLI into `bird_api::Manifest` and sent as a normal deploy; flags override it and repeatable flags add to its lists. Deploying from it only adds variables and domains, it never removes ones set elsewhere. Unknown fields are errors. Secrets stay out of it (`bird env set`).
 * Builds: `[build]` in `bird.toml` or `bird deploy --build [dir]` packs the context as a gzipped tar (trimmed by `.dockerignore`, which podman applies again) and uploads it to `POST /v1/services/{name}/builds`; birdd builds it with podman and streams `BuildEvent`s back. Builds run one at a time (others queue) and take `[build] args` / `--build-arg` as Dockerfile ARGs, which stay readable in the image. Built images are tagged `localhost/bird/<service>:<millis>`, are never pulled, and the last few distinct images per service are kept for rollbacks.
 * Machines run with podman's init as pid 1, so apps that ignore SIGTERM still stop promptly.
+* Proxy: every response it produces carries `x-server: Bird`, replacing the app's and not configurable. Request bodies are capped (`max_body_bytes`, 413), response bodies fail after `body_idle_timeout` without data, and websocket tunnels keep their connection's slot. An absolute request target wins over `Host`, and the app receives that host.
 * Templates: built-in TOML files in `crates/bird-server/templates/` are `bird.toml` manifests plus `description` and `connection`; `{service}` is replaced with the new service name. They are embedded with `include_str!` and checked by tests; pin images to a major (or major.minor) tag.
 * Desired state lives in SQLite; the server reconciles actual state (Podman) toward it. Reconciliation must be idempotent.
 
@@ -60,6 +61,15 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Prefer borrowing over cloning, `&str` over `String` in parameters, iterators over manual loops when clearer.
 * Keep functions small and single-purpose. Keep modules flat until they need structure.
 * Public items need clear names; avoid comments unless the reason is non-obvious, then one line.
+* Make invalid states unrepresentable: `Option`/enums over sentinel values, `NonZero*` over checked zeroes, a `Source::{Image, Build}` enum over two optional fields.
+* Validation in a type's parser applies to rows already stored. Tighten rules for new input at the write path (e.g. `deploy()`), or old data stops loading.
+* Prefer `let ... else` and `?` for early exits; match exhaustively on our own enums instead of `_`, so new variants are caught by the compiler.
+* No `as` casts between numeric types; use `From`/`TryFrom` and decide what overflow means.
+* Pass `&T`/`&[T]`/`impl Trait` in; return owned values or iterators. Take ownership only when storing or moving into a task.
+* Constants with units in the name (`BUILD_TIMEOUT`, `MAX_CONTEXT_BYTES`) instead of magic numbers; config structs implement `Default`, tests override with `..Default::default()`.
+* `#[must_use]` on pure functions and getters; `const fn` where it is free.
+* Inspect wrapped errors with `std::iter::successors(Some(err), |&e| e.source())` and `is::<T>()`, never by matching error strings.
+* `clippy.toml` allows unwrap/expect/panic/indexing only inside `#[test]` fns; helpers outside them (fixtures, integration test helpers) use `expect("why it holds")`.
 
 ## Async and concurrency
 
@@ -68,11 +78,16 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Every network call, Podman call, and health check has a timeout.
 * Never hold a lock across `.await`. Prefer message passing or `arc-swap` for read-heavy shared state.
 * Channels are bounded. Spawned tasks are tracked and shut down gracefully on SIGTERM.
+* Anything tied to a connection or request (semaphore permits, shutdown watches) moves into every task that outlives it, or limits silently stop applying.
+* A timeout on the first response is not enough: streams also need an idle timeout and a size cap.
+* Custom `Body`/`Future` types stay `Unpin` (box the `Sleep`, require `B: Unpin`) so no pin projection is needed, and are generic over the inner body so they don't add another box.
+* Cancellation is by drop: race work against shutdown and client disconnect with `tokio::select!` and make sure dropping mid-way leaves nothing half-done.
 
 ## Performance
 
 * The proxy is the hot path: no per-request allocation beyond what is required, stream bodies and never buffer them fully, reuse upstream connections, route table read lock-free via `arc-swap`.
 * Measure before optimizing. No premature caching or abstraction.
+* Hot-path changes are benchmarked against the previous commit with `.e2e/bench.sh`, alternating old and new runs, and the cost is reported.
 * Release profile: `lto = "thin"`, `codegen-units = 1`.
 
 ## Safety and security
@@ -107,6 +122,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Unit tests for pure logic (validation, routing, reconciliation decisions) next to the code.
 * Integration tests run against real Podman and are marked `#[ignore = "requires a running podman socket"]`; no mocking Podman except behind a trait for unit tests.
 * Verify real API shapes (e.g. `curl --unix-socket`) before writing wire types; never guess.
+* A regression test must fail without the fix; test the behaviour from outside (real sockets, real Podman) rather than the implementation.
 * A step is done when `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test -- --include-ignored` pass.
 
 ## Git
