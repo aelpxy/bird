@@ -1,0 +1,235 @@
+use std::fmt;
+use std::num::NonZeroU16;
+use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ValidationError {
+    #[error(
+        "invalid name {0:?}: use 1-63 lowercase letters, digits or '-', starting with a letter"
+    )]
+    Name(String),
+    #[error("invalid hostname {0:?}")]
+    Hostname(String),
+    #[error("invalid image reference {0:?}")]
+    Image(String),
+    #[error("invalid port {0}: must be 1-65535")]
+    Port(u16),
+    #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]
+    EnvKey(String),
+}
+
+macro_rules! validated_string {
+    ($name:ident, $parse:path, $variant:ident) => {
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+        #[serde(try_from = "String", into = "String")]
+        pub struct $name(String);
+
+        impl $name {
+            #[must_use]
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl TryFrom<String> for $name {
+            type Error = ValidationError;
+
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                $parse(value).map(Self).map_err(ValidationError::$variant)
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = ValidationError;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Self::try_from(s.to_owned())
+            }
+        }
+
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                value.0
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(&self.0)
+            }
+        }
+    };
+}
+
+validated_string!(Name, parse_name, Name);
+validated_string!(Hostname, parse_hostname, Hostname);
+validated_string!(ImageRef, parse_image, Image);
+validated_string!(EnvKey, parse_env_key, EnvKey);
+
+fn parse_name(s: String) -> Result<String, String> {
+    let b = s.as_bytes();
+    let ok = matches!(b.first(), Some(b'a'..=b'z'))
+        && b.len() <= 63
+        && b.iter()
+            .all(|c| matches!(c, b'a'..=b'z' | b'0'..=b'9' | b'-'))
+        && b.last() != Some(&b'-');
+    if ok { Ok(s) } else { Err(s) }
+}
+
+fn parse_hostname(s: String) -> Result<String, String> {
+    let normalized = s.strip_suffix('.').unwrap_or(&s).to_ascii_lowercase();
+    let ok = normalized.len() <= 253
+        && normalized.split('.').count() >= 2
+        && normalized.split('.').all(is_dns_label);
+    if ok { Ok(normalized) } else { Err(s) }
+}
+
+fn is_dns_label(label: &str) -> bool {
+    let b = label.as_bytes();
+    !b.is_empty()
+        && b.len() <= 63
+        && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'-')
+        && b.first() != Some(&b'-')
+        && b.last() != Some(&b'-')
+}
+
+fn parse_image(s: String) -> Result<String, String> {
+    let ok = !s.is_empty()
+        && s.len() <= 512
+        && s.bytes().next().is_some_and(|c| c.is_ascii_alphanumeric())
+        && s.bytes().all(|c| {
+            c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b'-' | b'/' | b':' | b'@')
+        });
+    if ok { Ok(s) } else { Err(s) }
+}
+
+fn parse_env_key(s: String) -> Result<String, String> {
+    let b = s.as_bytes();
+    let ok = b
+        .first()
+        .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
+        && b.len() <= 255
+        && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    if ok { Ok(s) } else { Err(s) }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(try_from = "u16", into = "u16")]
+pub struct Port(NonZeroU16);
+
+impl Port {
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0.get()
+    }
+}
+
+impl TryFrom<u16> for Port {
+    type Error = ValidationError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        NonZeroU16::new(value)
+            .map(Self)
+            .ok_or(ValidationError::Port(value))
+    }
+}
+
+impl From<Port> for u16 {
+    fn from(value: Port) -> Self {
+        value.get()
+    }
+}
+
+impl fmt::Display for Port {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn names() {
+        for ok in ["a", "web", "my-app-2", &"a".repeat(63)] {
+            assert!(ok.parse::<Name>().is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            "Web",
+            "2web",
+            "-web",
+            "web-",
+            "my_app",
+            "my.app",
+            &"a".repeat(64),
+        ] {
+            assert!(bad.parse::<Name>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn hostnames_are_normalized() {
+        let h: Hostname = "Web.Example.COM.".parse().unwrap();
+        assert_eq!(h.as_str(), "web.example.com");
+    }
+
+    #[test]
+    fn hostnames() {
+        for ok in ["web.localhost", "a.b.c.example.com", "x-1.io"] {
+            assert!(ok.parse::<Hostname>().is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            "localhost",
+            "-a.com",
+            "a-.com",
+            "a..com",
+            "*.a.com",
+            "a_b.com",
+            "a b.com",
+        ] {
+            assert!(bad.parse::<Hostname>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn images() {
+        for ok in [
+            "nginx",
+            "nginx:1.27",
+            "ghcr.io/org/app:v1",
+            "localhost:5000/app@sha256:abc123",
+        ] {
+            assert!(ok.parse::<ImageRef>().is_ok(), "{ok}");
+        }
+        for bad in ["", "-nginx", "--rm", "/nginx", "nginx latest", "nginx;rm"] {
+            assert!(bad.parse::<ImageRef>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn env_keys() {
+        for ok in ["PORT", "_X", "DATABASE_URL", "a1"] {
+            assert!(ok.parse::<EnvKey>().is_ok(), "{ok}");
+        }
+        for bad in ["", "1A", "A-B", "A B", "A=B"] {
+            assert!(bad.parse::<EnvKey>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn ports() {
+        assert!(Port::try_from(0).is_err());
+        assert_eq!(Port::try_from(8080).unwrap().get(), 8080);
+    }
+}

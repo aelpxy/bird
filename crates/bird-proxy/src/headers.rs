@@ -1,0 +1,89 @@
+use std::net::IpAddr;
+
+use hyper::HeaderMap;
+use hyper::header::{
+    CONNECTION, FORWARDED, HeaderName, HeaderValue, TE, TRAILER, TRANSFER_ENCODING, UPGRADE,
+};
+
+const HOP_BY_HOP: [HeaderName; 7] = [
+    CONNECTION,
+    HeaderName::from_static("keep-alive"),
+    HeaderName::from_static("proxy-connection"),
+    TE,
+    TRAILER,
+    TRANSFER_ENCODING,
+    UPGRADE,
+];
+
+const X_FORWARDED_FOR: HeaderName = HeaderName::from_static("x-forwarded-for");
+const X_FORWARDED_HOST: HeaderName = HeaderName::from_static("x-forwarded-host");
+const X_FORWARDED_PROTO: HeaderName = HeaderName::from_static("x-forwarded-proto");
+
+pub(crate) fn strip_hop_by_hop(headers: &mut HeaderMap) {
+    let listed: Vec<HeaderName> = headers
+        .get_all(CONNECTION)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .filter_map(|name| HeaderName::from_bytes(name.trim().as_bytes()).ok())
+        .collect();
+    for name in listed {
+        headers.remove(name);
+    }
+    for name in HOP_BY_HOP {
+        headers.remove(name);
+    }
+}
+
+// we are the edge, so client-supplied forwarding headers are untrusted and replaced
+pub(crate) fn set_forwarded(
+    headers: &mut HeaderMap,
+    client_ip: IpAddr,
+    original_host: Option<HeaderValue>,
+) {
+    headers.remove(FORWARDED);
+    match HeaderValue::try_from(client_ip.to_string()) {
+        Ok(value) => headers.insert(X_FORWARDED_FOR, value),
+        Err(_) => headers.remove(X_FORWARDED_FOR),
+    };
+    headers.insert(X_FORWARDED_PROTO, HeaderValue::from_static("http"));
+    match original_host {
+        Some(host) => headers.insert(X_FORWARDED_HOST, host),
+        None => headers.remove(X_FORWARDED_HOST),
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strips_standard_and_listed_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONNECTION, HeaderValue::from_static("close, X-Secret"));
+        headers.insert("x-secret", HeaderValue::from_static("1"));
+        headers.insert("keep-alive", HeaderValue::from_static("timeout=5"));
+        headers.insert(UPGRADE, HeaderValue::from_static("websocket"));
+        headers.insert("x-keep", HeaderValue::from_static("1"));
+        strip_hop_by_hop(&mut headers);
+        assert_eq!(headers.len(), 1);
+        assert!(headers.contains_key("x-keep"));
+    }
+
+    #[test]
+    fn replaces_spoofed_forwarding_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(X_FORWARDED_FOR, HeaderValue::from_static("6.6.6.6"));
+        headers.insert(FORWARDED, HeaderValue::from_static("for=6.6.6.6"));
+        headers.insert(X_FORWARDED_HOST, HeaderValue::from_static("evil"));
+        set_forwarded(
+            &mut headers,
+            "10.0.0.1".parse().unwrap(),
+            Some(HeaderValue::from_static("web.localhost")),
+        );
+        assert_eq!(headers[X_FORWARDED_FOR], "10.0.0.1");
+        assert_eq!(headers[X_FORWARDED_HOST], "web.localhost");
+        assert_eq!(headers[X_FORWARDED_PROTO], "http");
+        assert!(!headers.contains_key(FORWARDED));
+    }
+}

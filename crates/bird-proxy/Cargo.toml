@@ -1,0 +1,21 @@
+[package]
+name = "bird-proxy"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+arc-swap.workspace = true
+bird-core.workspace = true
+bytes.workspace = true
+http-body-util.workspace = true
+hyper = { workspace = true, features = ["client", "server", "http1"] }
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "server", "server-graceful", "tokio"] }
+tokio = { workspace = true, features = ["net", "time", "sync", "macros", "rt"] }
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
+
+[lints]
+workspace = true

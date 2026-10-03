@@ -1,0 +1,27 @@
+[package]
+name = "bird-server"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "birdd"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum = { workspace = true, features = ["http1", "json", "query", "tokio"] }
+bird-api.workspace = true
+bird-core.workspace = true
+bird-podman.workspace = true
+bird-proxy.workspace = true
+bird-store.workspace = true
+clap.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync", "signal", "io-util"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true
