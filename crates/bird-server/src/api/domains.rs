@@ -2,11 +2,13 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use bird_api::AddDomain;
+use bird_api::ErrorBody;
 use bird_core::{Hostname, Name, ServiceId};
 
 use crate::state::AppState;
 use crate::{Error, Result, routing};
 
+#[utoipa::path(get, path = "/v1/services/{name}/domains", tag = "domains", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Domains routed to the service", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Path(name): Path<Name>,
@@ -15,6 +17,7 @@ pub(crate) async fn list(
     Ok(Json(hostnames(&state, service.id).await?))
 }
 
+#[utoipa::path(post, path = "/v1/services/{name}/domains", tag = "domains", params(("name" = String, Path, description = "Service name")), request_body = AddDomain, responses((status = 201, description = "Domain added, returns all domains of the service", body = Vec<String>), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn add(
     State(state): State<AppState>,
     Path(name): Path<Name>,
@@ -39,6 +42,7 @@ pub(crate) async fn add(
     ))
 }
 
+#[utoipa::path(delete, path = "/v1/services/{name}/domains/{hostname}", tag = "domains", params(("name" = String, Path, description = "Service name"), ("hostname" = String, Path, description = "Domain to remove")), responses((status = 204, description = "Domain removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Path((name, hostname)): Path<(Name, Hostname)>,

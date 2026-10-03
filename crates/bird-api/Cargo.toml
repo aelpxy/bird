@@ -4,9 +4,13 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+[features]
+openapi = ["dep:utoipa", "bird-core/openapi"]
+
 [dependencies]
 bird-core.workspace = true
 serde.workspace = true
+utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -4,15 +4,21 @@ mod deployments;
 mod domains;
 mod error;
 mod logs;
+mod openapi;
 mod scale;
 mod services;
 mod stream;
 mod variables;
 
+use std::sync::Arc;
+
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use axum::http::header::CONTENT_TYPE;
 use axum::middleware;
-use axum::routing::{delete, get, post, put};
+use axum::routing::get;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
 
 use crate::state::AppState;
 use crate::token::ApiToken;
@@ -20,27 +26,30 @@ use crate::token::ApiToken;
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
 pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
-    Router::new()
-        .route("/v1/deploy", post(deploy::create))
-        .route("/v1/services", get(services::list))
-        .route("/v1/services/{name}", delete(services::remove))
-        .route(
-            "/v1/services/{name}/domains",
-            get(domains::list).post(domains::add),
-        )
-        .route(
-            "/v1/services/{name}/domains/{hostname}",
-            delete(domains::remove),
-        )
-        .route("/v1/services/{name}/deployments", get(deployments::list))
-        .route("/v1/services/{name}/rollback", post(deployments::rollback))
-        .route("/v1/services/{name}/logs", get(logs::logs))
-        .route("/v1/services/{name}/scale", put(scale::update))
-        .route(
-            "/v1/services/{name}/variables",
-            get(variables::list).patch(variables::update),
-        )
-        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+    let (api, spec) = documented_routes().split_for_parts();
+    let spec: Arc<str> = openapi::render(&spec).into();
+    api.layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::from_fn_with_state(token, auth::require_token))
+        .route(
+            "/v1/openapi.json",
+            get(move || {
+                let spec = Arc::clone(&spec);
+                async move { ([(CONTENT_TYPE, "application/json")], spec.to_string()) }
+            }),
+        )
         .with_state(state)
+}
+
+fn documented_routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::with_openapi(openapi::document())
+        .routes(routes!(deploy::create))
+        .routes(routes!(services::list))
+        .routes(routes!(services::remove))
+        .routes(routes!(domains::list, domains::add))
+        .routes(routes!(domains::remove))
+        .routes(routes!(deployments::list))
+        .routes(routes!(deployments::rollback))
+        .routes(routes!(logs::logs))
+        .routes(routes!(scale::update))
+        .routes(routes!(variables::list, variables::update))
 }

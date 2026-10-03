@@ -1,11 +1,13 @@
 use axum::Json;
 use axum::extract::{Path, State};
+use bird_api::ErrorBody;
 use bird_api::{DeployResponse, DeploymentInfo, RollbackRequest};
 use bird_core::{Deployment, DeploymentStatus, Name, ServiceId};
 
 use crate::state::AppState;
 use crate::{Error, Result, deploy};
 
+#[utoipa::path(get, path = "/v1/services/{name}/deployments", tag = "deployments", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Deployments, newest first", body = Vec<DeploymentInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Path(name): Path<Name>,
@@ -26,6 +28,7 @@ pub(crate) async fn list(
     ))
 }
 
+#[utoipa::path(post, path = "/v1/services/{name}/rollback", tag = "deployments", params(("name" = String, Path, description = "Service name")), request_body = RollbackRequest, responses((status = 200, description = "Earlier image, port and variables deployed again", body = DeployResponse), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
 pub(crate) async fn rollback(
     State(state): State<AppState>,
     Path(name): Path<Name>,

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::DeployResponse;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateVariables {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub set: BTreeMap<EnvKey, String>,
@@ -31,6 +32,7 @@ impl fmt::Debug for UpdateVariables {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct VariablesResponse {
     pub keys: Vec<EnvKey>,
     pub deployment: Option<DeployResponse>,

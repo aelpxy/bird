@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use crate::ValidationError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(value_type = u8, minimum = 1, maximum = 32))]
 #[serde(try_from = "u8", into = "u8")]
 pub struct Replicas(u8);
 

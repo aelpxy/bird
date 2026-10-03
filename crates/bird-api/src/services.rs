@@ -5,6 +5,7 @@ use bird_core::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ServiceSummary {
     pub name: Name,
     pub image: ImageRef,
@@ -15,6 +16,7 @@ pub struct ServiceSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeploymentSummary {
     pub id: DeploymentId,
     pub status: DeploymentStatus,
@@ -22,6 +24,7 @@ pub struct DeploymentSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct MachineSummary {
     pub id: MachineId,
     pub state: MachineState,
