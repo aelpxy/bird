@@ -71,6 +71,19 @@ impl ApiClient {
         serde_json::from_slice(&body).context("birdd sent an unexpected response")
     }
 
+    pub(crate) async fn patch<B: Serialize, T: DeserializeOwned>(
+        &self,
+        path: &str,
+        payload: &B,
+        timeout: Duration,
+    ) -> Result<T> {
+        let payload = serde_json::to_vec(payload)?;
+        let body = self
+            .send(Method::PATCH, path, Some(payload), timeout)
+            .await?;
+        serde_json::from_slice(&body).context("birdd sent an unexpected response")
+    }
+
     pub(crate) async fn delete(&self, path: &str, timeout: Duration) -> Result<()> {
         self.send(Method::DELETE, path, None, timeout).await?;
         Ok(())

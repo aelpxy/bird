@@ -7,7 +7,7 @@ use crate::args::DeployArgs;
 use crate::client::ApiClient;
 
 // covers a slow image pull plus the app's startup window on the server
-const DEPLOY_TIMEOUT: Duration = Duration::from_mins(15);
+pub(crate) const DEPLOY_TIMEOUT: Duration = Duration::from_mins(15);
 
 pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
     println!("deploying {} ({})...", args.name, args.image);
@@ -19,6 +19,11 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
         env: args.env.into_iter().collect(),
     };
     let response: DeployResponse = client.post("/v1/deploy", &request, DEPLOY_TIMEOUT).await?;
+    print_deployed(&response);
+    Ok(())
+}
+
+pub(crate) fn print_deployed(response: &DeployResponse) {
     println!(
         "deployed {} (deployment {})",
         response.service, response.deployment_id
@@ -26,5 +31,4 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
     for domain in &response.domains {
         println!("  -> {domain}");
     }
-    Ok(())
 }

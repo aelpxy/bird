@@ -3,6 +3,7 @@ mod deploy;
 mod error;
 mod logs;
 mod services;
+mod variables;
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -20,6 +21,10 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
         .route("/v1/services", get(services::list))
         .route("/v1/services/{name}", delete(services::remove))
         .route("/v1/services/{name}/logs", get(logs::tail))
+        .route(
+            "/v1/services/{name}/variables",
+            get(variables::list).patch(variables::update),
+        )
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::from_fn_with_state(token, auth::require_token))
         .with_state(state)
