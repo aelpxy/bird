@@ -45,21 +45,29 @@ impl Store {
         )
     }
 
-    // every image bird deployed, and whether a live or recent deployment still needs it
+    // every image bird deployed, and whether it is live or among the last few distinct images a
+    // service ran; redeploys and failed deploys do not push older images out
     pub fn list_deployed_images(&self, keep_recent: u32) -> Result<Vec<(ImageRef, bool)>> {
         self.query_all(
-            "WITH ranked AS (
-                 SELECT image, status, ROW_NUMBER() OVER (
-                     PARTITION BY service_id ORDER BY created_at DESC, id DESC
+            "WITH used AS (
+                 SELECT service_id, image,
+                     MAX(CASE WHEN status != ?5 THEN id END) AS last_ran,
+                     MAX(status IN (?2, ?3, ?4)) AS live
+                 FROM deployments GROUP BY service_id, image
+             ), ranked AS (
+                 SELECT image, live, last_ran, ROW_NUMBER() OVER (
+                     PARTITION BY service_id ORDER BY last_ran DESC
                  ) AS recency
-                 FROM deployments
+                 FROM used
              )
-             SELECT image, MAX(recency <= ?1 OR status IN (?2, ?3, ?4)) FROM ranked GROUP BY image",
+             SELECT image, MAX((last_ran IS NOT NULL AND recency <= ?1) OR live)
+             FROM ranked GROUP BY image",
             params![
                 keep_recent,
                 DeploymentStatus::Active.as_str(),
                 DeploymentStatus::Deploying.as_str(),
-                DeploymentStatus::Pending.as_str()
+                DeploymentStatus::Pending.as_str(),
+                DeploymentStatus::Failed.as_str()
             ],
             rows::image_use,
         )
@@ -159,9 +167,17 @@ mod tests {
             let deployment = store.create_deployment(&current).unwrap();
             store.activate_deployment(deployment.id).unwrap();
         };
-        for tag in ["app:1", "app:2", "app:3", "app:4"] {
+        for tag in ["app:1", "app:2", "app:3", "app:4", "app:4", "app:4"] {
             deploy_image(&mut store, tag);
         }
+        store
+            .update_service(service.id, &"app:5".parse().unwrap(), service.port)
+            .unwrap();
+        let current = store.service(service.id).unwrap().unwrap();
+        let failed = store.create_deployment(&current).unwrap();
+        store
+            .set_deployment_status(failed.id, DeploymentStatus::Failed)
+            .unwrap();
         let mut images: Vec<(String, bool)> = store
             .list_deployed_images(2)
             .unwrap()
@@ -176,6 +192,7 @@ mod tests {
                 ("app:2".to_owned(), false),
                 ("app:3".to_owned(), true),
                 ("app:4".to_owned(), true),
+                ("app:5".to_owned(), false),
             ]
         );
     }

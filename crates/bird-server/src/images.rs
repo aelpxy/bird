@@ -4,13 +4,13 @@ use bird_core::ImageRef;
 
 use crate::state::AppState;
 
-// rollbacks to the last few deployments stay instant because their images are kept
-const KEEP_RECENT_DEPLOYMENTS: u32 = 3;
+// the last few images each service ran stay, so rollbacks work even for images built here
+const KEEP_RECENT_IMAGES: u32 = 3;
 
 pub(crate) async fn remove_unused(state: &AppState) {
     let images = match state
         .db
-        .call(|store| store.list_deployed_images(KEEP_RECENT_DEPLOYMENTS))
+        .call(|store| store.list_deployed_images(KEEP_RECENT_IMAGES))
         .await
     {
         Ok(images) => images,
