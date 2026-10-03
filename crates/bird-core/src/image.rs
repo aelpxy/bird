@@ -15,6 +15,15 @@ impl ImageRef {
             Some(_) => format!("docker.io/{raw}"),
         }
     }
+
+    #[must_use]
+    pub fn registry(&self) -> String {
+        let qualified = self.qualified();
+        qualified
+            .split_once('/')
+            .map_or(qualified.as_str(), |(host, _)| host)
+            .to_ascii_lowercase()
+    }
 }
 
 // what data on a volume depends on: the image, its major version and its base variant
@@ -86,6 +95,14 @@ mod tests {
         assert_eq!(qualify("ghcr.io/org/app"), "ghcr.io/org/app");
         assert_eq!(qualify("localhost/app"), "localhost/app");
         assert_eq!(qualify("registry:5000/app"), "registry:5000/app");
+    }
+
+    #[test]
+    fn finds_the_registry_host() {
+        let registry = |raw: &str| raw.parse::<ImageRef>().unwrap().registry();
+        assert_eq!(registry("nginx"), "docker.io");
+        assert_eq!(registry("ghcr.io/org/app:1"), "ghcr.io");
+        assert_eq!(registry("localhost:5000/private/app"), "localhost:5000");
     }
 
     #[test]

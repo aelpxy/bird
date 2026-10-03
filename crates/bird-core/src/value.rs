@@ -22,6 +22,10 @@ pub enum ValidationError {
     MountPath(String),
     #[error("invalid command: give a program and up to 63 arguments, without NUL bytes")]
     Command,
+    #[error(
+        "invalid registry {0:?}: use a host like ghcr.io, docker.io or registry.example.com:5000"
+    )]
+    Registry(String),
     #[error("invalid memory limit {0:?}: use 32m to 256g, like 512m or 2g")]
     Memory(String),
     #[error("invalid cpu limit {0:?}: use 0.1 to 64 cores, like 0.5 or 2")]
@@ -87,6 +91,7 @@ validated_string!(Hostname, parse_hostname, Hostname);
 validated_string!(ImageRef, parse_image, Image);
 validated_string!(EnvKey, parse_env_key, EnvKey);
 validated_string!(MountPath, parse_mount_path, MountPath);
+validated_string!(RegistryHost, parse_registry_host, Registry);
 
 fn parse_name(s: String) -> Result<String, String> {
     let b = s.as_bytes();
@@ -133,6 +138,17 @@ fn parse_env_key(s: String) -> Result<String, String> {
         && b.len() <= 255
         && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_');
     if ok { Ok(s) } else { Err(s) }
+}
+
+fn parse_registry_host(s: String) -> Result<String, String> {
+    let normalized = s.trim().to_ascii_lowercase();
+    let (host, port) = normalized.split_once(':').unwrap_or((&normalized, ""));
+    let ok = !host.is_empty()
+        && normalized.len() <= 253
+        && (host.contains('.') || host == "localhost")
+        && host.split('.').all(is_dns_label)
+        && (port.is_empty() || port.parse::<u16>().is_ok_and(|p| p > 0));
+    if ok { Ok(normalized) } else { Err(s) }
 }
 
 fn parse_mount_path(s: String) -> Result<String, String> {
@@ -250,6 +266,32 @@ mod tests {
         }
         for bad in ["", "1A", "A-B", "A B", "A=B"] {
             assert!(bad.parse::<EnvKey>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn registry_hosts() {
+        for ok in [
+            "ghcr.io",
+            "docker.io",
+            "localhost:5000",
+            "Registry.Example.com:443",
+        ] {
+            assert!(ok.parse::<RegistryHost>().is_ok(), "{ok}");
+        }
+        assert_eq!(
+            "GHCR.io".parse::<RegistryHost>().unwrap().as_str(),
+            "ghcr.io"
+        );
+        for bad in [
+            "",
+            "ghcr",
+            "https://ghcr.io",
+            "ghcr.io/org",
+            "host:0",
+            "host.io:99999",
+        ] {
+            assert!(bad.parse::<RegistryHost>().is_err(), "{bad}");
         }
     }
 

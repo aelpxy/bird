@@ -63,9 +63,25 @@ impl Transport {
         timeout: Duration,
     ) -> Result<Response> {
         tracing::debug!(%method, path, "podman request");
-        tokio::time::timeout(timeout, self.exchange(method, path, body))
+        tokio::time::timeout(timeout, self.exchange(method, path, body, None))
             .await
             .map_err(|_| Error::Timeout)?
+    }
+
+    pub(crate) async fn send_with_registry_auth(
+        &self,
+        method: Method,
+        path: &str,
+        registry_auth: String,
+        timeout: Duration,
+    ) -> Result<Response> {
+        tracing::debug!(%method, path, "podman request with registry credentials");
+        tokio::time::timeout(
+            timeout,
+            self.exchange(method, path, None, Some(registry_auth)),
+        )
+        .await
+        .map_err(|_| Error::Timeout)?
     }
 
     // the timeout covers connecting and the response head; the body streams until either side stops
@@ -107,6 +123,7 @@ impl Transport {
         method: Method,
         path: &str,
         body: Option<Vec<u8>>,
+        registry_auth: Option<String>,
     ) -> Result<Response> {
         let stream = UnixStream::connect(&*self.socket)
             .await
@@ -123,6 +140,9 @@ impl Transport {
             .header(HOST, "podman");
         if body.is_some() {
             builder = builder.header(CONTENT_TYPE, "application/json");
+        }
+        if let Some(registry_auth) = registry_auth {
+            builder = builder.header("X-Registry-Auth", registry_auth);
         }
         let request = builder.body(Full::new(Bytes::from(body.unwrap_or_default())))?;
 
