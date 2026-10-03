@@ -311,6 +311,96 @@
         }
       }
     },
+    "/v1/services/{name}/builds": {
+      "post": {
+        "tags": [
+          "builds"
+        ],
+        "summary": "Build an image from source",
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service the image is for",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dockerfile",
+            "in": "path",
+            "description": "Dockerfile path inside the context, Dockerfile by default",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Build context as a tar archive, optionally gzipped, at most 512 MiB",
+          "content": {
+            "application/x-tar": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newline-delimited JSON stream of BuildEvent, ending with built or failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Build context too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services/{name}/deployments": {
       "get": {
         "tags": [
@@ -1126,6 +1216,64 @@
           }
         }
       },
+      "BuildEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "line",
+              "type"
+            ],
+            "properties": {
+              "line": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "log"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "image",
+              "type"
+            ],
+            "properties": {
+              "image": {
+                "$ref": "#/components/schemas/ImageRef"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "built"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "error",
+              "type"
+            ],
+            "properties": {
+              "error": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          }
+        ]
+      },
       "Command": {
         "type": "array",
         "items": {
@@ -1740,6 +1888,10 @@
     {
       "name": "registries",
       "description": "Credentials for pulling private images"
+    },
+    {
+      "name": "builds",
+      "description": "Images built from source on the server"
     }
   ]
 }

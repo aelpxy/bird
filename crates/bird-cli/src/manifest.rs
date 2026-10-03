@@ -1,12 +1,18 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use bird_api::{MANIFEST_FILE, Manifest};
 
 const SECRET_HINTS: [&str; 5] = ["PASSWORD", "SECRET", "TOKEN", "API_KEY", "PRIVATE_KEY"];
 
+pub(crate) struct Loaded {
+    pub(crate) manifest: Manifest,
+    // build contexts in bird.toml are relative to the file, not to where bird runs
+    pub(crate) dir: PathBuf,
+}
+
 // an explicit --config must exist, the default bird.toml is optional
-pub(crate) fn load(explicit: Option<&Path>) -> Result<Option<Manifest>> {
+pub(crate) fn load(explicit: Option<&Path>) -> Result<Option<Loaded>> {
     let path = explicit.unwrap_or_else(|| Path::new(MANIFEST_FILE));
     let source = match std::fs::read_to_string(path) {
         Ok(source) => source,
@@ -17,8 +23,15 @@ pub(crate) fn load(explicit: Option<&Path>) -> Result<Option<Manifest>> {
     };
     let manifest: Manifest =
         toml::from_str(&source).with_context(|| format!("invalid {}", path.display()))?;
+    if manifest.image.is_some() && manifest.build.is_some() {
+        bail!(
+            "{} sets both image and [build], keep the one you deploy from",
+            path.display()
+        );
+    }
     warn_about_secrets(&manifest, path);
-    Ok(Some(manifest))
+    let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
+    Ok(Some(Loaded { manifest, dir }))
 }
 
 // bird.toml is usually committed, so literal secrets in it end up in git history
@@ -45,6 +58,11 @@ port = {port}
 # memory = "512m"
 # cpus = 0.5
 # command = ["./server", "--listen", "0.0.0.0:{port}"]
+
+# build from source on the server instead of pulling image; remove image above to use it
+# [build]
+# context = "."
+# dockerfile = "Dockerfile"
 
 # plain settings and references like ${{{{postgres.DATABASE_URL}}}}; set secrets with `bird env set`
 [env]
@@ -88,7 +106,7 @@ path = "/data"
 "#,
         )
         .unwrap();
-        let request = manifest.into_request();
+        let request = manifest.into_request("unused:1".parse().unwrap());
         assert_eq!(request.domains.len(), 2);
         assert_eq!(
             request.memory.map(bird_core::MemoryLimit::mebibytes),

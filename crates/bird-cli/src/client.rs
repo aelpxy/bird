@@ -14,6 +14,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
 
+const JSON: &str = "application/json";
+
 pub(crate) struct ApiClient {
     addr: String,
     token: Option<String>,
@@ -119,9 +121,32 @@ impl ApiClient {
         &self,
         path: &str,
         timeout: Duration,
+        on_line: impl FnMut(&str) -> Result<()>,
+    ) -> Result<()> {
+        let request = self.request(Method::GET, path, None, JSON)?;
+        self.read_lines(request, timeout, on_line).await
+    }
+
+    // sends a raw body and streams the answer line by line, like stream_lines
+    pub(crate) async fn upload_lines(
+        &self,
+        path: &str,
+        content_type: &str,
+        payload: Vec<u8>,
+        timeout: Duration,
+        on_line: impl FnMut(&str) -> Result<()>,
+    ) -> Result<()> {
+        let request = self.request(Method::POST, path, Some(payload), content_type)?;
+        self.read_lines(request, timeout, on_line).await
+    }
+
+    async fn read_lines(
+        &self,
+        request: Request<Full<Bytes>>,
+        timeout: Duration,
         mut on_line: impl FnMut(&str) -> Result<()>,
     ) -> Result<()> {
-        let response = tokio::time::timeout(timeout, self.open_stream(path))
+        let response = tokio::time::timeout(timeout, self.open_stream(request))
             .await
             .map_err(|_| anyhow!("birdd did not respond within {}s", timeout.as_secs()))??;
         let status = response.status();
@@ -145,10 +170,12 @@ impl ApiClient {
         Ok(())
     }
 
-    async fn open_stream(&self, path: &str) -> Result<hyper::Response<Incoming>> {
+    async fn open_stream(
+        &self,
+        request: Request<Full<Bytes>>,
+    ) -> Result<hyper::Response<Incoming>> {
         let (mut sender, conn) = self.connect().await?;
         tokio::spawn(conn);
-        let request = self.request(Method::GET, path, None)?;
         Ok(sender.send_request(request).await?)
     }
 
@@ -169,6 +196,7 @@ impl ApiClient {
         method: Method,
         path: &str,
         payload: Option<Vec<u8>>,
+        content_type: &str,
     ) -> Result<Request<Full<Bytes>>> {
         let mut request = Request::builder()
             .method(method)
@@ -178,7 +206,7 @@ impl ApiClient {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));
         }
         if payload.is_some() {
-            request = request.header(CONTENT_TYPE, "application/json");
+            request = request.header(CONTENT_TYPE, content_type);
         }
         Ok(request.body(Full::new(Bytes::from(payload.unwrap_or_default())))?)
     }
@@ -190,7 +218,7 @@ impl ApiClient {
         payload: Option<Vec<u8>>,
     ) -> Result<Bytes> {
         let (mut sender, conn) = self.connect().await?;
-        let request = self.request(method, path, payload)?;
+        let request = self.request(method, path, payload, JSON)?;
 
         let exchange = async move {
             let response = sender.send_request(request).await?;

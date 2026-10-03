@@ -34,6 +34,10 @@ pub enum ValidationError {
     Replicas(u8),
     #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]
     EnvKey(String),
+    #[error(
+        "invalid dockerfile path {0:?}: use a path inside the build context like Dockerfile or docker/web.Dockerfile"
+    )]
+    BuildFile(String),
 }
 
 macro_rules! validated_string {
@@ -92,6 +96,7 @@ validated_string!(ImageRef, parse_image, Image);
 validated_string!(EnvKey, parse_env_key, EnvKey);
 validated_string!(MountPath, parse_mount_path, MountPath);
 validated_string!(RegistryHost, parse_registry_host, Registry);
+validated_string!(BuildFile, parse_build_file, BuildFile);
 
 fn parse_name(s: String) -> Result<String, String> {
     let b = s.as_bytes();
@@ -158,6 +163,17 @@ fn parse_mount_path(s: String) -> Result<String, String> {
         && s.split('/').all(|part| part != "..")
         && s.bytes()
             .all(|c| c.is_ascii_graphic() && c != b':' && c != b',');
+    if ok { Ok(s) } else { Err(s) }
+}
+
+// relative to the build context and never leaving it
+fn parse_build_file(s: String) -> Result<String, String> {
+    let ok = !s.is_empty()
+        && s.len() <= 255
+        && !s.starts_with('/')
+        && s.split('/')
+            .all(|part| !part.is_empty() && part != ".." && part != ".")
+        && s.bytes().all(|c| c.is_ascii_graphic());
     if ok { Ok(s) } else { Err(s) }
 }
 
@@ -258,6 +274,24 @@ mod tests {
         }
         for bad in ["", "-nginx", "--rm", "/nginx", "nginx latest", "nginx;rm"] {
             assert!(bad.parse::<ImageRef>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn build_files() {
+        for ok in ["Dockerfile", "docker/web.Dockerfile", "Containerfile.prod"] {
+            assert!(ok.parse::<BuildFile>().is_ok(), "{ok}");
+        }
+        for bad in [
+            "",
+            "/etc/passwd",
+            "../Dockerfile",
+            "a/../../b",
+            "./Dockerfile",
+            "a//b",
+            "a b",
+        ] {
+            assert!(bad.parse::<BuildFile>().is_err(), "{bad}");
         }
     }
 

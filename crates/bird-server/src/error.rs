@@ -77,6 +77,12 @@ pub enum Error {
     DomainTaken(bird_core::Hostname),
     #[error("{0} has no variable {1}")]
     VariableNotFound(Name, EnvKey),
+    #[error("image {0} is no longer on this server, deploy from source again to rebuild it")]
+    LocalImageMissing(bird_core::ImageRef),
+    #[error("build context is larger than {} MiB, exclude more with .dockerignore", .0 / 1024 / 1024)]
+    ContextTooLarge(usize),
+    #[error("build failed: {0}")]
+    BuildFailed(String),
     #[error("registry username and password must not be empty")]
     EmptyCredentials,
     #[error("domain {0} is not attached to this service")]

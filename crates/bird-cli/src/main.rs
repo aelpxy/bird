@@ -1,6 +1,8 @@
 mod args;
 mod client;
 mod commands;
+mod context;
+mod dockerignore;
 mod manifest;
 mod profile;
 

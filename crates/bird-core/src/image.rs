@@ -33,6 +33,12 @@ impl ImageRef {
         !path.bytes().any(|c| c.is_ascii_uppercase())
     }
 
+    // images under localhost/ only exist in this server's podman, built by bird
+    #[must_use]
+    pub fn is_local(&self) -> bool {
+        self.registry() == "localhost"
+    }
+
     #[must_use]
     pub fn registry(&self) -> String {
         let qualified = self.qualified();
@@ -131,6 +137,10 @@ mod tests {
         assert_eq!(registry("nginx"), "docker.io");
         assert_eq!(registry("ghcr.io/org/app:1"), "ghcr.io");
         assert_eq!(registry("localhost:5000/private/app"), "localhost:5000");
+        let local = |raw: &str| raw.parse::<ImageRef>().unwrap().is_local();
+        assert!(local("localhost/bird/web:1"));
+        assert!(!local("localhost:5000/web:1"));
+        assert!(!local("nginx"));
     }
 
     #[test]

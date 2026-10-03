@@ -1,4 +1,5 @@
 mod auth;
+mod build;
 mod client;
 mod container;
 mod error;
@@ -11,6 +12,7 @@ mod transport;
 mod volume;
 
 pub use auth::RegistryAuth;
+pub use build::{BuildLine, BuildOutput};
 pub use client::{Podman, default_socket};
 pub use container::{ContainerInfo, ContainerSpec, ContainerState, Limits, PublishedPort};
 pub use error::{Error, Result};

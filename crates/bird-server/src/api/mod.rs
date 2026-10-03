@@ -1,4 +1,5 @@
 mod auth;
+mod builds;
 mod deploy;
 mod deployments;
 mod docs;
@@ -47,6 +48,7 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
 fn documented_routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(openapi::document())
         .routes(routes!(deploy::create))
+        .routes(routes!(builds::create))
         .routes(routes!(services::list))
         .routes(routes!(services::remove))
         .routes(routes!(domains::list, domains::add))

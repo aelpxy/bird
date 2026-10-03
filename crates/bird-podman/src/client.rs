@@ -49,6 +49,22 @@ impl Podman {
             .await
     }
 
+    pub(crate) async fn upload<B>(
+        &self,
+        path: &str,
+        content_type: &str,
+        body: B,
+        timeout: Duration,
+    ) -> Result<Streamed>
+    where
+        B: hyper::body::Body<Data = bytes::Bytes> + Send + 'static,
+        B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        self.transport
+            .upload(path, content_type, body, timeout)
+            .await
+    }
+
     pub(crate) async fn send_with_registry_auth(
         &self,
         method: Method,
