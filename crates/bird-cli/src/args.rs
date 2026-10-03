@@ -29,6 +29,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: EnvCommand,
     },
+    /// Manage the domains routed to a service
+    Domains {
+        #[command(subcommand)]
+        command: DomainsCommand,
+    },
     /// Show recent logs of a service
     Logs {
         name: Name,
@@ -60,6 +65,18 @@ pub(crate) enum EnvCommand {
         #[arg(long)]
         no_deploy: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum DomainsCommand {
+    /// List domains of a service
+    #[command(visible_alias = "ls")]
+    List { name: Name },
+    /// Route a domain to a service, https follows automatically when enabled
+    Add { name: Name, hostname: Hostname },
+    /// Stop routing a domain to a service
+    #[command(visible_alias = "rm")]
+    Remove { name: Name, hostname: Hostname },
 }
 
 #[derive(Debug, clap::Args)]
