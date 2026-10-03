@@ -24,6 +24,13 @@ pub(crate) async fn launch(
 ) -> Result<()> {
     state.podman.pull_image(&deployment.image).await?;
 
+    let service_id = service.id;
+    let attached = state
+        .db
+        .call(move |store| store.list_volumes(service_id))
+        .await?;
+    let mounts = super::volumes::mounts(state, &attached).await?;
+
     let deployment_id = deployment.id;
     let machine = state
         .db
@@ -35,6 +42,7 @@ pub(crate) async fn launch(
         port: deployment.port,
         network: state.network.to_string(),
         aliases: labels::aliases(service),
+        mounts,
         env,
         labels: labels::for_machine(service, deployment.id, machine.id),
     };

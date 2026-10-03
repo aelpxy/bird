@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::client::DEFAULT_TIMEOUT;
 use crate::error::check;
 use crate::query::encode;
-use crate::{Podman, Result};
+use crate::{Podman, Result, VolumeMount};
 use inspect::{Inspect, ListEntry};
 use spec::SpecGenerator;
 
@@ -22,6 +22,7 @@ pub struct ContainerSpec {
     pub port: Port,
     pub network: String,
     pub aliases: Vec<String>,
+    pub mounts: Vec<VolumeMount>,
     pub env: BTreeMap<EnvKey, String>,
     pub labels: BTreeMap<String, String>,
 }

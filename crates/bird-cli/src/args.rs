@@ -1,3 +1,4 @@
+use bird_api::VolumeSpec;
 use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port, Replicas};
 use clap::{Parser, Subcommand};
 
@@ -23,7 +24,12 @@ pub(crate) enum Command {
     List,
     /// Remove a service and destroy its machines
     #[command(visible_alias = "rm")]
-    Remove { name: Name },
+    Remove {
+        name: Name,
+        /// Also delete the service's volumes and all data on them
+        #[arg(long)]
+        purge: bool,
+    },
     /// Manage environment variables, changes redeploy the service
     Env {
         #[command(subcommand)]
@@ -108,11 +114,31 @@ pub(crate) struct DeployArgs {
     /// Environment variable as KEY=VALUE, repeatable
     #[arg(long = "env", short = 'e', value_parser = parse_env)]
     pub(crate) env: Vec<(EnvKey, String)>,
+    /// Persistent volume as `NAME:/path`, repeatable; data survives redeploys
+    #[arg(long = "volume", short = 'v', value_parser = parse_volume)]
+    pub(crate) volumes: Vec<VolumeSpec>,
+    /// Run an image whose version or base differs from the one that wrote the volume data
+    #[arg(long)]
+    pub(crate) allow_image_change: bool,
 }
 
 fn parse_port(raw: &str) -> Result<Port, String> {
     let number: u16 = raw.parse().map_err(|_| format!("{raw:?} is not a port"))?;
     Port::try_from(number).map_err(|err| err.to_string())
+}
+
+fn parse_volume(raw: &str) -> Result<VolumeSpec, String> {
+    let (name, path) = raw
+        .split_once(':')
+        .ok_or_else(|| format!("{raw:?} must look like NAME:/path"))?;
+    Ok(VolumeSpec {
+        name: name
+            .parse()
+            .map_err(|err: bird_core::ValidationError| err.to_string())?,
+        path: path
+            .parse()
+            .map_err(|err: bird_core::ValidationError| err.to_string())?,
+    })
 }
 
 fn parse_env(raw: &str) -> Result<(EnvKey, String), String> {
@@ -166,6 +192,30 @@ mod tests {
         assert!(!no_deploy);
         assert!(Args::try_parse_from(["bird", "env", "set", "web"]).is_err());
         assert!(Args::try_parse_from(["bird", "env", "unset", "web", "bad-key"]).is_err());
+    }
+
+    #[test]
+    fn parses_volumes() {
+        let args = Args::try_parse_from([
+            "bird",
+            "deploy",
+            "pg",
+            "postgres:18",
+            "-v",
+            "data:/var/lib/postgresql",
+        ])
+        .unwrap();
+        let Command::Deploy(deploy) = args.command else {
+            panic!("expected deploy");
+        };
+        assert_eq!(deploy.volumes[0].name.as_str(), "data");
+        assert_eq!(deploy.volumes[0].path.as_str(), "/var/lib/postgresql");
+        for bad in ["data", "data:relative", "Data:/x", "data:/a/../b"] {
+            assert!(
+                Args::try_parse_from(["bird", "deploy", "pg", "postgres:18", "-v", bad]).is_err(),
+                "{bad}"
+            );
+        }
     }
 
     #[test]

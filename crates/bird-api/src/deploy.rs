@@ -3,6 +3,8 @@ use std::collections::BTreeMap;
 use bird_core::{DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, Name, Port};
 use serde::{Deserialize, Serialize};
 
+use crate::VolumeSpec;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DeployRequest {
@@ -15,6 +17,10 @@ pub struct DeployRequest {
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<HealthCheck>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub volumes: Vec<VolumeSpec>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub allow_image_change: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -35,8 +35,8 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-// podman reports duplicate container names as a 500 with this cause instead of a 409
-const NAME_IN_USE: &str = "that name is already in use";
+// podman reports some duplicates as a 500 with one of these causes instead of a 409
+const ALREADY_EXISTS_CAUSES: [&str; 2] = ["that name is already in use", "volume already exists"];
 
 #[derive(Deserialize)]
 struct ApiError {
@@ -60,7 +60,7 @@ pub(crate) fn check(response: Response, subject: impl FnOnce() -> String) -> Res
             subject: subject(),
             message,
         },
-        _ if cause == NAME_IN_USE => Error::Conflict {
+        _ if ALREADY_EXISTS_CAUSES.contains(&cause.as_str()) => Error::Conflict {
             subject: subject(),
             message,
         },

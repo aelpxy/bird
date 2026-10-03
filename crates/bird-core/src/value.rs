@@ -16,6 +16,10 @@ pub enum ValidationError {
     Image(String),
     #[error("invalid port {0}: must be 1-65535")]
     Port(u16),
+    #[error(
+        "invalid mount path {0:?}: use an absolute path like /var/lib/postgresql, without .. or spaces"
+    )]
+    MountPath(String),
     #[error("invalid replica count: use 1-32 machines")]
     Replicas(u8),
     #[error("invalid variable key {0:?}: use letters, digits or '_', not starting with a digit")]
@@ -76,6 +80,7 @@ validated_string!(Name, parse_name, Name);
 validated_string!(Hostname, parse_hostname, Hostname);
 validated_string!(ImageRef, parse_image, Image);
 validated_string!(EnvKey, parse_env_key, EnvKey);
+validated_string!(MountPath, parse_mount_path, MountPath);
 
 fn parse_name(s: String) -> Result<String, String> {
     let b = s.as_bytes();
@@ -121,6 +126,16 @@ fn parse_env_key(s: String) -> Result<String, String> {
         .is_some_and(|c| c.is_ascii_alphabetic() || *c == b'_')
         && b.len() <= 255
         && b.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_');
+    if ok { Ok(s) } else { Err(s) }
+}
+
+fn parse_mount_path(s: String) -> Result<String, String> {
+    let ok = s.starts_with('/')
+        && s.len() > 1
+        && s.len() <= 255
+        && s.split('/').all(|part| part != "..")
+        && s.bytes()
+            .all(|c| c.is_ascii_graphic() && c != b':' && c != b',');
     if ok { Ok(s) } else { Err(s) }
 }
 
@@ -229,6 +244,16 @@ mod tests {
         }
         for bad in ["", "1A", "A-B", "A B", "A=B"] {
             assert!(bad.parse::<EnvKey>().is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn mount_paths() {
+        for ok in ["/data", "/var/lib/postgresql", "/srv/app-data_1"] {
+            assert!(ok.parse::<MountPath>().is_ok(), "{ok}");
+        }
+        for bad in ["", "/", "data", "/a/../etc", "/a b", "/a:b", "/a,b"] {
+            assert!(bad.parse::<MountPath>().is_err(), "{bad}");
         }
     }
 

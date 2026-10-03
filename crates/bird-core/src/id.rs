@@ -34,7 +34,14 @@ macro_rules! define_id {
     )+};
 }
 
-define_id!(ProjectId, EnvironmentId, ServiceId, DeploymentId, MachineId);
+define_id!(
+    ProjectId,
+    EnvironmentId,
+    ServiceId,
+    DeploymentId,
+    MachineId,
+    VolumeId
+);
 
 #[cfg(test)]
 mod tests {

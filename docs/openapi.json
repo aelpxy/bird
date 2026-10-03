@@ -131,6 +131,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "purge",
+            "in": "query",
+            "description": "Also delete the service's volumes and the data on them; required when it has any",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -635,6 +644,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Services with volumes run a single machine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -806,6 +825,9 @@
           "port"
         ],
         "properties": {
+          "allow_image_change": {
+            "type": "boolean"
+          },
           "domain": {
             "oneOf": [
               {
@@ -843,6 +865,12 @@
           },
           "port": {
             "$ref": "#/components/schemas/Port"
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VolumeSpec"
+            }
           }
         }
       },
@@ -1031,6 +1059,9 @@
           }
         }
       },
+      "MountPath": {
+        "type": "string"
+      },
       "Name": {
         "type": "string"
       },
@@ -1079,7 +1110,8 @@
           "port",
           "replicas",
           "health",
-          "domains"
+          "domains",
+          "volumes"
         ],
         "properties": {
           "deployment": {
@@ -1112,6 +1144,12 @@
           },
           "replicas": {
             "$ref": "#/components/schemas/Replicas"
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VolumeSpec"
+            }
           }
         }
       },
@@ -1159,6 +1197,21 @@
             "items": {
               "$ref": "#/components/schemas/EnvKey"
             }
+          }
+        }
+      },
+      "VolumeSpec": {
+        "type": "object",
+        "required": [
+          "name",
+          "path"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "path": {
+            "$ref": "#/components/schemas/MountPath"
           }
         }
       }

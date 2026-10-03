@@ -43,6 +43,26 @@ pub enum Error {
     },
     #[error("service {0} has no earlier deployment to roll back to")]
     NoRollbackTarget(Name),
+    #[error("{0} has a volume, which only one machine may use at a time")]
+    VolumeNeedsSingleMachine(Name),
+    #[error("volume {volume} is mounted at {was}, it cannot move to {now}")]
+    VolumePathChanged {
+        volume: Name,
+        was: bird_core::MountPath,
+        now: bird_core::MountPath,
+    },
+    #[error(
+        "volume {volume} holds data written by {was}, running {now} on it could corrupt it; migrate the data first, then pass --allow-image-change"
+    )]
+    ImageChange {
+        volume: Name,
+        was: String,
+        now: String,
+    },
+    #[error("{0} has volumes, pass --purge to delete them together with their data")]
+    HasVolumes(Name),
+    #[error("volume {0} no longer exists in podman, its data was removed outside bird")]
+    VolumeMissing(Name),
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
     #[error("domain {0} is not attached to this service")]

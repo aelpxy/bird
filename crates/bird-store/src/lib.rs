@@ -14,6 +14,7 @@ mod supervision;
 #[cfg(test)]
 mod testing;
 mod variables;
+mod volumes;
 
 pub use error::{Error, Result};
 pub use routes::RouteEntry;

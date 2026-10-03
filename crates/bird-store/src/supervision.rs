@@ -48,11 +48,12 @@ impl Store {
     pub fn fail_interrupted(&mut self) -> Result<Interrupted> {
         self.transaction(|store| {
             let machines = store.execute(
-                "UPDATE machines SET state = ?1 WHERE state IN (?2, ?3)",
+                "UPDATE machines SET state = ?1 WHERE state IN (?2, ?3, ?4)",
                 params![
                     MachineState::Failed.as_str(),
                     MachineState::Created.as_str(),
-                    MachineState::Starting.as_str()
+                    MachineState::Starting.as_str(),
+                    MachineState::Stopped.as_str()
                 ],
             )?;
             let deployments = store.execute(
@@ -139,11 +140,15 @@ mod tests {
             .set_machine_state(starting.id, MachineState::Starting)
             .unwrap();
         store.create_machine(deployment.id).unwrap();
+        let paused = store.create_machine(deployment.id).unwrap();
+        store
+            .set_machine_state(paused.id, MachineState::Stopped)
+            .unwrap();
 
         assert_eq!(
             store.fail_interrupted().unwrap(),
             Interrupted {
-                machines: 2,
+                machines: 3,
                 deployments: 1
             }
         );

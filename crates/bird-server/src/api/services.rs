@@ -1,10 +1,11 @@
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use bird_api::ErrorBody;
-use bird_api::{DeploymentSummary, MachineSummary, ServiceSummary};
+use bird_api::{DeploymentSummary, MachineSummary, ServiceSummary, VolumeSpec};
 use bird_core::{MachineState, Name};
 use bird_store::Store;
+use serde::Deserialize;
 
 use crate::state::AppState;
 use crate::{Result, deploy};
@@ -26,13 +27,22 @@ pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<Servi
     Ok(Json(summaries))
 }
 
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct RemoveQuery {
+    /// Also delete the service's volumes and the data on them; required when it has any
+    #[serde(default)]
+    purge: bool,
+}
+
 /// Remove a service and its machines
-#[utoipa::path(delete, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name")), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(delete, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name"), RemoveQuery), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Path(name): Path<Name>,
+    Query(query): Query<RemoveQuery>,
 ) -> Result<StatusCode> {
-    let task = tokio::spawn(async move { deploy::remove_service(&state, name).await });
+    let task = tokio::spawn(async move { deploy::remove_service(&state, name, query.purge).await });
     match task.await {
         Ok(result) => result.map(|()| StatusCode::NO_CONTENT),
         Err(err) => Err(std::io::Error::other(err).into()),
@@ -40,6 +50,14 @@ pub(crate) async fn remove(
 }
 
 fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<ServiceSummary> {
+    let volumes = store
+        .list_volumes(service.id)?
+        .into_iter()
+        .map(|v| VolumeSpec {
+            name: v.name,
+            path: v.mount_path,
+        })
+        .collect();
     let domains = store
         .list_domains(service.id)?
         .into_iter()
@@ -53,6 +71,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             replicas: service.replicas,
             health: service.health,
             domains,
+            volumes,
             deployment: None,
         });
     };
@@ -72,6 +91,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         replicas: service.replicas,
         health: service.health,
         domains,
+        volumes,
         deployment: Some(DeploymentSummary {
             id: active.id,
             status: active.status,
