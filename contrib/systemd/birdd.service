@@ -1,0 +1,24 @@
+# Rootless user unit for birdd.
+#
+# Install:
+#   install -Dm755 target/release/birdd target/release/bird -t ~/.local/bin
+#   install -Dm644 contrib/systemd/birdd.service -t ~/.config/systemd/user
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now podman.socket birdd
+#   loginctl enable-linger "$USER"   # start at boot without a login session
+
+[Unit]
+Description=bird daemon (API, proxy and machine supervisor)
+Wants=podman.socket
+After=podman.socket
+
+[Service]
+Type=exec
+ExecStart=%h/.local/bin/birdd
+Environment=RUST_LOG=info
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=45
+
+[Install]
+WantedBy=default.target
