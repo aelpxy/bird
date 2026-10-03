@@ -1,3 +1,4 @@
+mod build;
 mod deploy;
 mod domains;
 mod env;

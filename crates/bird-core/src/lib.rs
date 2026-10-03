@@ -16,4 +16,6 @@ pub use model::{
 };
 pub use replicas::Replicas;
 pub use resources::{CpuLimit, MemoryLimit};
-pub use value::{EnvKey, Hostname, ImageRef, MountPath, Name, Port, RegistryHost, ValidationError};
+pub use value::{
+    BuildFile, EnvKey, Hostname, ImageRef, MountPath, Name, Port, RegistryHost, ValidationError,
+};

@@ -20,6 +20,7 @@ const TOKEN_SCHEME: &str = "api_token";
         (name = "logs", description = "Recent and live logs of running machines"),
         (name = "templates", description = "Ready-made services such as Postgres and Valkey"),
         (name = "registries", description = "Credentials for pulling private images"),
+        (name = "builds", description = "Images built from source on the server"),
     )
 )]
 struct ApiDoc;
@@ -97,6 +98,7 @@ mod tests {
             "/v1/services/{name}/variables/{key}",
             "/v1/templates",
             "/v1/registries",
+            "/v1/services/{name}/builds",
             "/v1/registries/{host}",
             "/v1/templates/{template}/deploy",
         ] {

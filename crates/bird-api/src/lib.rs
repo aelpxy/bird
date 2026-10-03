@@ -1,3 +1,4 @@
+mod builds;
 mod deploy;
 mod deployments;
 mod domains;
@@ -11,12 +12,13 @@ mod templates;
 mod variables;
 mod volumes;
 
+pub use builds::BuildEvent;
 pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};
 pub use domains::AddDomain;
 pub use error::ErrorBody;
 pub use logs::{LogEntry, LogStream};
-pub use manifest::{MANIFEST_FILE, Manifest};
+pub use manifest::{BuildSpec, MANIFEST_FILE, Manifest};
 pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};

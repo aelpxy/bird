@@ -154,7 +154,11 @@ pub(crate) struct DeployArgs {
     /// Service name, overrides bird.toml
     pub(crate) name: Option<Name>,
     /// Image to run, overrides bird.toml
+    #[arg(conflicts_with = "build")]
     pub(crate) image: Option<ImageRef>,
+    /// Build the image on the server from this directory's Dockerfile instead of pulling one
+    #[arg(long, value_name = "DIR", num_args = 0..=1, default_missing_value = ".")]
+    pub(crate) build: Option<PathBuf>,
     /// Service manifest to read instead of ./bird.toml
     #[arg(long, short = 'c')]
     pub(crate) config: Option<PathBuf>,

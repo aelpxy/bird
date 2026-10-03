@@ -3,8 +3,8 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use bird_core::{
-    Deployment, DeploymentId, EnvKey, HealthCheck, MachineId, MachineState, MemoryLimit, Port,
-    Service,
+    Deployment, DeploymentId, EnvKey, HealthCheck, ImageRef, MachineId, MachineState, MemoryLimit,
+    Port, Service,
 };
 use bird_podman::{ContainerSpec, ContainerState, Limits, RegistryAuth};
 use tokio::time::Instant;
@@ -19,13 +19,15 @@ const READY_POLL: Duration = Duration::from_millis(250);
 const STOP_GRACE: Duration = Duration::from_secs(10);
 const FAILURE_LOG_LINES: u32 = 30;
 
-pub(crate) async fn launch(
-    state: &AppState,
-    service: &Service,
-    deployment: &Deployment,
-    env: BTreeMap<EnvKey, String>,
-) -> Result<()> {
-    let host = deployment.image.registry();
+// built images live only in local podman storage, there is nothing to pull them from
+async fn ensure_image(state: &AppState, image: &ImageRef) -> Result<()> {
+    if image.is_local() {
+        if state.podman.image_exists(image).await? {
+            return Ok(());
+        }
+        return Err(Error::LocalImageMissing(image.clone()));
+    }
+    let host = image.registry();
     let auth = state
         .db
         .call(move |store| store.registry(&host))
@@ -35,10 +37,17 @@ pub(crate) async fn launch(
             password: registry.password,
             tls_verify: !registry.insecure,
         });
-    state
-        .podman
-        .pull_image(&deployment.image, auth.as_ref())
-        .await?;
+    state.podman.pull_image(image, auth.as_ref()).await?;
+    Ok(())
+}
+
+pub(crate) async fn launch(
+    state: &AppState,
+    service: &Service,
+    deployment: &Deployment,
+    env: BTreeMap<EnvKey, String>,
+) -> Result<()> {
+    ensure_image(state, &deployment.image).await?;
 
     let service_id = service.id;
     let attached = state

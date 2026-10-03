@@ -1,5 +1,5 @@
 use bird_api::{DeployRequest, Manifest, TemplateSummary};
-use bird_core::{EnvKey, Name};
+use bird_core::{EnvKey, ImageRef, Name};
 
 use crate::{Error, Result};
 
@@ -14,6 +14,7 @@ const BUILT_IN: [&str; 2] = [
 pub(crate) struct Template {
     description: String,
     connection: Option<EnvKey>,
+    image: ImageRef,
     manifest: Manifest,
 }
 
@@ -29,12 +30,19 @@ impl Template {
             Some(_) => return Err(invalid(&"connection must be a string")),
             None => None,
         };
-        let manifest = toml::Value::Table(table)
+        let manifest: Manifest = toml::Value::Table(table)
             .try_into()
             .map_err(|err| invalid(&err))?;
+        let Some(image) = manifest.image.clone() else {
+            return Err(invalid(&"templates need an image"));
+        };
+        if manifest.build.is_some() {
+            return Err(invalid(&"templates cannot build from source"));
+        }
         Ok(Self {
             description,
             connection,
+            image,
             manifest,
         })
     }
@@ -51,7 +59,7 @@ impl Template {
         TemplateSummary {
             name: self.manifest.name.clone(),
             description: self.description.clone(),
-            image: self.manifest.image.clone(),
+            image: self.image.clone(),
         }
     }
 
@@ -62,7 +70,7 @@ impl Template {
         for value in manifest.env.values_mut() {
             *value = value.replace(SERVICE_PLACEHOLDER, service.as_str());
         }
-        manifest.into_request()
+        manifest.into_request(self.image.clone())
     }
 }
 

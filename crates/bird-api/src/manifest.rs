@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use bird_core::{
-    Command, CpuLimit, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
+    BuildFile, Command, CpuLimit, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -16,7 +17,10 @@ pub const MANIFEST_FILE: &str = "bird.toml";
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub name: Name,
-    pub image: ImageRef,
+    #[serde(default)]
+    pub image: Option<ImageRef>,
+    #[serde(default)]
+    pub build: Option<BuildSpec>,
     #[serde(default)]
     pub port: Option<Port>,
     #[serde(default)]
@@ -35,12 +39,42 @@ pub struct Manifest {
     pub volumes: Vec<VolumeSpec>,
 }
 
+// builds the image from source on the server instead of pulling one
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BuildSpec {
+    /// Directory sent to the server, relative to bird.toml; defaults to its directory
+    #[serde(default)]
+    pub context: Option<PathBuf>,
+    /// Defaults to Dockerfile in the context
+    #[serde(default)]
+    pub dockerfile: Option<BuildFile>,
+}
+
 impl Manifest {
     #[must_use]
-    pub fn into_request(self) -> DeployRequest {
+    pub fn named(name: Name) -> Self {
+        Self {
+            name,
+            image: None,
+            build: None,
+            port: None,
+            domains: Vec::new(),
+            health: None,
+            command: None,
+            memory: None,
+            cpus: None,
+            env: BTreeMap::new(),
+            volumes: Vec::new(),
+        }
+    }
+
+    // the image comes from the manifest, a flag or a build, so the caller settles it
+    #[must_use]
+    pub fn into_request(self, image: ImageRef) -> DeployRequest {
         DeployRequest {
             name: self.name,
-            image: self.image,
+            image,
             port: self.port.unwrap_or(Port::HTTP),
             domains: self.domains,
             env: self.env,

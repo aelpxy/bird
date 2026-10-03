@@ -18,6 +18,7 @@ tokio = { workspace = true, features = ["net", "time", "macros"] }
 tracing.workspace = true
 
 [dev-dependencies]
+tar.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util"] }
 
 [lints]

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited};
-use hyper::body::Incoming;
+use hyper::body::{Body, Incoming};
 use hyper::header::{CONTENT_TYPE, HOST};
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
@@ -90,6 +90,55 @@ impl Transport {
         tokio::time::timeout(timeout, self.open_stream(path))
             .await
             .map_err(|_| Error::Timeout)?
+    }
+
+    // streams the request body to podman, then hands back the streamed response
+    pub(crate) async fn upload<B>(
+        &self,
+        path: &str,
+        content_type: &str,
+        body: B,
+        timeout: Duration,
+    ) -> Result<Streamed>
+    where
+        B: Body<Data = Bytes> + Send + 'static,
+        B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        tracing::debug!(path, "podman upload");
+        tokio::time::timeout(timeout, self.open_upload(path, content_type, body))
+            .await
+            .map_err(|_| Error::Timeout)?
+    }
+
+    async fn open_upload<B>(&self, path: &str, content_type: &str, body: B) -> Result<Streamed>
+    where
+        B: Body<Data = Bytes> + Send + 'static,
+        B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        let stream = UnixStream::connect(&*self.socket)
+            .await
+            .map_err(|source| Error::Connect {
+                path: self.socket.to_path_buf(),
+                source,
+            })?;
+        let (mut sender, conn) =
+            hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?;
+        tokio::spawn(async move {
+            if let Err(err) = conn.await {
+                tracing::debug!(error = %err, "podman upload connection closed");
+            }
+        });
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("{API_PREFIX}{path}"))
+            .header(HOST, "podman")
+            .header(CONTENT_TYPE, content_type)
+            .body(body)?;
+        let response = sender.send_request(request).await?;
+        Ok(Streamed {
+            status: response.status(),
+            body: response.into_body(),
+        })
     }
 
     async fn open_stream(&self, path: &str) -> Result<Streamed> {
