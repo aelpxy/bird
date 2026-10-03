@@ -9,6 +9,7 @@ use bird_store::Store;
 use crate::state::AppState;
 use crate::{Result, deploy};
 
+/// List services
 #[utoipa::path(get, path = "/v1/services", tag = "services", responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<ServiceSummary>>> {
     let environment_id = state.environment_id;
@@ -25,6 +26,7 @@ pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<Servi
     Ok(Json(summaries))
 }
 
+/// Remove a service and its machines
 #[utoipa::path(delete, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name")), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,

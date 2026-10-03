@@ -8,7 +8,7 @@ const TOKEN_SCHEME: &str = "api_token";
 #[openapi(
     info(
         title = "bird",
-        description = "Deploy and run containers on a bird server. Every endpoint except this document needs the API token from birdd's data directory as a bearer token."
+        description = "Deploy and run containers on a bird server. Browse these docs at /docs. Every endpoint except the docs needs the API token from birdd's data directory as a bearer token."
     ),
     modifiers(&BearerToken),
     security(("api_token" = [])),

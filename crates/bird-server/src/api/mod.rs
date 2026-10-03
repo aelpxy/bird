@@ -1,6 +1,7 @@
 mod auth;
 mod deploy;
 mod deployments;
+mod docs;
 mod domains;
 mod error;
 mod logs;
@@ -30,6 +31,7 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
     let spec: Arc<str> = openapi::render(&spec).into();
     api.layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::from_fn_with_state(token, auth::require_token))
+        .route("/docs", get(docs::page))
         .route(
             "/v1/openapi.json",
             get(move || {
