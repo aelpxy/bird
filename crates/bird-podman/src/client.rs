@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::Result;
 use crate::error::check;
-use crate::transport::{Response, Transport};
+use crate::transport::{Response, Streamed, Transport};
 
 pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -47,6 +47,10 @@ impl Podman {
         self.transport
             .send(Method::POST, path, Some(body), DEFAULT_TIMEOUT)
             .await
+    }
+
+    pub(crate) async fn stream(&self, path: &str) -> Result<Streamed> {
+        self.transport.stream(path, DEFAULT_TIMEOUT).await
     }
 
     pub(crate) async fn send(

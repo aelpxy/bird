@@ -28,7 +28,9 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         }
         Command::Scale { name, replicas } => scale::run(&connect(args.api)?, &name, replicas).await,
         Command::Env { command } => env::run(&connect(args.api)?, command).await,
-        Command::Logs { name, tail } => logs::run(&connect(args.api)?, &name, tail).await,
+        Command::Logs { name, tail, follow } => {
+            logs::run(&connect(args.api)?, &name, tail, follow).await
+        }
     }
 }
 

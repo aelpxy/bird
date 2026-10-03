@@ -1,3 +1,4 @@
+use bird_core::MachineId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -9,6 +10,7 @@ pub enum LogStream {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogEntry {
+    pub machine: MachineId,
     pub stream: LogStream,
     pub text: String,
 }

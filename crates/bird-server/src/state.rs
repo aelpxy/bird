@@ -7,6 +7,7 @@ use tokio::sync::Notify;
 
 use crate::db::Db;
 use crate::deploy::DeployGuard;
+use crate::shutdown::Shutdown;
 use crate::{Error, Result};
 
 #[derive(Clone)]
@@ -19,6 +20,7 @@ pub(crate) struct AppState {
     pub(crate) deploys: DeployGuard,
     pub(crate) domains_changed: Arc<Notify>,
     pub(crate) reconcile_now: Arc<Notify>,
+    pub(crate) shutdown: Shutdown,
 }
 
 impl AppState {
