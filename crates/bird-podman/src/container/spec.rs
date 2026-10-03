@@ -20,6 +20,8 @@ pub(super) struct SpecGenerator<'a> {
     resource_limits: ResourceLimits,
     portmappings: [PortMapping; 1],
     restart_policy: &'static str,
+    // most apps ignore SIGTERM as pid 1, so stops would wait out the grace period and get killed
+    init: bool,
 }
 
 #[derive(Serialize)]
@@ -109,6 +111,7 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                 protocol: "tcp",
             }],
             restart_policy: "unless-stopped",
+            init: true,
         }
     }
 }
@@ -150,6 +153,7 @@ mod tests {
             serde_json::json!(["web", "web.internal"])
         );
         assert_eq!(json["netns"]["nsmode"], "bridge");
+        assert_eq!(json["init"], true);
         assert_eq!(json["portmappings"][0]["container_port"], 80);
         assert_eq!(json["portmappings"][0]["host_ip"], "127.0.0.1");
         assert_eq!(
