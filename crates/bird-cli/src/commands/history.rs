@@ -26,13 +26,14 @@ pub(crate) async fn history(client: &ApiClient, name: &Name) -> Result<()> {
                 d.id.to_string(),
                 d.status.to_string(),
                 d.image.to_string(),
+                d.variables.to_string(),
                 ago(now.saturating_sub(d.created_at)),
             ]
         })
         .collect();
     print!(
         "{}",
-        render(&["DEPLOYMENT", "STATUS", "IMAGE", "CREATED"], &rows)
+        render(&["DEPLOYMENT", "STATUS", "IMAGE", "VARS", "CREATED"], &rows)
     );
     Ok(())
 }
@@ -42,10 +43,11 @@ pub(crate) async fn rollback(
     name: &Name,
     deployment_id: Option<DeploymentId>,
 ) -> Result<()> {
-    match deployment_id {
-        Some(id) => println!("rolling {name} back to deployment {id}..."),
-        None => println!("rolling {name} back to its previous deployment..."),
-    }
+    let target = match deployment_id {
+        Some(id) => format!("deployment {id}"),
+        None => "its previous deployment".to_owned(),
+    };
+    println!("rolling {name} back to {target} (image, port and variables)...");
     let request = RollbackRequest { deployment_id };
     let response: DeployResponse = client
         .post(
@@ -55,7 +57,6 @@ pub(crate) async fn rollback(
         )
         .await?;
     print_deployed(&response);
-    println!("note: rollbacks restore the image and port, variables stay as they are now");
     Ok(())
 }
 

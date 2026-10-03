@@ -7,6 +7,7 @@ pub struct DeploymentInfo {
     pub image: ImageRef,
     pub port: Port,
     pub status: DeploymentStatus,
+    pub variables: usize,
     pub created_at: i64,
 }
 

@@ -143,14 +143,15 @@ impl Supervisor {
         if !backoff.ready(Instant::now()) {
             return;
         }
-        let service_id = service.id;
+        // replacements run what the deployment was deployed with, not unapplied variable edits
+        let deployment_id = deployment.id;
         let env: BTreeMap<EnvKey, String> = match self
             .state
             .db
-            .call(move |store| store.list_variables(service_id))
+            .call(move |store| store.deployment_variables(deployment_id))
             .await
         {
-            Ok(variables) => variables.into_iter().map(|v| (v.key, v.value)).collect(),
+            Ok(env) => env,
             Err(err) => {
                 tracing::warn!(service = %service.name, error = %err, "could not load variables for replacement");
                 return;
