@@ -1,5 +1,8 @@
 // an in-process birdd against the real podman, with its own data dir, ports and networks
-#![allow(dead_code, reason = "each test binary uses a different part of the harness")]
+#![allow(
+    dead_code,
+    reason = "each test binary uses a different part of the harness"
+)]
 
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -83,7 +86,10 @@ impl Birdd {
             .await
             .is_err()
         {
-            assert!(tokio::time::Instant::now() < deadline, "birdd never started");
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "birdd never started"
+            );
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         let root = std::fs::read_to_string(data_dir.join("api-token"))
@@ -107,7 +113,13 @@ impl Birdd {
         format!("{}{name}", self.prefix)
     }
 
-    pub async fn call(&self, token: &str, method: Method, path: &str, body: Option<Value>) -> Response {
+    pub async fn call(
+        &self,
+        token: &str,
+        method: Method,
+        path: &str,
+        body: Option<Value>,
+    ) -> Response {
         let mut request = self
             .http
             .request(method, format!("http://{}{path}", self.api))
@@ -145,7 +157,11 @@ impl Birdd {
     // a user with that role and their first token
     pub async fn user(&self, name: &str, role: &str) -> String {
         let created = self
-            .post(&self.root, "/v1/users", json!({ "name": name, "role": role }))
+            .post(
+                &self.root,
+                "/v1/users",
+                json!({ "name": name, "role": role }),
+            )
             .await;
         assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.body);
         created
@@ -167,16 +183,29 @@ impl Birdd {
 
     // runs a command in a service's machine, returning its exit code and output; a command that
     // could not run gives -1 and the reason
-    pub async fn exec(&self, token: &str, scope: &str, service: &str, command: &[&str]) -> (i32, String) {
+    pub async fn exec(
+        &self,
+        token: &str,
+        scope: &str,
+        service: &str,
+        command: &[&str],
+    ) -> (i32, String) {
         let response = self
             .http
-            .post(format!("http://{}{scope}/services/{service}/exec", self.api))
+            .post(format!(
+                "http://{}{scope}/services/{service}/exec",
+                self.api
+            ))
             .bearer_auth(token)
             .json(&json!({ "command": command }))
             .send()
             .await
             .expect("birdd answers");
-        assert!(response.status().is_success(), "exec refused: {}", response.status());
+        assert!(
+            response.status().is_success(),
+            "exec refused: {}",
+            response.status()
+        );
         let text = response.text().await.expect("a readable stream");
         let mut output = String::new();
         for line in text.lines() {
@@ -185,13 +214,18 @@ impl Birdd {
             match field("type").as_str() {
                 Some("output") => output.push_str(field("text").as_str().unwrap_or_default()),
                 Some("exited") => {
-                    let code = field("code").as_i64().and_then(|code| i32::try_from(code).ok());
+                    let code = field("code")
+                        .as_i64()
+                        .and_then(|code| i32::try_from(code).ok());
                     return (code.unwrap_or(-1), output);
                 }
                 _ => return (-1, format!("{output}{event}")),
             }
         }
-        (-1, format!("{output}(the stream ended without an exit code)"))
+        (
+            -1,
+            format!("{output}(the stream ended without an exit code)"),
+        )
     }
 
     pub async fn stop(mut self) {
