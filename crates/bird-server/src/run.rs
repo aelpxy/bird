@@ -17,7 +17,7 @@ use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
 use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
-use crate::{Config, Error, Result, api, data_dir, listen};
+use crate::{Config, Error, Result, api, data_dir, listen, routing};
 
 const DEFAULT_PROJECT: &str = "default";
 const DEFAULT_ENVIRONMENT: &str = "production";
@@ -58,8 +58,9 @@ pub async fn run(config: Config) -> Result<()> {
         backups: Arc::new(backup_storage(&config, &data_dir)),
     };
     supervisor::recover_interrupted(&state).await?;
-    let mut supervisor = Supervisor::new(state.clone());
-    supervisor.sweep().await;
+    // machines keep running across a restart, so their recorded routes serve until the first sweep
+    routing::refresh(&state).await?;
+    let supervisor = Supervisor::new(state.clone());
 
     let edge = edge(&config, &state).await?;
     let scheduler = Scheduler::new(state.clone(), database_backups(&config, &data_dir));
