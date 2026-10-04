@@ -19,7 +19,7 @@ pub use container::{
     ContainerInfo, ContainerSpec, ContainerState, Lifecycle, Limits, PublishedPort,
 };
 pub use error::{Error, Result};
-pub use exec::ExecSession;
+pub use exec::{ExecInfo, ExecSession, TtySession};
 pub use follow::LogFollower;
 pub use logs::{LogLine, LogStream};
 pub use volume::VolumeMount;

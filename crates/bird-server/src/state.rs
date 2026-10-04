@@ -24,6 +24,8 @@ pub(crate) struct AppState {
     pub(crate) shutdown: Shutdown,
     pub(crate) builds: Arc<Semaphore>,
     pub(crate) backups: Arc<BackupStorage>,
+    // one permit per open terminal, held until its process is hung up
+    pub(crate) terminals: Arc<Semaphore>,
 }
 
 impl AppState {

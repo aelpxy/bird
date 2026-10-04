@@ -58,8 +58,11 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::EmptyCredentials
         | Error::InvalidBuildArgs(_)
         | Error::AmbiguousMachine(_)
+        | Error::InvalidTtyRequest(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+        Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
+        Error::TooManyTerminals => StatusCode::SERVICE_UNAVAILABLE,
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }

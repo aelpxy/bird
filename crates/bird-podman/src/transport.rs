@@ -5,7 +5,8 @@ use std::time::Duration;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::body::{Body, Incoming};
-use hyper::header::{CONTENT_TYPE, HOST};
+use hyper::header::{CONNECTION, CONTENT_TYPE, HOST, UPGRADE};
+use hyper::upgrade::Upgraded;
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use tokio::net::UnixStream;
@@ -139,6 +140,58 @@ impl Transport {
             status: response.status(),
             body: response.into_body(),
         })
+    }
+
+    // podman hands the connection over to the process: raw output out, raw input in, until it exits
+    pub(crate) async fn upgrade(
+        &self,
+        path: &str,
+        body: Vec<u8>,
+        timeout: Duration,
+    ) -> Result<TokioIo<Upgraded>> {
+        tracing::debug!(path, "podman upgrade");
+        tokio::time::timeout(timeout, self.open_upgrade(path, body))
+            .await
+            .map_err(|_| Error::Timeout)?
+    }
+
+    async fn open_upgrade(&self, path: &str, body: Vec<u8>) -> Result<TokioIo<Upgraded>> {
+        let stream = UnixStream::connect(&*self.socket)
+            .await
+            .map_err(|source| Error::Connect {
+                path: self.socket.to_path_buf(),
+                source,
+            })?;
+        let (mut sender, conn) =
+            hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?;
+        tokio::spawn(async move {
+            if let Err(err) = conn.with_upgrades().await {
+                tracing::debug!(error = %err, "podman upgrade connection closed");
+            }
+        });
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("{API_PREFIX}{path}"))
+            .header(HOST, "podman")
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONNECTION, "Upgrade")
+            .header(UPGRADE, "tcp")
+            .body(Full::new(Bytes::from(body)))?;
+        let response = sender.send_request(request).await?;
+        let status = response.status();
+        if status != StatusCode::SWITCHING_PROTOCOLS {
+            let body = Limited::new(response.into_body(), MAX_RESPONSE_BYTES)
+                .collect()
+                .await
+                .map_err(Error::Body)?
+                .to_bytes();
+            crate::error::check(Response { status, body }, || path.to_owned())?;
+            return Err(Error::Api {
+                status: status.as_u16(),
+                message: "podman did not hand over the connection".to_owned(),
+            });
+        }
+        Ok(TokioIo::new(hyper::upgrade::on(response).await?))
     }
 
     async fn open_stream(&self, path: &str) -> Result<Streamed> {

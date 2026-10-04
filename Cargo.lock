@@ -230,6 +230,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "rustix",
  "serde",
  "serde_json",
  "tar",
@@ -296,8 +297,11 @@ dependencies = [
  "clap",
  "http-body",
  "http-body-util",
+ "hyper",
+ "hyper-util",
  "instant-acme",
  "rcgen",
+ "rustix",
  "serde",
  "serde_json",
  "thiserror",
@@ -917,6 +921,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
 name = "log"
 version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1206,6 +1216,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf0c4a6ece9950b9abdb62b1cfcf2a68b3b67a10ba445b3bb85be2a293d0632"
 dependencies = [
  "nom",
+]
+
+[[package]]
+name = "rustix"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "891efababe418670775f199f0d233d84843c227a0949a883ce15b37c78d6629d"
+dependencies = [
+ "bitflags",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -108,3 +108,53 @@ async fn one_off_container_reports_output_and_exit_code() {
     assert_eq!(info.ports, Vec::new());
     podman.remove_container(&id).await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "requires a running podman socket"]
+async fn tty_exec_is_interactive_and_resizable() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let podman = podman();
+    podman
+        .pull_image(&IMAGE.parse().unwrap(), None)
+        .await
+        .unwrap();
+    let name = "bird-test-tty";
+    let _ = podman.remove_container(name).await;
+    let id = podman
+        .create_container(&spec(name, "sleep 60"))
+        .await
+        .unwrap();
+    podman.start_container(&id).await.unwrap();
+
+    let mut session = podman.exec_tty(&id, &["sh".to_owned()]).await.unwrap();
+    podman.resize_exec(session.id(), 132, 40).await.unwrap();
+    session
+        .io
+        .write_all(b"stty size; echo $((6 * 7)); exit 4\n")
+        .await
+        .unwrap();
+    let mut output = Vec::new();
+    tokio::time::timeout(Duration::from_secs(10), session.io.read_to_end(&mut output))
+        .await
+        .unwrap()
+        .unwrap();
+    let output = String::from_utf8_lossy(&output);
+    assert!(output.contains("40 132"), "{output}");
+    assert!(output.contains("42"), "{output}");
+    let info = podman.inspect_exec(session.id()).await.unwrap();
+    assert_eq!((info.running, info.exit_code), (false, 4));
+
+    // podman keeps a terminal session running when its client leaves, so callers must hang it up
+    let abandoned = podman
+        .exec_tty(&id, &["sleep".to_owned(), "300".to_owned()])
+        .await
+        .unwrap();
+    let abandoned_id = abandoned.id().to_owned();
+    drop(abandoned);
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let info = podman.inspect_exec(&abandoned_id).await.unwrap();
+    assert!(info.running);
+    assert!(info.pid.is_some());
+    podman.remove_container(&id).await.unwrap();
+}
