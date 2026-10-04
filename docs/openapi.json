@@ -1292,7 +1292,7 @@
           {
             "name": "follow",
             "in": "query",
-            "description": "Keep the response open and stream new lines as they are written",
+            "description": "Keep the response open and stream new lines as they are written, also from machines that\nstart later, like replacements from a deploy",
             "required": false,
             "schema": {
               "type": "boolean"

@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use hyper::body::Incoming;
 
 use crate::error::check;
@@ -13,6 +15,14 @@ pub(crate) const FRAME_HEADER_LEN: usize = 8;
 pub enum LogStream {
     Stdout,
     Stderr,
+}
+
+// where following a container's logs starts
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogStart {
+    Tail(u32),
+    Since(SystemTime),
+    Beginning,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,9 +42,17 @@ impl Podman {
         Ok(demux(&body))
     }
 
-    pub async fn follow_logs(&self, id: &str, tail: u32) -> Result<LogFollower> {
+    pub async fn follow_logs(&self, id: &str, from: LogStart) -> Result<LogFollower> {
+        let from = match from {
+            LogStart::Tail(lines) => format!("&tail={lines}"),
+            LogStart::Since(time) => {
+                let elapsed = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+                format!("&since={}.{:09}", elapsed.as_secs(), elapsed.subsec_nanos())
+            }
+            LogStart::Beginning => String::new(),
+        };
         let path = format!(
-            "/containers/{}/logs?follow=true&stdout=true&stderr=true&tail={tail}",
+            "/containers/{}/logs?follow=true&stdout=true&stderr=true{from}",
             encode(id)
         );
         Ok(LogFollower::new(self.follow(id, &path).await?))
