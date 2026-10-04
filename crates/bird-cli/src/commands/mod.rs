@@ -10,6 +10,7 @@ mod init;
 mod list;
 mod login;
 mod logs;
+mod orgs;
 mod pipe;
 mod power;
 mod projects;
@@ -29,8 +30,8 @@ use anyhow::Result;
 use bird_core::Name;
 
 use crate::args::{
-    Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, ProjectCommand,
-    RegistryCommand, TokenCommand, UserCommand,
+    Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, OrgCommand,
+    ProjectCommand, RegistryCommand, TokenCommand, UserCommand,
 };
 use crate::client::ApiClient;
 use crate::scope::{Scope, Sources};
@@ -140,6 +141,9 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             project,
             environment,
         } => projects::switch(&connect(api)?, project, environment).await,
+        Command::Org { command } => {
+            orgs::run(&connect(api)?, command.unwrap_or(OrgCommand::List), out).await
+        }
         Command::Whoami => users::whoami(&connect(api)?, out).await,
         Command::User { command } => {
             users::user(&connect(api)?, command.unwrap_or(UserCommand::List), out).await

@@ -41,16 +41,405 @@
         }
       }
     },
+    "/v1/orgs": {
+      "get": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "List your orgs, or every org for server admins",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "Orgs with your role in each",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Create an org, for server admins; a user who creates one becomes its owner",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrg"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Org created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org}": {
+      "delete": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Delete an org that owns no projects, for its owners",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "description": "Org name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Org deleted"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org}/members": {
+      "get": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "List an org's members, for its members",
+        "operationId": "members",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "description": "Org name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members and their roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrgMember"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/orgs/{org}/members/{user}": {
+      "put": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Add a user to an org or change their role, for its owners",
+        "operationId": "set_member",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "description": "Org name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetMember"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Member set"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Remove a user from an org, for its owners or the user leaving",
+        "operationId": "remove_member",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "description": "Org name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Member removed"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects": {
       "get": {
         "tags": [
           "projects"
         ],
-        "summary": "List projects and their environments",
+        "summary": "List the projects of your orgs, or every project for server admins",
         "operationId": "list",
         "responses": {
           "200": {
-            "description": "Projects with their environments",
+            "description": "Projects with their org and environments",
             "content": {
               "application/json": {
                 "schema": {
@@ -78,7 +467,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Create a project with a `production` environment",
+        "summary": "Create a project with a `production` environment, for the org's admins",
         "operationId": "create",
         "requestBody": {
           "content": {
@@ -121,6 +510,26 @@
               }
             }
           },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflicting state or operation in progress",
             "content": {
@@ -139,7 +548,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Delete a project whose environments have no services or backups left",
+        "summary": "Delete a project whose environments have no services or backups left, for the org's admins",
         "operationId": "remove",
         "parameters": [
           {
@@ -158,6 +567,16 @@
           },
           "401": {
             "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
             "content": {
               "application/json": {
                 "schema": {
@@ -194,7 +613,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Create an environment, with its own private network",
+        "summary": "Create an environment, with its own private network, for the org's admins",
         "operationId": "create_environment",
         "parameters": [
           {
@@ -248,6 +667,16 @@
               }
             }
           },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Service or resource not found",
             "content": {
@@ -276,7 +705,7 @@
         "tags": [
           "projects"
         ],
-        "summary": "Delete an environment that has no services or backups left",
+        "summary": "Delete an environment that has no services or backups left, for the org's admins",
         "operationId": "remove_environment",
         "parameters": [
           {
@@ -304,6 +733,16 @@
           },
           "401": {
             "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
             "content": {
               "application/json": {
                 "schema": {
@@ -3939,6 +4378,18 @@
           }
         }
       },
+      "CreateOrg": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateProject": {
         "type": "object",
         "description": "A new project, which starts with a `production` environment",
@@ -3948,6 +4399,17 @@
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Name"
+          },
+          "org": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Name",
+                "description": "Org that owns it; left out, the one org you administer, or `default` for server admins"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false
@@ -4449,6 +4911,51 @@
       "Name": {
         "type": "string"
       },
+      "OrgMember": {
+        "type": "object",
+        "required": [
+          "user",
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrgRole"
+          },
+          "user": {
+            "$ref": "#/components/schemas/Name"
+          }
+        }
+      },
+      "OrgRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin",
+          "member"
+        ]
+      },
+      "OrgSummary": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrgRole",
+                "description": "Your role in it; server admins see every org, also ones they do not belong to"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Port": {
         "type": "integer",
         "format": "int32",
@@ -4458,6 +4965,7 @@
         "type": "object",
         "required": [
           "name",
+          "org",
           "environments"
         ],
         "properties": {
@@ -4468,6 +4976,9 @@
             }
           },
           "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "org": {
             "$ref": "#/components/schemas/Name"
           }
         }
@@ -4680,6 +5191,18 @@
             }
           }
         }
+      },
+      "SetMember": {
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrgRole"
+          }
+        },
+        "additionalProperties": false
       },
       "TemplateDeployResponse": {
         "type": "object",
@@ -4902,6 +5425,10 @@
     {
       "name": "users",
       "description": "Users and their API tokens"
+    },
+    {
+      "name": "orgs",
+      "description": "Orgs own projects; their members work in them"
     },
     {
       "name": "projects",

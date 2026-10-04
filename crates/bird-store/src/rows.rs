@@ -81,8 +81,9 @@ fn replicas(row: &Row<'_>, idx: usize) -> rusqlite::Result<Replicas> {
 pub(crate) fn project(row: &Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
         id: parse(row, 0)?,
-        name: parse(row, 1)?,
-        created_at: row.get(2)?,
+        org_id: parse(row, 1)?,
+        name: parse(row, 2)?,
+        created_at: row.get(3)?,
     })
 }
 

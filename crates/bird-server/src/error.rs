@@ -50,6 +50,18 @@ pub enum Error {
     CommandConflict,
     #[error("invalid path: {0}")]
     InvalidPath(String),
+    #[error("org {0} not found, see `bird org list`")]
+    OrgNotFound(Name),
+    #[error("org {0} already exists")]
+    OrgExists(Name),
+    #[error("org {org} still owns projects {}; delete them first with `bird project rm`", .projects.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    OrgHasProjects { org: Name, projects: Vec<Name> },
+    #[error("{user} is the last owner of {org}; make someone else owner first")]
+    LastOwner { org: Name, user: Name },
+    #[error("{user} is not a member of {org}")]
+    NotMember { org: Name, user: Name },
+    #[error("{0}")]
+    PickOrg(String),
     #[error("user {0} not found, see `bird user list`")]
     UserNotFound(Name),
     #[error("user {0} already exists")]

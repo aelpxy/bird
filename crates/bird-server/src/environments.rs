@@ -1,4 +1,4 @@
-use bird_core::{Environment, Name, Project};
+use bird_core::{Environment, Name, OrgId, Project};
 
 use crate::state::AppState;
 use crate::{Error, Result};
@@ -11,7 +11,7 @@ pub(crate) async fn find(
     state: &AppState,
     project: &Name,
     environment: &Name,
-) -> Result<Environment> {
+) -> Result<(Project, Environment)> {
     let (lookup_project, lookup_environment) = (project.clone(), environment.clone());
     let found = state
         .db
@@ -19,19 +19,27 @@ pub(crate) async fn find(
             let Some(project) = store.project_by_name(&lookup_project)? else {
                 return Ok(None);
             };
-            Ok(Some(
-                store.environment_by_name(project.id, &lookup_environment)?,
-            ))
+            let environment = store.environment_by_name(project.id, &lookup_environment)?;
+            Ok(Some((project, environment)))
         })
         .await?;
     match found {
         None => Err(Error::ProjectNotFound(project.clone())),
-        Some(None) => Err(Error::EnvironmentNotFound {
+        Some((_, None)) => Err(Error::EnvironmentNotFound {
             project: project.clone(),
             environment: environment.clone(),
         }),
-        Some(Some(environment)) => Ok(environment),
+        Some((project, Some(environment))) => Ok((project, environment)),
     }
+}
+
+pub(crate) async fn project(state: &AppState, name: &Name) -> Result<Project> {
+    let lookup = name.clone();
+    state
+        .db
+        .call(move |store| store.project_by_name(&lookup))
+        .await?
+        .ok_or_else(|| Error::ProjectNotFound(name.clone()))
 }
 
 pub(crate) async fn list(state: &AppState) -> Result<Vec<(Project, Vec<Environment>)>> {
@@ -50,7 +58,11 @@ pub(crate) async fn list(state: &AppState) -> Result<Vec<(Project, Vec<Environme
         .await
 }
 
-pub(crate) async fn create_project(state: &AppState, name: &Name) -> Result<Environment> {
+pub(crate) async fn create_project(
+    state: &AppState,
+    org: OrgId,
+    name: &Name,
+) -> Result<Environment> {
     let first: Name = FIRST_ENVIRONMENT.parse()?;
     let network = network_name(name, &first);
     let (project, owned_network) = (name.clone(), network.clone());
@@ -58,7 +70,7 @@ pub(crate) async fn create_project(state: &AppState, name: &Name) -> Result<Envi
         .db
         .call(move |store| {
             store.transaction(|store| {
-                let project = store.create_project(&project)?;
+                let project = store.create_project(org, &project)?;
                 store.create_environment(project.id, &first, Some(&owned_network))
             })
         })
@@ -126,7 +138,7 @@ pub(crate) async fn remove_environment(
     project: &Name,
     name: &Name,
 ) -> Result<()> {
-    let environment = find(state, project, name).await?;
+    let (_, environment) = find(state, project, name).await?;
     let id = environment.id;
     let leftover = state
         .db

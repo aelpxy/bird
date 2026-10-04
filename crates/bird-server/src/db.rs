@@ -65,12 +65,12 @@ mod tests {
         let created = db
             .call({
                 let name = name.clone();
-                move |store| store.create_project(&name)
+                move |store| store.create_org(&name)
             })
             .await
             .unwrap();
         let found = db
-            .call(move |store| store.project_by_name(&name))
+            .call(move |store| store.org_by_name(&name))
             .await
             .unwrap();
         assert_eq!(found, Some(created));
@@ -80,11 +80,11 @@ mod tests {
     async fn surfaces_store_errors() {
         let db = Db::in_memory();
         let name: Name = "default".parse().unwrap();
-        let create = move |store: &mut Store| store.create_project(&name);
+        let create = move |store: &mut Store| store.create_org(&name);
         db.call(create.clone()).await.unwrap();
         assert!(matches!(
             db.call(create).await.unwrap_err(),
-            Error::Store(bird_store::Error::AlreadyExists("project"))
+            Error::Store(bird_store::Error::AlreadyExists("org"))
         ));
     }
 }

@@ -26,6 +26,12 @@ pub(crate) async fn project(
             if out.json(&projects)? {
                 return Ok(());
             }
+            if projects.is_empty() {
+                println!(
+                    "no projects you can see yet; an org admin creates one with `bird project create`"
+                );
+                return Ok(());
+            }
             let current = client.scope();
             let rows: Vec<Vec<String>> = projects
                 .into_iter()
@@ -36,16 +42,23 @@ pub(crate) async fn project(
                         .iter()
                         .map(|env| marked(env, here && *env == current.environment))
                         .collect();
-                    vec![marked(&project.name, here), environments.join(", ")]
+                    vec![
+                        marked(&project.name, here),
+                        project.org.to_string(),
+                        environments.join(", "),
+                    ]
                 })
                 .collect();
-            print!("{}", render(&["PROJECT", "ENVIRONMENTS"], &rows));
+            print!("{}", render(&["PROJECT", "ORG", "ENVIRONMENTS"], &rows));
         }
-        ProjectCommand::Create { name } => {
+        ProjectCommand::Create { name, org } => {
             let created: ProjectSummary = client
                 .post(
                     "/v1/projects",
-                    &CreateProject { name: name.clone() },
+                    &CreateProject {
+                        name: name.clone(),
+                        org,
+                    },
                     TIMEOUT,
                 )
                 .await?;
@@ -53,8 +66,9 @@ pub(crate) async fn project(
                 return Ok(());
             }
             println!(
-                "{} created project {name} with environment {FIRST_ENVIRONMENT}; act in it with `bird switch {name}`",
-                style::out(Paint::Green, "✓")
+                "{} created project {name} in org {} with environment {FIRST_ENVIRONMENT}; act in it with `bird switch {name}`",
+                style::out(Paint::Green, "✓"),
+                created.org
             );
         }
         ProjectCommand::Remove { name, yes } => {

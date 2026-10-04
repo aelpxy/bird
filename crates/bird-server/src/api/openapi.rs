@@ -14,6 +14,7 @@ const TOKEN_SCHEME: &str = "api_token";
     security(("api_token" = [])),
     tags(
         (name = "users", description = "Users and their API tokens"),
+        (name = "orgs", description = "Orgs own projects; their members work in them"),
         (name = "projects", description = "Projects and their environments, each with its own private network"),
         (name = "deployments", description = "Deploy images, inspect history and roll back"),
         (name = "services", description = "List, scale and remove services"),
@@ -111,6 +112,10 @@ mod tests {
         paths.extend(
             [
                 "/v1/me",
+                "/v1/orgs",
+                "/v1/orgs/{org}",
+                "/v1/orgs/{org}/members",
+                "/v1/orgs/{org}/members/{user}",
                 "/v1/users",
                 "/v1/users/{user}",
                 "/v1/users/{user}/tokens",
