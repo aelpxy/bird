@@ -2,7 +2,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use bird_api::{BackupInfo, BackupVolumeInfo, ErrorBody, RestoreRequest, RestoreResponse};
-use bird_core::{Backup, BackupId, Name};
+use bird_core::{Backup, BackupId, BackupSchedule, Name};
 
 use crate::state::AppState;
 use crate::{Result, backups};
@@ -53,6 +53,27 @@ pub(crate) async fn remove(
     Path((name, id)): Path<(Name, BackupId)>,
 ) -> Result<StatusCode> {
     backups::remove(&state, &name, id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Back up a service's volumes on a schedule
+#[utoipa::path(put, path = "/v1/services/{name}/backups/schedule", tag = "backups", params(("name" = String, Path, description = "Service name")), request_body = BackupSchedule, responses((status = 200, description = "Schedule saved; the first backup runs within a minute when none was scheduled before", body = BackupSchedule), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody), (status = 409, description = "The service has no volumes", body = ErrorBody)))]
+pub(crate) async fn set_schedule(
+    State(state): State<AppState>,
+    Path(name): Path<Name>,
+    Json(schedule): Json<BackupSchedule>,
+) -> Result<Json<BackupSchedule>> {
+    backups::set_schedule(&state, &name, schedule).await?;
+    Ok(Json(schedule))
+}
+
+/// Stop backing up a service on a schedule, keeping the backups it made
+#[utoipa::path(delete, path = "/v1/services/{name}/backups/schedule", tag = "backups", params(("name" = String, Path, description = "Service name")), responses((status = 204, description = "Schedule removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody)))]
+pub(crate) async fn clear_schedule(
+    State(state): State<AppState>,
+    Path(name): Path<Name>,
+) -> Result<StatusCode> {
+    backups::clear_schedule(&state, &name).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

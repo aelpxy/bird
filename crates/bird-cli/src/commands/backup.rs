@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bird_api::{BackupInfo, RestoreRequest, RestoreResponse};
-use bird_core::Name;
+use bird_core::{BackupInterval, BackupKeep, BackupSchedule, Name};
 
 use super::history::{ago, unix_now};
 use super::table::render;
@@ -86,6 +86,9 @@ pub(crate) async fn run(
                 );
             }
         }
+        BackupCommand::Schedule { every, keep, off } => {
+            schedule(client, name, every.filter(|_| !off), keep, out).await?;
+        }
         BackupCommand::Remove { backup, yes } => {
             prompt::confirm(&format!("delete backup {backup} of {name}?"), yes)?;
             client
@@ -94,6 +97,42 @@ pub(crate) async fn run(
             println!("{} deleted backup {backup}", style::out(Paint::Green, "✓"));
         }
     }
+    Ok(())
+}
+
+async fn schedule(
+    client: &ApiClient,
+    name: &Name,
+    every: Option<BackupInterval>,
+    keep: BackupKeep,
+    out: Output,
+) -> Result<()> {
+    let path = format!("/v1/services/{name}/backups/schedule");
+    let Some(every) = every else {
+        client.delete(&path, TIMEOUT).await?;
+        println!(
+            "{} {name} is no longer backed up on a schedule; the backups it made are kept",
+            style::out(Paint::Green, "✓")
+        );
+        return Ok(());
+    };
+    client
+        .put(&path, &BackupSchedule { every, keep }, TIMEOUT)
+        .await?;
+    if out.json(&BackupSchedule { every, keep })? {
+        return Ok(());
+    }
+    println!(
+        "{} {name} is backed up every {every}, keeping the newest {keep}",
+        style::out(Paint::Green, "✓")
+    );
+    println!(
+        "  {}",
+        style::out(
+            Paint::Dim,
+            "the first one runs within a minute unless a scheduled backup is recent enough"
+        )
+    );
     Ok(())
 }
 

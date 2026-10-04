@@ -2,7 +2,10 @@ mod deploy;
 
 use std::path::PathBuf;
 
-use bird_core::{BackupId, DeploymentId, EnvKey, Hostname, ImageRef, Name, RegistryHost, Replicas};
+use bird_core::{
+    BackupId, BackupInterval, BackupKeep, DeploymentId, EnvKey, Hostname, ImageRef, Name,
+    RegistryHost, Replicas,
+};
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 
@@ -205,6 +208,18 @@ pub(crate) enum BackupCommand {
         #[arg(short, long)]
         yes: bool,
     },
+    /// Back the volumes up on a schedule, like `--every 1d --keep 7`, or stop with `--off`
+    Schedule {
+        /// How often, from 1h to 30d, like 6h or 1d
+        #[arg(long, required_unless_present = "off")]
+        every: Option<BackupInterval>,
+        /// How many scheduled backups to keep; manual and restore backups are never deleted
+        #[arg(long, default_value = "7")]
+        keep: BackupKeep,
+        /// Stop the schedule, keeping the backups it made
+        #[arg(long, conflicts_with = "every")]
+        off: bool,
+    },
     /// Delete a backup and its archives
     #[command(visible_alias = "rm")]
     Remove {
@@ -306,6 +321,25 @@ mod tests {
         let args = Args::try_parse_from(["bird", "run", "rake", "db:migrate", "--trace"]).unwrap();
         assert!(matches!(args.command, Command::Run { command } if command.len() == 3));
         assert!(Args::try_parse_from(["bird", "run"]).is_err());
+    }
+
+    #[test]
+    fn parses_backup_schedules() {
+        let args = Args::try_parse_from(["bird", "backup", "schedule", "--every", "6h"]).unwrap();
+        let Command::Backup {
+            command: Some(BackupCommand::Schedule { every, keep, off }),
+        } = args.command
+        else {
+            panic!("expected backup schedule");
+        };
+        assert_eq!(every.map(BackupInterval::secs), Some(21_600));
+        assert_eq!((keep.count(), off), (7, false));
+        assert!(Args::try_parse_from(["bird", "backup", "schedule", "--off"]).is_ok());
+        assert!(Args::try_parse_from(["bird", "backup", "schedule"]).is_err());
+        assert!(
+            Args::try_parse_from(["bird", "backup", "schedule", "--every", "1d", "--off"]).is_err()
+        );
+        assert!(Args::try_parse_from(["bird", "backup", "schedule", "--every", "10m"]).is_err());
     }
 
     #[test]

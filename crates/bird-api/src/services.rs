@@ -1,6 +1,6 @@
 use bird_core::{
-    CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout, Hostname, ImageRef,
-    MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
+    BackupSchedule, CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout, Hostname,
+    ImageRef, MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,7 @@ pub struct ServiceSummary {
     pub health_timeout: HealthTimeout,
     pub domains: Vec<Hostname>,
     pub volumes: Vec<VolumeSpec>,
+    pub backup_schedule: Option<BackupSchedule>,
     pub deployment: Option<DeploymentSummary>,
 }
 

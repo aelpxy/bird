@@ -1,11 +1,16 @@
 mod create;
+mod database;
 mod restore;
+mod schedule;
 pub(crate) mod storage;
 
 use bird_core::{Backup, BackupId, Name};
 
 pub(crate) use create::create;
+pub(crate) use database::DatabaseBackups;
 pub(crate) use restore::restore;
+pub(crate) use schedule::Scheduler;
+pub(crate) use schedule::{clear as clear_schedule, set as set_schedule};
 pub(crate) use storage::{BackupStorage, LocalDir};
 
 use crate::state::AppState;

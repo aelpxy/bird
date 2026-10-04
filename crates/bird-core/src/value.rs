@@ -44,6 +44,10 @@ pub enum ValidationError {
     HealthPath(String),
     #[error("invalid health timeout {0:?}: use 1s to 60m, like 90s or 5m")]
     HealthTimeout(String),
+    #[error("invalid backup interval {0:?}: use 1h to 30d, like 6h or 1d")]
+    BackupInterval(String),
+    #[error("invalid number of backups to keep {0:?}: use 1 to 1000")]
+    BackupKeep(String),
 }
 
 macro_rules! validated_string {

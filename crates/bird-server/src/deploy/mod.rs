@@ -10,7 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
 use bird_core::{
-    Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service, ServiceState, Volume,
+    Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Name, Port, Service, ServiceState,
+    Volume,
 };
 use bird_store::Store;
 use tokio::task::JoinSet;
@@ -45,6 +46,7 @@ pub(crate) async fn redeploy(
         cpus: None,
         volumes: Vec::new(),
         replicas: None,
+        backup: None,
         allow_image_change: false,
     };
     deploy(state, request).await
@@ -56,6 +58,12 @@ pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Resu
     }
     request.env = secrets::expand_all(request.env)?;
     references::check_change(state, &request.name, &request.env, &[]).await?;
+    if request.backup.is_some()
+        && request.volumes.is_empty()
+        && !has_volumes(state, &request.name).await?
+    {
+        return Err(crate::Error::NothingToBackUp(request.name.clone()));
+    }
     let _ticket = state
         .deploys
         .wait_for(&request.name, OPERATION_PATIENCE)
@@ -208,6 +216,9 @@ async fn save_config(
                 for volume in &new_volumes {
                     store.create_volume(service.id, &volume.name, &volume.path)?;
                 }
+                if let Some(schedule) = request.backup {
+                    store.set_backup_schedule(service.id, schedule)?;
+                }
                 let domains = store
                     .list_domains(service.id)?
                     .into_iter()
@@ -289,4 +300,18 @@ fn apply_settings(
         None => service,
     };
     Ok(service)
+}
+
+async fn has_volumes(state: &AppState, name: &Name) -> Result<bool> {
+    let environment_id = state.environment_id;
+    let name = name.clone();
+    state
+        .db
+        .call(move |store| {
+            let Some(service) = store.service_by_name(environment_id, &name)? else {
+                return Ok(false);
+            };
+            Ok(!store.list_volumes(service.id)?.is_empty())
+        })
+        .await
 }

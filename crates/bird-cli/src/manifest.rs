@@ -106,6 +106,11 @@ dockerfile = \"Dockerfile\"
 # [[volumes]]
 # name = "data"
 # path = "/data"
+
+# back the volumes up on a schedule, keeping the newest copies
+# [backup]
+# every = "1d"
+# keep = 7
 "#
     )
 }
@@ -155,6 +160,8 @@ DATABASE_URL = "${{pg.DATABASE_URL}}"
 [[volumes]]
 name = "data"
 path = "/data"
+[backup]
+every = "6h"
 "#,
         )
         .unwrap();
@@ -166,6 +173,8 @@ path = "/data"
         );
         assert_eq!(request.cpus.map(bird_core::CpuLimit::millicores), Some(500));
         assert_eq!(request.volumes.len(), 1);
+        let backup = request.backup.unwrap();
+        assert_eq!((backup.every.secs(), backup.keep.count()), (21_600, 7));
         assert_eq!(request.replicas.map(bird_core::Replicas::get), Some(3));
         assert_eq!(
             request.health.map(|h| h.to_string()).as_deref(),
@@ -189,6 +198,9 @@ path = "/data"
             "health = \"grpc\"",
             "health = \"healthz\"",
             "health_timeout = \"1h\"",
+            "[backup]\nevery = \"10m\"",
+            "[backup]\nkeep = 3",
+            "[backup]\nevery = \"1d\"\nevry = 1",
             "replicas = 0",
             "replicas = 99",
         ] {

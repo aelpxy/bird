@@ -77,6 +77,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         .into_iter()
         .map(|d| d.hostname)
         .collect();
+    let backup_schedule = store.backup_schedule(service.id)?;
     let Some(active) = store.active_deployment(service.id)? else {
         return Ok(ServiceSummary {
             name: service.name,
@@ -90,6 +91,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             health_timeout: service.health_timeout,
             domains,
             volumes,
+            backup_schedule,
             deployment: None,
         });
     };
@@ -115,6 +117,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         health_timeout: service.health_timeout,
         domains,
         volumes,
+        backup_schedule,
         deployment: Some(DeploymentSummary {
             id: active.id,
             status: active.status,

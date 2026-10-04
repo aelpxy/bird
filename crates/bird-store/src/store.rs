@@ -42,6 +42,13 @@ impl Store {
         }
     }
 
+    // a consistent copy of the whole database while it stays in use; the target must not exist yet
+    pub fn copy_to(&self, path: &Path) -> Result<()> {
+        self.conn
+            .execute("VACUUM INTO ?1", [path.to_string_lossy()])?;
+        Ok(())
+    }
+
     pub(crate) fn execute(&self, sql: &str, params: impl Params) -> rusqlite::Result<usize> {
         self.conn.prepare_cached(sql)?.execute(params)
     }
@@ -118,5 +125,26 @@ mod tests {
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
         }
+    }
+
+    #[test]
+    fn copies_a_live_database() {
+        let dir = std::env::temp_dir().join(format!("bird-copy-{}", ProjectId::generate()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Store::open(dir.join("bird.db")).unwrap();
+        store.create_project(&name("default")).unwrap();
+        let copy = dir.join("copy.db");
+        store.copy_to(&copy).unwrap();
+        assert!(store.copy_to(&copy).is_err());
+        drop(store);
+        let restored = Store::open(&copy).unwrap();
+        assert!(
+            restored
+                .project_by_name(&name("default"))
+                .unwrap()
+                .is_some()
+        );
+        drop(restored);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

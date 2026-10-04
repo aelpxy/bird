@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use bird_core::{BackupInterval, BackupKeep};
 use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
@@ -37,6 +38,18 @@ pub struct Config {
     /// Directory for volume backups, defaults to `backups` in the data directory
     #[arg(long, env = "BIRD_BACKUP_DIR")]
     pub backup_dir: Option<PathBuf>,
+
+    /// How often to copy bird.db into backup storage, like 6h or 1d
+    #[arg(long, env = "BIRD_DB_BACKUP_EVERY", default_value = "1d")]
+    pub db_backup_every: BackupInterval,
+
+    /// How many copies of bird.db to keep
+    #[arg(long, env = "BIRD_DB_BACKUP_KEEP", default_value = "7")]
+    pub db_backup_keep: BackupKeep,
+
+    /// Do not copy bird.db into backup storage
+    #[arg(long, env = "BIRD_NO_DB_BACKUP")]
+    pub no_db_backup: bool,
 
     #[arg(long, env = "BIRD_PODMAN_SOCKET")]
     pub podman_socket: Option<PathBuf>,

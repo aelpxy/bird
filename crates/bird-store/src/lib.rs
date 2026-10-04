@@ -1,3 +1,4 @@
+mod backup_schedules;
 mod backups;
 mod certificates;
 mod deployments;

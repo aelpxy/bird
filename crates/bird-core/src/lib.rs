@@ -1,3 +1,4 @@
+mod backup_schedule;
 mod command;
 mod health;
 mod id;
@@ -8,6 +9,7 @@ mod replicas;
 mod resources;
 mod value;
 
+pub use backup_schedule::{BackupInterval, BackupKeep, BackupSchedule};
 pub use command::Command;
 pub use health::{HealthCheck, HealthPath, HealthTimeout};
 pub use id::{BackupId, DeploymentId, EnvironmentId, MachineId, ProjectId, ServiceId, VolumeId};

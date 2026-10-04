@@ -28,6 +28,9 @@ pub(crate) trait Adapter {
 
     // deleting a key that is already gone succeeds
     async fn delete(&self, key: &str) -> Result<()>;
+
+    // keys of complete archives directly under `prefix`, in no particular order
+    async fn list(&self, prefix: &str) -> Result<Vec<String>>;
 }
 
 // the storage birdd was started with; a new adapter is a new variant
@@ -67,6 +70,12 @@ impl Adapter for BackupStorage {
     async fn delete(&self, key: &str) -> Result<()> {
         match self {
             Self::Local(local) => local.delete(key).await,
+        }
+    }
+
+    async fn list(&self, prefix: &str) -> Result<Vec<String>> {
+        match self {
+            Self::Local(local) => local.list(prefix).await,
         }
     }
 }

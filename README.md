@@ -142,9 +142,12 @@ bird backup create -s db               # copies every volume of the service
 bird backup -s db                      # lists them
 bird backup restore -s db <backup-id>
 bird backup rm -s db <backup-id>
+bird backup schedule -s db --every 1d --keep 7   # or `[backup] every = "1d"` in bird.toml; --off stops it
 ```
 
-A backup pauses the service's machines for the few seconds the copy takes, so the data is consistent the way it would be after a crash, which databases recover from. Restoring first saves the current data as a new backup, so you can undo it, then restarts the service on the restored data. Backups are kept in `~/.local/share/bird/backups` (`--backup-dir` to change it) and survive `bird rm --purge`. A recreated service generates new secrets, but restored database data keeps its old passwords: note them with `bird env get` before removing a service, and set them on the new one.
+A backup pauses the service's machines for the few seconds the copy takes, so the data is consistent the way it would be after a crash, which databases recover from. Restoring first saves the current data as a new backup, so you can undo it, then restarts the service on the restored data. Backups are kept in `~/.local/share/bird/backups` (`--backup-dir` to change it) and survive `bird rm --purge`. Scheduled backups run within a minute of being due, and only the newest `keep` scheduled ones stay; manual backups and the safety copies restores make are never deleted for you.
+
+birdd also copies its own database, `bird.db`, into `database/` in the backup directory once a day and keeps the last 7 (`--db-backup-every`, `--db-backup-keep`, `--no-db-backup`). To recover it, stop birdd, copy the newest `bird-<time>.db` over `bird.db` in the data directory, delete `bird.db-wal` and `bird.db-shm`, and start birdd again. A recreated service generates new secrets, but restored database data keeps its old passwords: note them with `bird env get` before removing a service, and set them on the new one.
 
 ### Private registries
 
