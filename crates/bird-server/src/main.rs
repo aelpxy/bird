@@ -11,5 +11,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
     let config = Config::parse();
-    bird_server::run(config).await.context("birdd failed")
+    // boxed: the whole daemon's state machine is too large for the stack
+    Box::pin(bird_server::run(config))
+        .await
+        .context("birdd failed")
 }

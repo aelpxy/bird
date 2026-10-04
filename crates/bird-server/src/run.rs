@@ -1,4 +1,4 @@
-use std::future::IntoFuture;
+use std::future::{Future, IntoFuture};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -12,7 +12,7 @@ use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, S3, S3Settings, S
 use crate::commands::tty;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
-use crate::shutdown::Shutdown;
+use crate::shutdown::{self, Shutdown};
 use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
 use crate::tls::{self, AcmeSettings, CertManager};
@@ -26,6 +26,14 @@ const DEFAULT_PROJECT: &str = "default";
 const MAX_CONCURRENT_BUILDS: usize = 1;
 
 pub async fn run(config: Config) -> Result<()> {
+    run_until(config, shutdown::signal_received()).await
+}
+
+// stops when `stop` completes, which tests use instead of a signal
+pub async fn run_until(
+    config: Config,
+    stop: impl Future<Output = ()> + Send + 'static,
+) -> Result<()> {
     let data_dir = config.data_dir();
     data_dir::prepare(&data_dir)?;
     let db = Db::open(&data_dir.join("bird.db"))?;
@@ -42,7 +50,7 @@ pub async fn run(config: Config) -> Result<()> {
     podman.ping().await?;
     podman.ensure_network(&config.network).await?;
 
-    let shutdown = Shutdown::on_signal();
+    let shutdown = Shutdown::when(stop);
     let state = AppState {
         db,
         podman,
