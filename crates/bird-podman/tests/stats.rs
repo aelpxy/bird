@@ -14,6 +14,7 @@ fn spec(name: &str) -> ContainerSpec {
                 .map(String::from)
                 .to_vec(),
         ),
+        entrypoint: None,
         lifecycle: Lifecycle::OneOff,
         network: "podman".to_owned(),
         aliases: Vec::new(),

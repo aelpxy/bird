@@ -62,6 +62,7 @@ pub(crate) async fn launch(
         name: format!("bird-{}-{}", service.name, machine.id),
         image: deployment.image.clone(),
         command: deployment.command.clone().map(Into::into),
+        entrypoint: None,
         lifecycle: Lifecycle::Service {
             port: deployment.port,
         },

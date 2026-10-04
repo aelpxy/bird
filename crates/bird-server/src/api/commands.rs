@@ -39,7 +39,9 @@ pub(crate) async fn run(
     ServiceScope { environment, name }: ServiceScope,
     Json(request): Json<RunRequest>,
 ) -> Result<Response> {
-    let target = commands::run_target(&state, environment, &name).await?;
+    let target = commands::run_target(&state, environment, &name)
+        .await?
+        .skipping_entrypoint(request.skip_entrypoint);
     Ok(stream(move |events| async move {
         commands::run(&state, &target, &request.command, &events).await
     }))

@@ -22,6 +22,17 @@ pub(crate) struct RunTarget {
     image: ImageRef,
     env: BTreeMap<EnvKey, String>,
     network: String,
+    skip_entrypoint: bool,
+}
+
+impl RunTarget {
+    // by default the command goes to the image's entrypoint as arguments, like `docker run`
+    pub(crate) fn skipping_entrypoint(self, skip: bool) -> Self {
+        Self {
+            skip_entrypoint: skip,
+            ..self
+        }
+    }
 }
 
 // the active deployment, or the newest one when none succeeded yet, like a first deploy that needs setup
@@ -49,6 +60,7 @@ pub(crate) async fn run_target(
     };
     Ok(RunTarget {
         network: state.network(environment).await?,
+        skip_entrypoint: false,
         service,
         image,
         env,
@@ -135,10 +147,17 @@ fn spec(target: &RunTarget, command: &Command, lifecycle: Lifecycle) -> Containe
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_millis());
+    let (entrypoint, command) = match command.args().split_first() {
+        Some((program, args)) if target.skip_entrypoint => {
+            (Some(vec![program.clone()]), Some(args.to_vec()))
+        }
+        _ => (None, Some(command.args().to_vec())),
+    };
     ContainerSpec {
         name: format!("bird-run-{}-{millis}", service.name),
         image: target.image.clone(),
-        command: Some(command.args().to_vec()),
+        command,
+        entrypoint,
         lifecycle,
         network: target.network.clone(),
         aliases: Vec::new(),

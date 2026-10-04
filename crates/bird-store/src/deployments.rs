@@ -154,7 +154,7 @@ mod tests {
         let command =
             bird_core::Command::try_from(vec!["sh".to_owned(), "-c".to_owned(), "run".to_owned()])
                 .unwrap();
-        store.set_command(service.id, &command).unwrap();
+        store.set_command(service.id, Some(&command)).unwrap();
         let service = store.service(service.id).unwrap().unwrap();
         assert_eq!(service.command.as_ref(), Some(&command));
         let deployment = store.create_deployment(&service).unwrap();

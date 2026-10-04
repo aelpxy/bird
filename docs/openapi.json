@@ -2260,6 +2260,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "skip_entrypoint",
+            "in": "query",
+            "description": "Run the command itself instead of passing it to the image's entrypoint",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2383,6 +2392,15 @@
               "type": "integer",
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "skip_entrypoint",
+            "in": "query",
+            "description": "Run the command itself instead of passing it to the image's entrypoint",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -3541,7 +3559,8 @@
           "command": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Command"
+                "$ref": "#/components/schemas/Command",
+                "description": "Command to run instead of the image's; left out, an existing service keeps its saved one"
               },
               {
                 "type": "null"
@@ -3558,6 +3577,10 @@
                 "type": "null"
               }
             ]
+          },
+          "default_command": {
+            "type": "boolean",
+            "description": "Forget the saved command and run the image's own again; not together with `command`"
           },
           "domains": {
             "type": "array",
@@ -4051,6 +4074,10 @@
         "properties": {
           "command": {
             "$ref": "#/components/schemas/Command"
+          },
+          "skip_entrypoint": {
+            "type": "boolean",
+            "description": "Run the command itself instead of passing it to the image's entrypoint"
           }
         }
       },

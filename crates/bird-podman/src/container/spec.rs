@@ -11,6 +11,8 @@ pub(super) struct SpecGenerator<'a> {
     image: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     command: Option<&'a [String]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entrypoint: Option<&'a [String]>,
     env: &'a BTreeMap<EnvKey, String>,
     labels: &'a BTreeMap<String, String>,
     netns: Namespace,
@@ -81,6 +83,7 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
             name: &spec.name,
             image: spec.image.qualified(),
             command: spec.command.as_deref(),
+            entrypoint: spec.entrypoint.as_deref(),
             env: &spec.env,
             labels: &spec.labels,
             netns: Namespace { nsmode: "bridge" },
@@ -140,6 +143,7 @@ mod tests {
             name: "bird-x".to_owned(),
             image: "nginx:alpine".parse().unwrap(),
             command: None,
+            entrypoint: None,
             lifecycle: Lifecycle::Service {
                 port: Port::try_from(80).unwrap(),
             },
@@ -157,11 +161,24 @@ mod tests {
     }
 
     #[test]
+    fn replaces_the_entrypoint_only_when_asked() {
+        let spec = ContainerSpec {
+            command: Some(vec!["hi".to_owned()]),
+            entrypoint: Some(vec!["echo".to_owned()]),
+            ..spec(&[])
+        };
+        let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
+        assert_eq!(json["entrypoint"], serde_json::json!(["echo"]));
+        assert_eq!(json["command"], serde_json::json!(["hi"]));
+    }
+
+    #[test]
     fn serializes_spec() {
         let spec = spec(&["web", "web.internal"]);
         let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
         assert_eq!(json["image"], "docker.io/library/nginx:alpine");
         assert!(json.get("command").is_none());
+        assert!(json.get("entrypoint").is_none());
         assert_eq!(json["env"]["A"], "b");
         assert_eq!(
             json["networks"]["bird"]["aliases"],

@@ -46,6 +46,8 @@ pub enum Error {
     EnvironmentHasServices { scope: String, services: Vec<Name> },
     #[error("{scope} still has backups of {}, delete them first with `bird backup rm`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
     EnvironmentHasBackups { scope: String, services: Vec<Name> },
+    #[error("give a command or ask for the image's default command, not both")]
+    CommandConflict,
     #[error("invalid path: {0}")]
     InvalidPath(String),
     #[error("service {0} not found")]

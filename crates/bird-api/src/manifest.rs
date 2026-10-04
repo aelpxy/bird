@@ -123,6 +123,7 @@ impl Manifest {
                 every: spec.every,
                 keep: spec.keep,
             }),
+            default_command: false,
             allow_image_change: false,
         }
     }

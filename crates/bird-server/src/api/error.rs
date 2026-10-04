@@ -67,6 +67,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::AmbiguousMachine(_)
         | Error::InvalidTtyRequest(_)
         | Error::InvalidPath(_)
+        | Error::CommandConflict
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,

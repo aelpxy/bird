@@ -80,8 +80,12 @@ impl Store {
         expect_changed(changed, "service")
     }
 
-    pub fn set_command(&self, id: ServiceId, command: &Command) -> Result<()> {
-        let encoded = serde_json::to_string(command.args()).map_err(Error::Encode)?;
+    // `None` goes back to the image's own command
+    pub fn set_command(&self, id: ServiceId, command: Option<&Command>) -> Result<()> {
+        let encoded = command
+            .map(|command| serde_json::to_string(command.args()))
+            .transpose()
+            .map_err(Error::Encode)?;
         let changed = self.execute(
             "UPDATE services SET command = ?2 WHERE id = ?1",
             params![id.to_string(), encoded],
@@ -283,7 +287,10 @@ mod tests {
     fn restores_settings() {
         let (store, service) = setup();
         let command = bird_core::Command::try_from(vec!["sh".to_owned()]).unwrap();
-        store.set_command(service.id, &command).unwrap();
+        store.set_command(service.id, Some(&command)).unwrap();
+        store.set_command(service.id, None).unwrap();
+        assert_eq!(store.service(service.id).unwrap().unwrap().command, None);
+        store.set_command(service.id, Some(&command)).unwrap();
         store
             .set_health(service.id, &"/up".parse().unwrap())
             .unwrap();
