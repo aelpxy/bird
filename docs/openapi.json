@@ -248,6 +248,56 @@
       }
     },
     "/v1/services/{name}": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Show one service",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service, its active deployment and machines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "services"
@@ -1805,9 +1855,14 @@
         "required": [
           "id",
           "status",
+          "created_at",
           "machines"
         ],
         "properties": {
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
           "id": {
             "$ref": "#/components/schemas/DeploymentId"
           },
@@ -1907,7 +1962,8 @@
         "type": "object",
         "required": [
           "id",
-          "state"
+          "state",
+          "updated_at"
         ],
         "properties": {
           "id": {
@@ -1915,6 +1971,11 @@
           },
           "state": {
             "$ref": "#/components/schemas/MachineState"
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the machine entered its current state, in unix seconds"
           }
         }
       },

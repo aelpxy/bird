@@ -7,13 +7,18 @@ use bird_api::{RegistryLogin, RegistrySummary};
 use super::table::render;
 use crate::args::RegistryCommand;
 use crate::client::ApiClient;
+use crate::ui::Output;
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) async fn run(client: &ApiClient, command: RegistryCommand) -> Result<()> {
+pub(crate) async fn run(client: &ApiClient, command: RegistryCommand, out: Output) -> Result<()> {
     match command {
         RegistryCommand::List => {
             let registries: Vec<RegistrySummary> = client.get("/v1/registries", TIMEOUT).await?;
+            if out.json(&registries)? {
+                return Ok(());
+            }
             if registries.is_empty() {
                 println!(
                     "no registries yet, add one with `bird registry login <host> --username <user>`"
@@ -43,13 +48,19 @@ pub(crate) async fn run(client: &ApiClient, command: RegistryCommand) -> Result<
             client
                 .put(&format!("/v1/registries/{host}"), &login, TIMEOUT)
                 .await?;
-            println!("stored credentials for {host}, deploys pull private images from it now");
+            println!(
+                "{} stored credentials for {host}, deploys pull private images from it now",
+                style::out(Paint::Green, "✓")
+            );
         }
         RegistryCommand::Logout { host } => {
             client
                 .delete(&format!("/v1/registries/{host}"), TIMEOUT)
                 .await?;
-            println!("removed credentials for {host}");
+            println!(
+                "{} removed credentials for {host}",
+                style::out(Paint::Green, "✓")
+            );
         }
     }
     Ok(())

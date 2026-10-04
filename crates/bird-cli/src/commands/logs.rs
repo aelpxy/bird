@@ -7,21 +7,39 @@ use bird_api::{LogEntry, LogStream, ServiceSummary};
 use bird_core::{MachineId, MachineState, Name};
 
 use crate::client::ApiClient;
+use crate::ui::Output;
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 const MACHINE_LABEL_LEN: usize = 6;
 
-pub(crate) async fn run(client: &ApiClient, name: &Name, tail: u32, follow: bool) -> Result<()> {
+pub(crate) async fn run(
+    client: &ApiClient,
+    name: &Name,
+    tail: u32,
+    follow: bool,
+    out: Output,
+) -> Result<()> {
     let path = format!("/v1/services/{name}/logs?tail={tail}");
     if follow {
         let labeled = running_machines(client, name).await? > 1;
         return client
             .stream_lines(&format!("{path}&follow=true"), TIMEOUT, |line| {
+                if out.json {
+                    println!("{line}");
+                    return Ok(());
+                }
                 print(&serde_json::from_str(line)?, labeled)
             })
             .await;
     }
     let entries: Vec<LogEntry> = client.get(&path, TIMEOUT).await?;
+    if out.json {
+        for entry in &entries {
+            println!("{}", serde_json::to_string(entry)?);
+        }
+        return Ok(());
+    }
     let labeled = entries
         .iter()
         .map(|e| e.machine)
@@ -35,11 +53,10 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, tail: u32, follow: bool
 }
 
 async fn running_machines(client: &ApiClient, name: &Name) -> Result<usize> {
-    let services: Vec<ServiceSummary> = client.get("/v1/services", TIMEOUT).await?;
-    Ok(services
+    let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
+    Ok(service
+        .deployment
         .iter()
-        .filter(|s| &s.name == name)
-        .filter_map(|s| s.deployment.as_ref())
         .flat_map(|d| &d.machines)
         .filter(|m| m.state == MachineState::Running)
         .count())
@@ -47,7 +64,7 @@ async fn running_machines(client: &ApiClient, name: &Name) -> Result<usize> {
 
 fn print(entry: &LogEntry, labeled: bool) -> Result<()> {
     let prefix = if labeled {
-        format!("[{}] ", label(entry.machine))
+        format!("{} ", style::out(Paint::Cyan, label(entry.machine)))
     } else {
         String::new()
     };
@@ -59,7 +76,7 @@ fn print(entry: &LogEntry, labeled: bool) -> Result<()> {
 }
 
 // the tail of a v7 uuid is random, its head is a timestamp shared by machines started together
-fn label(machine: MachineId) -> String {
+pub(super) fn label(machine: MachineId) -> String {
     let id = machine.to_string();
     id.get(id.len().saturating_sub(MACHINE_LABEL_LEN)..)
         .unwrap_or(&id)

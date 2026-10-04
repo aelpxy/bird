@@ -29,11 +29,21 @@ struct ApiError {
 
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ({})", self.body.error, self.status)?;
+        if self.body.error.is_empty() {
+            write!(f, "birdd answered {}", self.status)?;
+        } else {
+            f.write_str(&self.body.error)?;
+        }
+        if self.status == StatusCode::NOT_FOUND && self.body.error.starts_with("service ") {
+            write!(
+                f,
+                "\nsee your services with `bird ls`, or create this one with `bird deploy`"
+            )?;
+        }
         if self.status == StatusCode::UNAUTHORIZED {
             write!(
                 f,
-                "\nrun `bird login <host:port>` with the token from birdd's data dir"
+                "\nlog in with the token from birdd's data dir: bird login <host:port> < api-token"
             )?;
         }
         if !self.body.logs.is_empty() {
@@ -187,7 +197,12 @@ impl ApiClient {
     )> {
         let stream = TcpStream::connect(&self.addr)
             .await
-            .with_context(|| format!("cannot reach birdd at {}, is it running?", self.addr))?;
+            .with_context(|| {
+                format!(
+                    "cannot reach birdd at {}; is it running (systemctl --user status birdd), or is --api set to the right address?",
+                    self.addr
+                )
+            })?;
         Ok(hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?)
     }
 

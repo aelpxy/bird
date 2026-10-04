@@ -27,6 +27,7 @@ pub struct ServiceSummary {
 pub struct DeploymentSummary {
     pub id: DeploymentId,
     pub status: DeploymentStatus,
+    pub created_at: i64,
     pub machines: Vec<MachineSummary>,
 }
 
@@ -35,4 +36,6 @@ pub struct DeploymentSummary {
 pub struct MachineSummary {
     pub id: MachineId,
     pub state: MachineState,
+    /// When the machine entered its current state, in unix seconds
+    pub updated_at: i64,
 }

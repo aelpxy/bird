@@ -1,5 +1,6 @@
 mod backup;
 mod build;
+mod completions;
 mod deploy;
 mod domains;
 mod env;
@@ -11,38 +12,82 @@ mod logs;
 mod registry;
 mod remove;
 mod scale;
+mod status;
 mod table;
 mod templates;
 
-use anyhow::Result;
+use std::path::Path;
 
-use crate::args::{Args, Command};
+use anyhow::Result;
+use bird_core::Name;
+
+use crate::args::{Args, BackupCommand, Command, DomainsCommand, EnvCommand, RegistryCommand};
 use crate::client::ApiClient;
-use crate::profile;
+use crate::ui::Output;
+use crate::{manifest, profile};
 
 pub(crate) async fn run(args: Args) -> Result<()> {
-    match args.command {
-        Command::Login { api } => login::run(api).await,
-        Command::Deploy(deploy) => deploy::run(&connect(args.api)?, *deploy).await,
-        Command::Init { name, image, port } => init::run(&name, &image, port),
-        Command::Registry { command } => registry::run(&connect(args.api)?, command).await,
-        Command::Templates => templates::list(&connect(args.api)?).await,
+    let Args {
+        service,
+        config,
+        json,
+        api,
+        command,
+    } = args;
+    let out = Output { json };
+    let target = || target(service.clone(), config.as_deref());
+    match command {
+        Command::Init { name, image, port } => init::run(name, image.as_ref(), port),
+        Command::Deploy(deploy) => {
+            deploy::run(&connect(api)?, *deploy, service, config.as_deref(), out).await
+        }
+        Command::Status => status::run(&connect(api)?, &target()?, out).await,
+        Command::List => list::run(&connect(api)?, out).await,
+        Command::Logs { tail, follow } => {
+            logs::run(&connect(api)?, &target()?, tail, follow, out).await
+        }
+        Command::Env { command } => {
+            let command = command.unwrap_or(EnvCommand::List);
+            env::run(&connect(api)?, &target()?, command, out).await
+        }
+        Command::Domains { command } => {
+            let command = command.unwrap_or(DomainsCommand::List);
+            domains::run(&connect(api)?, &target()?, command, out).await
+        }
+        Command::Scale { replicas } => scale::run(&connect(api)?, &target()?, replicas).await,
+        Command::History => history::history(&connect(api)?, &target()?, out).await,
+        Command::Rollback { deployment } => {
+            history::rollback(&connect(api)?, &target()?, deployment, out).await
+        }
+        Command::Backup { command } => {
+            let command = command.unwrap_or(BackupCommand::List);
+            backup::run(&connect(api)?, &target()?, command, out).await
+        }
         Command::Add { template, name } => {
-            templates::add(&connect(args.api)?, &template, name).await
+            templates::add(&connect(api)?, &template, name, out).await
         }
-        Command::List => list::run(&connect(args.api)?).await,
-        Command::Remove { name, purge } => remove::run(&connect(args.api)?, &name, purge).await,
-        Command::Domains { command } => domains::run(&connect(args.api)?, command).await,
-        Command::History { name } => history::history(&connect(args.api)?, &name).await,
-        Command::Rollback { name, deployment } => {
-            history::rollback(&connect(args.api)?, &name, deployment).await
+        Command::Templates => templates::list(&connect(api)?, out).await,
+        Command::Remove { purge, yes } => remove::run(&connect(api)?, &target()?, purge, yes).await,
+        Command::Registry { command } => {
+            let command = command.unwrap_or(RegistryCommand::List);
+            registry::run(&connect(api)?, command, out).await
         }
-        Command::Scale { name, replicas } => scale::run(&connect(args.api)?, &name, replicas).await,
-        Command::Env { command } => env::run(&connect(args.api)?, command).await,
-        Command::Backup { command } => backup::run(&connect(args.api)?, command).await,
-        Command::Logs { name, tail, follow } => {
-            logs::run(&connect(args.api)?, &name, tail, follow).await
-        }
+        Command::Login { api } => login::run(api).await,
+        Command::Completions { shell } => completions::run(shell),
+    }
+}
+
+// -s wins, then the name in bird.toml, so commands run inside an app's directory need no name
+fn target(explicit: Option<Name>, config: Option<&Path>) -> Result<Name> {
+    if let Some(name) = explicit {
+        return Ok(name);
+    }
+    match manifest::load(config)? {
+        Some(loaded) => Ok(loaded.manifest.name),
+        None => anyhow::bail!(
+            "which service? pass -s <name>, or run this where a {} names one",
+            bird_api::MANIFEST_FILE
+        ),
     }
 }
 

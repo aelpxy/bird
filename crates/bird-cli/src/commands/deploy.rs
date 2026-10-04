@@ -1,24 +1,35 @@
-use std::time::Duration;
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::{Result, bail};
 use bird_api::{DeployResponse, MANIFEST_FILE, Manifest};
-use bird_core::{BuildFile, Command, EnvKey, ImageRef};
+use bird_core::{BuildFile, Command, EnvKey, ImageRef, Name};
 
 use super::build;
 use crate::args::DeployArgs;
 use crate::client::ApiClient;
 use crate::manifest::{self, Loaded};
+use crate::ui::style::{self, Paint};
+use crate::ui::{Output, Spinner, duration};
 
 // covers a slow image pull plus the app's startup window on the server
 pub(crate) const DEPLOY_TIMEOUT: Duration = Duration::from_mins(15);
 
-pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
-    let loaded = manifest::load(args.config.as_deref())?;
+pub(crate) async fn run(
+    client: &ApiClient,
+    args: DeployArgs,
+    service: Option<Name>,
+    config: Option<&Path>,
+    out: Output,
+) -> Result<()> {
+    let started = std::time::Instant::now();
+    let loaded = manifest::load(config)?;
+    if let Some(loaded) = &loaded {
+        manifest::warn_about_secrets(&loaded.manifest, config.unwrap_or(Path::new(MANIFEST_FILE)));
+    }
     let allow_image_change = args.allow_image_change;
-    let (manifest, source) = merge(loaded, args)?;
+    let (manifest, source) = merge(loaded, args, service)?;
     let image = match source {
         Source::Image(image) => image,
         Source::Build {
@@ -29,10 +40,10 @@ pub(crate) async fn run(client: &ApiClient, args: DeployArgs) -> Result<()> {
     };
     let mut request = manifest.into_request(image);
     request.allow_image_change = allow_image_change;
-    println!("deploying {} ({})...", request.name, request.image);
+    let spinner = Spinner::start(format!("deploying {} ({})", request.name, request.image));
     let response: DeployResponse = client.post("/v1/deploy", &request, DEPLOY_TIMEOUT).await?;
-    print_deployed(&response);
-    Ok(())
+    drop(spinner);
+    print_deployed(&response, started.elapsed(), out)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -46,15 +57,19 @@ enum Source {
 }
 
 // flags win over bird.toml; repeatable flags add to its lists
-fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)> {
-    let (mut manifest, dir) = match (loaded, args.name.clone()) {
+fn merge(
+    loaded: Option<Loaded>,
+    args: DeployArgs,
+    service: Option<Name>,
+) -> Result<(Manifest, Source)> {
+    let (mut manifest, dir) = match (loaded, args.name.clone().or(service)) {
         (Some(Loaded { mut manifest, dir }), name) => {
             manifest.name = name.unwrap_or(manifest.name);
             (manifest, dir)
         }
         (None, Some(name)) => (Manifest::named(name), PathBuf::new()),
         (None, None) => bail!(
-            "no {MANIFEST_FILE} here: pass a name and image, or create one with `bird init <name> <image>`"
+            "no {MANIFEST_FILE} here: create one with `bird init`, or pass a name and image like `bird deploy web nginx:alpine`"
         ),
     };
     let dockerfile = manifest.build.as_ref().and_then(|b| b.dockerfile.clone());
@@ -111,14 +126,40 @@ fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)>
     Ok((manifest, source))
 }
 
-pub(crate) fn print_deployed(response: &DeployResponse) {
+pub(crate) fn print_deployed(
+    response: &DeployResponse,
+    elapsed: Duration,
+    out: Output,
+) -> Result<()> {
+    if out.json(response)? {
+        return Ok(());
+    }
     println!(
-        "deployed {} (deployment {})",
-        response.service, response.deployment_id
+        "{} deployed {} in {} {}",
+        style::out(Paint::Green, "✓"),
+        style::out(Paint::Bold, &response.service),
+        duration(elapsed),
+        style::out(
+            Paint::Dim,
+            format!("(deployment {})", response.deployment_id)
+        )
     );
     for domain in &response.domains {
-        println!("  -> {domain}");
+        println!("  {} {domain}", style::out(Paint::Dim, "→"));
     }
+    if response.domains.is_empty() {
+        println!(
+            "  {}",
+            style::out(
+                Paint::Dim,
+                format!(
+                    "no domains, other services reach it at {}.internal",
+                    response.service
+                )
+            )
+        );
+    }
+    Ok(())
 }
 
 fn context_dir(manifest_dir: &Path, context: Option<PathBuf>) -> PathBuf {
@@ -194,6 +235,7 @@ MODE = "file"
                 "--",
                 "serve",
             ]),
+            None,
         )
         .unwrap();
         assert_eq!(source, Source::Image("app:1".parse().unwrap()));
@@ -216,7 +258,7 @@ MODE = "file"
     #[test]
     fn positional_name_and_image_win() {
         let (manifest, source) =
-            merge(Some(loaded(WITH_BUILD)), args(&["staging", "app:2"])).unwrap();
+            merge(Some(loaded(WITH_BUILD)), args(&["staging", "app:2"]), None).unwrap();
         assert_eq!(manifest.name.as_str(), "staging");
         assert_eq!(source, Source::Image("app:2".parse().unwrap()));
     }
@@ -226,6 +268,7 @@ MODE = "file"
         let (_, source) = merge(
             Some(loaded(WITH_BUILD)),
             args(&["--build-arg", "MODE=flag"]),
+            None,
         )
         .unwrap();
         let expected_args = BTreeMap::from([
@@ -240,7 +283,7 @@ MODE = "file"
                 args: expected_args,
             }
         );
-        let (_, source) = merge(Some(loaded(WITH_IMAGE)), args(&["--build"])).unwrap();
+        let (_, source) = merge(Some(loaded(WITH_IMAGE)), args(&["--build"]), None).unwrap();
         assert_eq!(
             source,
             Source::Build {
@@ -254,16 +297,25 @@ MODE = "file"
     }
 
     #[test]
+    fn service_flag_names_the_deploy() {
+        let service = Some("staging".parse().unwrap());
+        let (manifest, _) = merge(Some(loaded(WITH_IMAGE)), args(&[]), service.clone()).unwrap();
+        assert_eq!(manifest.name.as_str(), "staging");
+        let (manifest, _) = merge(None, args(&["web", "nginx"]), service).unwrap();
+        assert_eq!(manifest.name.as_str(), "web");
+    }
+
+    #[test]
     fn needs_a_manifest_or_name_and_source() {
-        assert!(merge(None, args(&[])).is_err());
-        assert!(merge(None, args(&["web"])).is_err());
-        let (manifest, source) = merge(None, args(&["web", "nginx"])).unwrap();
+        assert!(merge(None, args(&[]), None).is_err());
+        assert!(merge(None, args(&["web"]), None).is_err());
+        let (manifest, source) = merge(None, args(&["web", "nginx"]), None).unwrap();
         assert_eq!(source, Source::Image("nginx".parse().unwrap()));
         assert_eq!(
             manifest.into_request("nginx".parse().unwrap()).port.get(),
             80
         );
-        let (_, source) = merge(None, args(&["web", "--build", "site"])).unwrap();
+        let (_, source) = merge(None, args(&["web", "--build", "site"]), None).unwrap();
         assert!(matches!(source, Source::Build { dir, .. } if dir == Path::new("site")));
     }
 }

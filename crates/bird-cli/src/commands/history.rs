@@ -7,13 +7,18 @@ use bird_core::{DeploymentId, Name};
 use super::deploy::{DEPLOY_TIMEOUT, print_deployed};
 use super::table::render;
 use crate::client::ApiClient;
+use crate::ui::style;
+use crate::ui::{Output, Spinner};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) async fn history(client: &ApiClient, name: &Name) -> Result<()> {
+pub(crate) async fn history(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let deployments: Vec<DeploymentInfo> = client
         .get(&format!("/v1/services/{name}/deployments"), TIMEOUT)
         .await?;
+    if out.json(&deployments)? {
+        return Ok(());
+    }
     if deployments.is_empty() {
         println!("{name} has no deployments yet");
         return Ok(());
@@ -24,7 +29,7 @@ pub(crate) async fn history(client: &ApiClient, name: &Name) -> Result<()> {
         .map(|d| {
             vec![
                 d.id.to_string(),
-                d.status.to_string(),
+                style::out(style::deployment(d.status), d.status),
                 d.image.to_string(),
                 d.variables.to_string(),
                 ago(now.saturating_sub(d.created_at)),
@@ -42,12 +47,15 @@ pub(crate) async fn rollback(
     client: &ApiClient,
     name: &Name,
     deployment_id: Option<DeploymentId>,
+    out: Output,
 ) -> Result<()> {
     let target = match deployment_id {
         Some(id) => format!("deployment {id}"),
         None => "its previous deployment".to_owned(),
     };
-    println!("rolling {name} back to {target} (image, port and variables)...");
+    let spinner = Spinner::start(format!(
+        "rolling {name} back to {target} (image, port and variables)"
+    ));
     let request = RollbackRequest { deployment_id };
     let response: DeployResponse = client
         .post(
@@ -56,8 +64,9 @@ pub(crate) async fn rollback(
             DEPLOY_TIMEOUT,
         )
         .await?;
-    print_deployed(&response);
-    Ok(())
+    let elapsed = spinner.elapsed();
+    drop(spinner);
+    print_deployed(&response, elapsed, out)
 }
 
 pub(super) fn unix_now() -> i64 {

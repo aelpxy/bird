@@ -51,7 +51,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(deploy::create))
         .routes(routes!(builds::create))
         .routes(routes!(services::list))
-        .routes(routes!(services::remove))
+        .routes(routes!(services::get, services::remove))
         .routes(routes!(domains::list, domains::add))
         .routes(routes!(domains::remove))
         .routes(routes!(deployments::list))

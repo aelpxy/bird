@@ -27,7 +27,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
   * `bird-store`, `bird-podman`, `bird-proxy`: depend only on `bird-core`.
   * `bird-api`: HTTP request/response types shared by server and CLI; depends only on `bird-core`.
   * `bird-server`: the `birdd` daemon, wires everything together.
-  * `bird-cli`: the `bird` binary; talks to `birdd` over its HTTP API using `bird-api` types, never to the store or Podman directly.
+  * `bird-cli`: the `bird` binary; talks to `birdd` over its HTTP API using `bird-api` types, never to the store or Podman directly. Service commands take the service from `-s` or `./bird.toml`, never a positional name (only `deploy`, `init` and `add` name new services). Results go to stdout and progress, spinners and prompts to stderr; read commands honour `--json`; color only on a terminal without `NO_COLOR`; destructive commands confirm unless `-y`, and refuse without a terminal.
 * No circular dependencies, no "utils" or "common" dumping-ground crates or modules.
 
 ## File structure

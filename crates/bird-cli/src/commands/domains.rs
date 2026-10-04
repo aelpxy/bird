@@ -6,32 +6,51 @@ use bird_core::{Hostname, Name};
 
 use crate::args::DomainsCommand;
 use crate::client::ApiClient;
+use crate::ui::Output;
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) async fn run(client: &ApiClient, command: DomainsCommand) -> Result<()> {
+pub(crate) async fn run(
+    client: &ApiClient,
+    name: &Name,
+    command: DomainsCommand,
+    out: Output,
+) -> Result<()> {
     match command {
-        DomainsCommand::List { name } => {
+        DomainsCommand::List => {
             let hostnames: Vec<Hostname> = client
                 .get(&format!("/v1/services/{name}/domains"), TIMEOUT)
                 .await?;
-            print_domains(&name, &hostnames);
+            if !out.json(&hostnames)? {
+                print_domains(name, &hostnames);
+            }
         }
-        DomainsCommand::Add { name, hostname } => {
+        DomainsCommand::Add { hostname } => {
             let hostnames: Vec<Hostname> = client
                 .post(
                     &format!("/v1/services/{name}/domains"),
-                    &AddDomain { hostname },
+                    &AddDomain {
+                        hostname: hostname.clone(),
+                    },
                     TIMEOUT,
                 )
                 .await?;
-            print_domains(&name, &hostnames);
+            if !out.json(&hostnames)? {
+                println!(
+                    "{} {hostname} routes to {name}; point its DNS at this server",
+                    style::out(Paint::Green, "✓")
+                );
+            }
         }
-        DomainsCommand::Remove { name, hostname } => {
+        DomainsCommand::Remove { hostname } => {
             client
                 .delete(&format!("/v1/services/{name}/domains/{hostname}"), TIMEOUT)
                 .await?;
-            println!("removed {hostname} from {name}");
+            println!(
+                "{} {hostname} no longer routes to {name}",
+                style::out(Paint::Green, "✓")
+            );
         }
     }
     Ok(())
@@ -39,7 +58,10 @@ pub(crate) async fn run(client: &ApiClient, command: DomainsCommand) -> Result<(
 
 fn print_domains(name: &Name, hostnames: &[Hostname]) {
     if hostnames.is_empty() {
-        println!("{name} has no domains");
+        println!(
+            "{name} has no domains, add one with {}",
+            style::out(Paint::Bold, "bird domains add <hostname>")
+        );
     }
     for hostname in hostnames {
         println!("{hostname}");

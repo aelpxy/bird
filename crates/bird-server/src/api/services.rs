@@ -27,6 +27,20 @@ pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<Servi
     Ok(Json(summaries))
 }
 
+/// Show one service
+#[utoipa::path(get, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+pub(crate) async fn get(
+    State(state): State<AppState>,
+    Path(name): Path<Name>,
+) -> Result<Json<ServiceSummary>> {
+    let service = state.service(&name).await?;
+    let summary = state
+        .db
+        .call(move |store| summarize(store, service))
+        .await?;
+    Ok(Json(summary))
+}
+
 #[derive(Deserialize, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct RemoveQuery {
@@ -85,6 +99,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         .map(|m| MachineSummary {
             id: m.id,
             state: m.state,
+            updated_at: m.updated_at,
         })
         .collect();
     Ok(ServiceSummary {
@@ -101,6 +116,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         deployment: Some(DeploymentSummary {
             id: active.id,
             status: active.status,
+            created_at: active.created_at,
             machines,
         }),
     })

@@ -5,6 +5,8 @@ use bird_api::{ScaleRequest, ServiceSummary};
 use bird_core::{MachineState, Name, Replicas};
 
 use crate::client::ApiClient;
+use crate::ui::Spinner;
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_secs(1);
@@ -18,16 +20,13 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, replicas: Replicas) -> 
             TIMEOUT,
         )
         .await?;
-    println!("scaling {name} to {replicas} machines...");
+    let spinner = Spinner::start(format!("scaling {name} to {replicas} machines"));
 
     let deadline = tokio::time::Instant::now() + CONVERGE_TIMEOUT;
-    let mut last = None;
     while tokio::time::Instant::now() < deadline {
-        let services: Vec<ServiceSummary> = client.get("/v1/services", TIMEOUT).await?;
-        let Some(service) = services.into_iter().find(|s| &s.name == name) else {
-            bail!("service {name} disappeared while scaling");
-        };
+        let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
         let Some(deployment) = service.deployment else {
+            drop(spinner);
             println!("{name} is not deployed yet, it will start {replicas} machines on deploy");
             return Ok(());
         };
@@ -36,16 +35,21 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, replicas: Replicas) -> 
             .iter()
             .filter(|m| m.state == MachineState::Running)
             .count();
-        let total = deployment.machines.len();
-        if last != Some(running) {
-            println!("  {running}/{replicas} running");
-            last = Some(running);
-        }
-        if running == usize::from(replicas.get()) && total == running {
-            println!("{name} is running {replicas} machines");
+        if running == usize::from(replicas.get()) && deployment.machines.len() == running {
+            drop(spinner);
+            println!(
+                "{} {name} runs {replicas} {}",
+                style::out(Paint::Green, "✓"),
+                if replicas == Replicas::ONE {
+                    "machine"
+                } else {
+                    "machines"
+                }
+            );
             return Ok(());
         }
+        spinner.set(format!("scaling {name}: {running}/{replicas} running"));
         tokio::time::sleep(POLL).await;
     }
-    bail!("{name} did not reach {replicas} machines in time, check `bird logs {name}`")
+    bail!("{name} did not reach {replicas} machines in time, check `bird logs -s {name}`")
 }

@@ -6,14 +6,22 @@ use bird_core::MachineState;
 
 use super::table::render;
 use crate::client::ApiClient;
+use crate::ui::Output;
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
-const HEADER: [&str; 5] = ["NAME", "IMAGE", "STATUS", "MACHINES", "DOMAINS"];
+const HEADER: [&str; 5] = ["NAME", "STATUS", "MACHINES", "IMAGE", "DOMAINS"];
 
-pub(crate) async fn run(client: &ApiClient) -> Result<()> {
+pub(crate) async fn run(client: &ApiClient, out: Output) -> Result<()> {
     let services: Vec<ServiceSummary> = client.get("/v1/services", TIMEOUT).await?;
+    if out.json(&services)? {
+        return Ok(());
+    }
     if services.is_empty() {
-        println!("no services yet, deploy one with `bird deploy <name> <image>`");
+        println!(
+            "no services yet, start with {} in your app's directory",
+            style::out(Paint::Bold, "bird init")
+        );
         return Ok(());
     }
     let rows: Vec<Vec<String>> = services.iter().map(row).collect();
@@ -29,12 +37,20 @@ fn row(service: &ServiceSummary) -> Vec<String> {
                 .iter()
                 .filter(|m| m.state == MachineState::Running)
                 .count();
+            let paint = if running == usize::from(service.replicas.get()) {
+                Paint::Green
+            } else {
+                Paint::Yellow
+            };
             (
-                deployment.status.to_string(),
-                format!("{running}/{}", service.replicas),
+                style::out(style::deployment(deployment.status), deployment.status),
+                style::out(paint, format!("{running}/{}", service.replicas)),
             )
         }
-        None => ("not deployed".to_owned(), "0/0".to_owned()),
+        None => (
+            style::out(Paint::Dim, "not deployed"),
+            style::out(Paint::Dim, "0/0"),
+        ),
     };
     let domains = service
         .domains
@@ -43,12 +59,12 @@ fn row(service: &ServiceSummary) -> Vec<String> {
         .collect::<Vec<_>>()
         .join(", ");
     vec![
-        service.name.to_string(),
-        service.image.to_string(),
+        style::out(Paint::Bold, &service.name),
         status,
         machines,
+        service.image.to_string(),
         if domains.is_empty() {
-            "-".to_owned()
+            style::out(Paint::Dim, "-")
         } else {
             domains
         },

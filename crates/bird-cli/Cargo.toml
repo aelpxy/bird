@@ -15,6 +15,7 @@ bird-api.workspace = true
 bird-core.workspace = true
 bytes.workspace = true
 clap.workspace = true
+clap_complete.workspace = true
 flate2.workspace = true
 http-body-util.workspace = true
 hyper = { workspace = true, features = ["client", "http1"] }

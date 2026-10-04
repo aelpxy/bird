@@ -6,6 +6,7 @@ use bird_api::ServiceSummary;
 
 use crate::client::ApiClient;
 use crate::profile::{self, Profile};
+use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -26,7 +27,11 @@ pub(crate) async fn run(api: String) -> Result<()> {
             token,
         },
     )?;
-    println!("logged in to {api}, saved to {}", path.display());
+    println!(
+        "{} logged in to {api}, saved to {}",
+        style::out(Paint::Green, "✓"),
+        path.display()
+    );
     Ok(())
 }
 
