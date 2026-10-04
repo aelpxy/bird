@@ -47,6 +47,8 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NoRollbackTarget(_)
         | Error::TemplateNotFound(_)
         | Error::NoMachines(_)
+        | Error::MachineNotFound { .. }
+        | Error::NeverDeployed(_)
         | Error::BackupNotFound(_)
         | Error::BackupDataMissing(_)
         | Error::LocalImageMissing(_) => StatusCode::NOT_FOUND,
@@ -54,6 +56,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::Validation(_)
         | Error::EmptyCredentials
         | Error::InvalidBuildArgs(_)
+        | Error::AmbiguousMachine(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,

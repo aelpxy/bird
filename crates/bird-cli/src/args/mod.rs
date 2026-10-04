@@ -76,6 +76,29 @@ pub(crate) enum Command {
         #[arg(short, long)]
         follow: bool,
     },
+    /// Run a command in a running machine, like `bird exec psql -U postgres -c 'select 1'`
+    Exec {
+        /// Machine to run in, as `bird status` shows it; defaults to the first running one
+        #[arg(short, long)]
+        machine: Option<String>,
+        #[arg(
+            required = true,
+            trailing_var_arg = true,
+            allow_hyphen_values = true,
+            value_name = "COMMAND"
+        )]
+        command: Vec<String>,
+    },
+    /// Run a command in a new container from the service's image, with its variables and network
+    Run {
+        #[arg(
+            required = true,
+            trailing_var_arg = true,
+            allow_hyphen_values = true,
+            value_name = "COMMAND"
+        )]
+        command: Vec<String>,
+    },
     /// Manage a service's environment variables, lists them by default
     Env {
         #[command(subcommand)]
@@ -260,6 +283,23 @@ mod tests {
         assert!(Args::try_parse_from(["bird", "env", "unset", "bad-key"]).is_err());
         let args = Args::try_parse_from(["bird", "env"]).unwrap();
         assert!(matches!(args.command, Command::Env { command: None }));
+    }
+
+    #[test]
+    fn commands_keep_their_own_flags() {
+        let args =
+            Args::try_parse_from(["bird", "-s", "db", "exec", "psql", "-c", "select 1"]).unwrap();
+        let Command::Exec { machine, command } = args.command else {
+            panic!("expected exec");
+        };
+        assert_eq!(machine, None);
+        assert_eq!(command, ["psql", "-c", "select 1"]);
+        let args =
+            Args::try_parse_from(["bird", "exec", "-m", "a516d4", "--", "ls", "-la"]).unwrap();
+        assert!(matches!(args.command, Command::Exec { machine: Some(m), .. } if m == "a516d4"));
+        let args = Args::try_parse_from(["bird", "run", "rake", "db:migrate", "--trace"]).unwrap();
+        assert!(matches!(args.command, Command::Run { command } if command.len() == 3));
+        assert!(Args::try_parse_from(["bird", "run"]).is_err());
     }
 
     #[test]

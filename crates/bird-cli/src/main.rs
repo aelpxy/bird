@@ -17,6 +17,7 @@ async fn main() -> ExitCode {
     match commands::run(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) if closed_pipe(&err) => ExitCode::SUCCESS,
+        Err(err) if err.is::<commands::RemoteExit>() => remote_exit(&err),
         Err(err) if err.is::<ui::prompt::Cancelled>() => {
             eprintln!("cancelled");
             ExitCode::FAILURE
@@ -36,4 +37,14 @@ fn closed_pipe(err: &anyhow::Error) -> bool {
     err.chain()
         .filter_map(|cause| cause.downcast_ref::<std::io::Error>())
         .any(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
+}
+
+// exit codes outside 1-255 (negative or huge) still signal failure
+fn remote_exit(err: &anyhow::Error) -> ExitCode {
+    let code = err
+        .downcast_ref::<commands::RemoteExit>()
+        .and_then(|exit| u8::try_from(exit.0).ok())
+        .filter(|code| *code != 0)
+        .unwrap_or(1);
+    ExitCode::from(code)
 }

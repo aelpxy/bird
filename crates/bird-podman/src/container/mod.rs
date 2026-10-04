@@ -20,13 +20,21 @@ pub struct ContainerSpec {
     pub name: String,
     pub image: ImageRef,
     pub command: Option<Vec<String>>,
-    pub port: Port,
+    pub lifecycle: Lifecycle,
     pub network: String,
     pub aliases: Vec<String>,
     pub mounts: Vec<VolumeMount>,
     pub limits: Limits,
     pub env: BTreeMap<EnvKey, String>,
     pub labels: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lifecycle {
+    // published on a localhost port and started again by podman when it exits
+    Service { port: Port },
+    // runs a command once, unpublished, and stays exited
+    OneOff,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,6 +148,14 @@ impl Podman {
         let response = self.send(Method::POST, &path, DEFAULT_TIMEOUT).await?;
         check(response, || format!("container {id}"))?;
         Ok(())
+    }
+
+    // blocks until the container exits, so the caller picks how long to wait
+    pub async fn wait_container(&self, id: &str, timeout: Duration) -> Result<i32> {
+        let path = format!("/containers/{}/wait?condition=exited", encode(id));
+        let response = self.send(Method::POST, &path, timeout).await?;
+        let body = check(response, || format!("container {id}"))?;
+        Ok(serde_json::from_slice(&body)?)
     }
 
     pub async fn remove_container(&self, id: &str) -> Result<()> {

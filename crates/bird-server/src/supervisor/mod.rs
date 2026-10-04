@@ -25,6 +25,7 @@ pub(crate) async fn recover_interrupted(state: &AppState) -> Result<()> {
             "marked work interrupted by the last shutdown as failed"
         );
     }
+    crate::commands::remove_leftover_runs(state).await;
     Ok(())
 }
 

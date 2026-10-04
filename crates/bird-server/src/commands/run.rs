@@ -1,0 +1,127 @@
+use std::collections::BTreeMap;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use bird_core::{Command, EnvKey, ImageRef, Name, Service};
+use bird_podman::{ContainerSpec, Lifecycle, Limits};
+use bytes::Bytes;
+use tokio::sync::mpsc;
+
+use super::forward;
+use crate::deploy::{MAX_PROCESSES, ensure_image};
+use crate::state::AppState;
+use crate::{Error, Result};
+
+const RUN_TIMEOUT: Duration = Duration::from_hours(1);
+const RUN_LABEL: &str = "bird.run";
+
+pub(crate) struct RunTarget {
+    service: Service,
+    image: ImageRef,
+    env: BTreeMap<EnvKey, String>,
+}
+
+// the active deployment, or the newest one when none succeeded yet, like a first deploy that needs setup
+pub(crate) async fn run_target(state: &AppState, name: &Name) -> Result<RunTarget> {
+    let service = state.service(name).await?;
+    let service_id = service.id;
+    let found = state
+        .db
+        .call(move |store| {
+            let deployment = match store.active_deployment(service_id)? {
+                Some(active) => Some(active),
+                None => store.list_deployments(service_id)?.into_iter().next(),
+            };
+            deployment
+                .map(|d| Ok((d.image, store.deployment_variables(d.id)?)))
+                .transpose()
+        })
+        .await?;
+    let Some((image, env)) = found else {
+        return Err(Error::NeverDeployed(name.clone()));
+    };
+    Ok(RunTarget {
+        service,
+        image,
+        env,
+    })
+}
+
+// the container is removed however this ends: exit, disconnect, timeout or shutdown
+pub(crate) async fn run(
+    state: &AppState,
+    target: &RunTarget,
+    command: &Command,
+    events: &mpsc::Sender<Bytes>,
+) -> Result<Option<i32>> {
+    ensure_image(state, &target.image).await?;
+    let spec = spec(state, target, command);
+    let id = state.podman.create_container(&spec).await?;
+    tracing::info!(service = %target.service.name, container = %spec.name, "running one-off command");
+    let outcome = tokio::select! {
+        () = state.shutdown.wait() => Err(Error::CommandFailed("birdd is shutting down".to_owned())),
+        () = events.closed() => Ok(None),
+        result = tokio::time::timeout(RUN_TIMEOUT, follow(state, &id, events)) => {
+            result.unwrap_or_else(|_| Err(Error::CommandFailed(format!(
+                "stopped after {} minutes",
+                RUN_TIMEOUT.as_secs() / 60
+            ))))
+        }
+    };
+    if let Err(err) = state.podman.remove_container(&id).await {
+        tracing::warn!(container = %spec.name, error = %err, "could not remove one-off container");
+    }
+    outcome
+}
+
+async fn follow(state: &AppState, id: &str, events: &mpsc::Sender<Bytes>) -> Result<Option<i32>> {
+    state.podman.start_container(id).await?;
+    let mut output = state.podman.follow_output(id).await?;
+    if !forward(&mut output, events).await? {
+        return Ok(None);
+    }
+    Ok(Some(state.podman.wait_container(id, RUN_TIMEOUT).await?))
+}
+
+fn spec(state: &AppState, target: &RunTarget, command: &Command) -> ContainerSpec {
+    let service = &target.service;
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis());
+    ContainerSpec {
+        name: format!("bird-run-{}-{millis}", service.name),
+        image: target.image.clone(),
+        command: Some(command.args().to_vec()),
+        lifecycle: Lifecycle::OneOff,
+        network: state.network.to_string(),
+        aliases: Vec::new(),
+        mounts: Vec::new(),
+        limits: Limits {
+            memory_bytes: service.memory.bytes(),
+            cpu_millicores: service.cpus.millicores(),
+            pids: MAX_PROCESSES,
+        },
+        env: target.env.clone(),
+        // no environment label, so the supervisor's orphan sweep leaves running commands alone
+        labels: BTreeMap::from([
+            ("bird.managed".to_owned(), "true".to_owned()),
+            (RUN_LABEL.to_owned(), service.name.to_string()),
+        ]),
+    }
+}
+
+// a run cannot outlive the birdd that streamed its output, so any found at startup is left over
+pub(crate) async fn remove_leftover_runs(state: &AppState) {
+    let leftovers = match state.podman.list_containers(RUN_LABEL).await {
+        Ok(containers) => containers,
+        Err(err) => {
+            tracing::warn!(error = %err, "could not list one-off containers");
+            return;
+        }
+    };
+    for container in leftovers {
+        tracing::info!(container = %container.name, "removing leftover one-off container");
+        if let Err(err) = state.podman.remove_container(&container.id).await {
+            tracing::warn!(container = %container.name, error = %err, "could not remove one-off container");
+        }
+    }
+}

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use bird_core::EnvKey;
 use serde::Serialize;
 
-use super::ContainerSpec;
+use super::{ContainerSpec, Lifecycle};
 
 #[derive(Serialize)]
 pub(super) struct SpecGenerator<'a> {
@@ -18,7 +18,8 @@ pub(super) struct SpecGenerator<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     volumes: Vec<NamedVolume<'a>>,
     resource_limits: ResourceLimits,
-    portmappings: [PortMapping; 1],
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    portmappings: Vec<PortMapping>,
     restart_policy: &'static str,
     // most apps ignore SIGTERM as pid 1, so stops would wait out the grace period and get killed
     init: bool,
@@ -105,12 +106,18 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                     limit: spec.limits.pids,
                 },
             },
-            portmappings: [PortMapping {
-                container_port: spec.port.get(),
-                host_ip: "127.0.0.1",
-                protocol: "tcp",
-            }],
-            restart_policy: "unless-stopped",
+            portmappings: match spec.lifecycle {
+                Lifecycle::Service { port } => vec![PortMapping {
+                    container_port: port.get(),
+                    host_ip: "127.0.0.1",
+                    protocol: "tcp",
+                }],
+                Lifecycle::OneOff => Vec::new(),
+            },
+            restart_policy: match spec.lifecycle {
+                Lifecycle::Service { .. } => "unless-stopped",
+                Lifecycle::OneOff => "no",
+            },
             init: true,
         }
     }
@@ -127,7 +134,9 @@ mod tests {
             name: "bird-x".to_owned(),
             image: "nginx:alpine".parse().unwrap(),
             command: None,
-            port: Port::try_from(80).unwrap(),
+            lifecycle: Lifecycle::Service {
+                port: Port::try_from(80).unwrap(),
+            },
             network: "bird".to_owned(),
             aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
             mounts: Vec::new(),
@@ -156,6 +165,7 @@ mod tests {
         assert_eq!(json["init"], true);
         assert_eq!(json["portmappings"][0]["container_port"], 80);
         assert_eq!(json["portmappings"][0]["host_ip"], "127.0.0.1");
+        assert_eq!(json["restart_policy"], "unless-stopped");
         assert_eq!(
             json["resource_limits"],
             serde_json::json!({
@@ -178,6 +188,15 @@ mod tests {
             json["volumes"],
             serde_json::json!([{"Name": "bird-volume-1", "Dest": "/var/lib/postgresql"}])
         );
+    }
+
+    #[test]
+    fn one_off_containers_are_unpublished_and_stay_exited() {
+        let mut spec = spec(&[]);
+        spec.lifecycle = Lifecycle::OneOff;
+        let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
+        assert!(json.get("portmappings").is_none());
+        assert_eq!(json["restart_policy"], "no");
     }
 
     #[test]

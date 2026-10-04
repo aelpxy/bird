@@ -1,6 +1,7 @@
 mod api;
 mod backoff;
 mod backups;
+mod commands;
 mod config;
 mod data_dir;
 mod db;
