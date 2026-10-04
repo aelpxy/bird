@@ -31,7 +31,7 @@ pub(crate) async fn run(client: &ApiClient, out: Output) -> Result<()> {
 
 fn row(service: &ServiceSummary) -> Vec<String> {
     let (status, machines) = match &service.deployment {
-        Some(_) if service.state == ServiceState::Stopped => (
+        _ if service.state == ServiceState::Stopped => (
             style::out(Paint::Dim, "stopped"),
             style::out(Paint::Dim, format!("0/{}", service.replicas)),
         ),
@@ -51,6 +51,10 @@ fn row(service: &ServiceSummary) -> Vec<String> {
                 style::out(paint, format!("{running}/{}", service.replicas)),
             )
         }
+        None if service.failed_deploy.is_some() => (
+            style::out(Paint::Red, "failed"),
+            style::out(Paint::Red, format!("0/{}", service.replicas)),
+        ),
         None => (
             style::out(Paint::Dim, "not deployed"),
             style::out(Paint::Dim, "0/0"),

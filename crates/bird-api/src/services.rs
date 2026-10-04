@@ -23,6 +23,16 @@ pub struct ServiceSummary {
     pub volumes: Vec<VolumeSpec>,
     pub backup_schedule: Option<BackupSchedule>,
     pub deployment: Option<DeploymentSummary>,
+    /// The newest deployment when it failed; an older active one may still be serving
+    #[serde(default)]
+    pub failed_deploy: Option<FailedDeploy>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct FailedDeploy {
+    pub id: DeploymentId,
+    pub created_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
