@@ -38,7 +38,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NothingToBackUp(_)
         | Error::BackupStorageMismatch(_)
         | Error::BackupVolumeMissing { .. }
-        | Error::ServiceExists(_)
+        | Error::ServiceExists { .. }
         | Error::ServiceStopped(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)

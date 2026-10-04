@@ -71,8 +71,10 @@ pub enum Error {
     TemplateNotFound(Name),
     #[error("built-in template is invalid: {0}")]
     Template(String),
-    #[error("a service named {0} already exists, pick another with --name")]
-    ServiceExists(Name),
+    #[error(
+        "a service named {name} already exists, name the new one: `bird add {template} <name>`"
+    )]
+    ServiceExists { name: Name, template: Name },
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
     #[error("{0} has no variable {1}")]

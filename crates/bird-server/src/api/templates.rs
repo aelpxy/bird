@@ -32,7 +32,10 @@ pub(crate) async fn deploy(
         .await?
         .is_some();
     if taken {
-        return Err(Error::ServiceExists(name));
+        return Err(Error::ServiceExists {
+            name,
+            template: template.name().clone(),
+        });
     }
     // run detached so a disconnecting client cannot abort the deploy halfway through
     let task = tokio::spawn(async move {
