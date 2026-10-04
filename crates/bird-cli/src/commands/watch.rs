@@ -2,6 +2,7 @@ use std::io::{IsTerminal, Write};
 use std::time::Duration;
 
 use anyhow::Result;
+use bird_api::ServiceSummary;
 use bird_core::Name;
 
 use super::history::unix_now;
@@ -21,9 +22,11 @@ pub(super) async fn run(client: &ApiClient, name: &Name, out: Output) -> Result<
     if out.json || !std::io::stdout().is_terminal() {
         return append(client, name, out).await;
     }
+    // a typo in the service name fails like plain `bird status` instead of being watched forever
+    let first = fetch(client, name).await?;
     let _screen = Screen::enter()?;
     tokio::select! {
-        result = redraw(client, name) => result,
+        result = redraw(client, name, first) => result,
         _ = tokio::signal::ctrl_c() => Ok(()),
     }
 }
@@ -41,20 +44,22 @@ async fn append(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     }
 }
 
-// errors are shown in place and retried, so a birdd restart or a deploy does not end the watch
-async fn redraw(client: &ApiClient, name: &Name) -> Result<()> {
+// later errors are shown in place and retried, so a birdd restart does not end the watch
+async fn redraw(client: &ApiClient, name: &Name, first: ServiceSummary) -> Result<()> {
     let hint = style::out(
         Paint::Dim,
         format!("every {}s, ctrl-c to stop", INTERVAL.as_secs()),
     );
+    let mut latest = Ok(first);
     loop {
-        let body = match fetch(client, name).await {
-            Ok(service) => describe(&service, unix_now()),
+        let body = match &latest {
+            Ok(service) => describe(service, unix_now()),
             Err(err) => format!("{} {err:#}\n", style::out(Paint::Red, "error:")),
         };
         let (_, rows) = terminal::size();
         show(&repaint(&format!("{hint}\n\n{body}"), rows))?;
         tokio::time::sleep(INTERVAL).await;
+        latest = fetch(client, name).await;
     }
 }
 
