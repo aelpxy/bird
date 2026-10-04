@@ -1749,6 +1749,346 @@
         }
       }
     },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/cron": {
+      "get": {
+        "tags": [
+          "cron"
+        ],
+        "summary": "List a service's cron jobs with their next and last run",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs by name; times are unix seconds and schedules are UTC",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CronJobSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/cron/{job}/runs": {
+      "get": {
+        "tags": [
+          "cron"
+        ],
+        "summary": "List a cron job's runs, newest first",
+        "operationId": "runs",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "job",
+            "in": "path",
+            "description": "Job name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest runs, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CronRunSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "cron"
+        ],
+        "summary": "Run a cron job now",
+        "operationId": "trigger",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "job",
+            "in": "path",
+            "description": "Job name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The run started; poll it for its status and output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronRunSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or job not found, or the service was never deployed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The job is already running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many cron jobs are running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/cron/{job}/runs/{id}": {
+      "get": {
+        "tags": [
+          "cron"
+        ],
+        "summary": "Show a cron run with the end of its output",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "job",
+            "in": "path",
+            "description": "Job name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Run id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run; output is the last 64 KiB, or why a skipped run did not start",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CronRunDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service, job or run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{project}/environments/{environment}/services/{name}/deployments": {
       "get": {
         "tags": [
@@ -4947,6 +5287,170 @@
           }
         }
       },
+      "CronJobSpec": {
+        "type": "object",
+        "required": [
+          "name",
+          "schedule",
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/CronSchedule"
+          },
+          "timeout": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CronTimeout",
+                "description": "Seconds a run may take, or text like \"30m\"; left out, an hour"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "CronJobSummary": {
+        "type": "object",
+        "required": [
+          "name",
+          "schedule",
+          "command",
+          "timeout"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "last_run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CronRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "next_run_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Unix seconds of the next scheduled run, in UTC"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/CronSchedule"
+          },
+          "timeout": {
+            "$ref": "#/components/schemas/CronTimeout"
+          }
+        }
+      },
+      "CronRunDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CronRunSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "output"
+            ],
+            "properties": {
+              "output": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "description": "A run with the end of what it printed, or why it did not run"
+      },
+      "CronRunId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "CronRunStatus": {
+        "type": "string",
+        "enum": [
+          "running",
+          "succeeded",
+          "failed",
+          "timed_out",
+          "interrupted",
+          "skipped"
+        ]
+      },
+      "CronRunSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "started_at"
+        ],
+        "properties": {
+          "exit_code": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "finished_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "$ref": "#/components/schemas/CronRunId"
+          },
+          "started_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CronRunStatus"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/CronTrigger"
+          }
+        }
+      },
+      "CronSchedule": {
+        "type": "string",
+        "description": "A 5-field cron pattern in UTC like */15 * * * *, or an alias like @daily",
+        "examples": [
+          "0 3 * * *"
+        ]
+      },
+      "CronTimeout": {
+        "type": "integer",
+        "format": "int32",
+        "maximum": 86400,
+        "minimum": 1
+      },
+      "CronTrigger": {
+        "type": "string",
+        "enum": [
+          "schedule",
+          "manual"
+        ]
+      },
       "DeployRequest": {
         "type": "object",
         "required": [
@@ -4990,6 +5494,16 @@
                 "type": "null"
               }
             ]
+          },
+          "cron": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CronJobSpec"
+            },
+            "description": "The service's cron jobs once the deploy succeeds, replacing the ones it had; left out, they stay as they are"
           },
           "default_command": {
             "type": "boolean",
@@ -6160,6 +6674,10 @@
     {
       "name": "commands",
       "description": "One-off commands in a running machine or a fresh container"
+    },
+    {
+      "name": "cron",
+      "description": "Commands run on a schedule, set with a service's bird.toml"
     }
   ]
 }

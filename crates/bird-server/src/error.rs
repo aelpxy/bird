@@ -167,6 +167,20 @@ pub enum Error {
     NothingToStart(Name),
     #[error("command failed: {0}")]
     CommandFailed(String),
+    #[error("command failed: stopped at its time limit of {}s", .0.as_secs())]
+    RunTimedOut(std::time::Duration),
+    #[error("birdd is shutting down")]
+    ShuttingDown,
+    #[error("{service} has no cron job {job}, see `bird cron`")]
+    CronJobNotFound { service: Name, job: Name },
+    #[error("cron run {0} not found")]
+    CronRunNotFound(bird_core::CronRunId),
+    #[error("cron job {0} is still running")]
+    CronJobRunning(Name),
+    #[error("too many cron jobs are running, try again shortly")]
+    TooManyCronRuns,
+    #[error("cron job {0} is listed twice")]
+    DuplicateCronJob(Name),
     #[error("too many terminals are open, close one and try again")]
     TooManyTerminals,
     #[error("a terminal needs a connection upgraded to bird-tty")]

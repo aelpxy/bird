@@ -50,6 +50,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::EnvironmentExists { .. }
         | Error::EnvironmentHasServices { .. }
         | Error::EnvironmentHasBackups { .. }
+        | Error::CronJobRunning(_)
         | Error::ServiceStopped(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
@@ -70,6 +71,8 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NeverDeployed(_)
         | Error::NothingToStart(_)
         | Error::BackupNotFound(_)
+        | Error::CronJobNotFound { .. }
+        | Error::CronRunNotFound(_)
         | Error::BackupDataMissing(_)
         | Error::LocalImageMissing(_) => StatusCode::NOT_FOUND,
         Error::Podman(bird_podman::Error::Pull { .. })
@@ -83,13 +86,16 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::WeakPassword { .. }
         | Error::NotASession
         | Error::CommandConflict
+        | Error::DuplicateCronJob(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Forbidden(_) | Error::WrongPassword => StatusCode::FORBIDDEN,
         Error::InvalidLogin | Error::InvalidCode => StatusCode::UNAUTHORIZED,
         Error::TooManyAttempts(_) => StatusCode::TOO_MANY_REQUESTS,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
-        Error::TooManyTerminals => StatusCode::SERVICE_UNAVAILABLE,
+        Error::TooManyTerminals | Error::TooManyCronRuns | Error::ShuttingDown => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
         Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }

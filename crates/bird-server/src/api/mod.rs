@@ -4,6 +4,7 @@ mod backups;
 mod builds;
 mod commands;
 mod credentials;
+mod cron;
 mod deploy;
 mod deployments;
 mod docs;
@@ -119,6 +120,9 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(backups::restore))
         .routes(routes!(backups::remove))
         .routes(routes!(backups::set_schedule, backups::clear_schedule))
+        .routes(routes!(cron::list))
+        .routes(routes!(cron::runs, cron::trigger))
+        .routes(routes!(cron::run))
         .routes(routes!(commands::exec))
         .routes(routes!(commands::run))
         .routes(routes!(terminals::exec))

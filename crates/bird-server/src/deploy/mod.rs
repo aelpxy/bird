@@ -25,7 +25,7 @@ use crate::state::AppState;
 
 // longer than a supervisor replacement takes, so user requests rarely see a busy error
 pub(crate) const OPERATION_PATIENCE: std::time::Duration = std::time::Duration::from_mins(2);
-use crate::{Result, images, routing, secrets};
+use crate::{Result, cron, images, routing, secrets};
 
 pub(crate) async fn redeploy(
     state: &AppState,
@@ -47,6 +47,7 @@ pub(crate) async fn redeploy(
         volumes: Vec::new(),
         replicas: None,
         backup: None,
+        cron: None,
         default_command: false,
         allow_image_change: false,
     };
@@ -64,6 +65,9 @@ pub(crate) async fn deploy(
     if request.default_command && request.command.is_some() {
         return Err(crate::Error::CommandConflict);
     }
+    if let Some(jobs) = &request.cron {
+        cron::check_specs(jobs)?;
+    }
     request.env = secrets::expand_all(request.env)?;
     references::check_change(state, environment, &request.name, &request.env, &[]).await?;
     if request.backup.is_some()
@@ -77,6 +81,7 @@ pub(crate) async fn deploy(
         .wait_for(environment, &request.name, OPERATION_PATIENCE)
         .await?;
     let new_volumes = volumes::preflight(state, environment, &request).await?;
+    let jobs = request.cron.take();
     let (service, previous_settings, domains, attached) =
         save_config(state, environment, request, new_volumes).await?;
     state.domains_changed.notify_one();
@@ -125,6 +130,11 @@ pub(crate) async fn deploy(
     routing::refresh(state).await?;
     if let Some(previous) = previous {
         machine::retire(state, previous.id).await;
+    }
+    // jobs change with a deploy that worked, so a failed one keeps running the old ones
+    if let Some(jobs) = jobs {
+        let count = cron::set_jobs(state, service.id, jobs).await?.len();
+        tracing::info!(service = %service.name, jobs = count, "cron jobs set");
     }
     volumes::record_lineage(state, &attached, &deployment.image).await;
     let cleanup = state.clone();

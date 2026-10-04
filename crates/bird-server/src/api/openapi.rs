@@ -26,6 +26,7 @@ const TOKEN_SCHEME: &str = "api_token";
         (name = "builds", description = "Images built from source on the server"),
         (name = "backups", description = "Copies of service volumes, and restoring them"),
         (name = "commands", description = "One-off commands in a running machine or a fresh container"),
+        (name = "cron", description = "Commands run on a schedule, set with a service's bird.toml"),
     )
 )]
 struct ApiDoc;
@@ -104,6 +105,9 @@ mod tests {
             "/services/{name}/variables",
             "/services/{name}/variables/{key}",
             "/services/{name}/builds",
+            "/services/{name}/cron",
+            "/services/{name}/cron/{job}/runs",
+            "/services/{name}/cron/{job}/runs/{id}",
             "/templates/{template}/deploy",
         ]
         .into_iter()

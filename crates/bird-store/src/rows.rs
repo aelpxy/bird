@@ -40,7 +40,7 @@ fn port(row: &Row<'_>, idx: usize) -> rusqlite::Result<Port> {
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
 }
 
-fn command(row: &Row<'_>, idx: usize) -> rusqlite::Result<Option<Command>> {
+pub(crate) fn command(row: &Row<'_>, idx: usize) -> rusqlite::Result<Option<Command>> {
     let raw: Option<String> = row.get(idx)?;
     raw.map(|raw| {
         let args: Vec<String> = serde_json::from_str(&raw).map_err(|err| {

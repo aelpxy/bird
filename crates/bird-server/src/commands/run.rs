@@ -69,25 +69,32 @@ pub(crate) async fn run_target(
     })
 }
 
-// the container is removed however this ends: exit, disconnect, timeout or shutdown
 pub(crate) async fn run(
     state: &AppState,
     target: &RunTarget,
     command: &Command,
     events: &mpsc::Sender<Bytes>,
 ) -> Result<Option<i32>> {
+    run_with_limit(state, target, command, events, RUN_TIMEOUT).await
+}
+
+// the container is removed however this ends: exit, disconnect, timeout or shutdown
+pub(crate) async fn run_with_limit(
+    state: &AppState,
+    target: &RunTarget,
+    command: &Command,
+    events: &mpsc::Sender<Bytes>,
+    limit: Duration,
+) -> Result<Option<i32>> {
     ensure_image(state, &target.image).await?;
     let spec = spec(target, command, Lifecycle::OneOff);
     let id = state.podman.create_container(&spec).await?;
     tracing::info!(service = %target.service.name, container = %spec.name, "running one-off command");
     let outcome = tokio::select! {
-        () = state.shutdown.wait() => Err(Error::CommandFailed("birdd is shutting down".to_owned())),
+        () = state.shutdown.wait() => Err(Error::ShuttingDown),
         () = events.closed() => Ok(None),
-        result = tokio::time::timeout(RUN_TIMEOUT, follow(state, &id, events)) => {
-            result.unwrap_or_else(|_| Err(Error::CommandFailed(format!(
-                "stopped after {} minutes",
-                RUN_TIMEOUT.as_secs() / 60
-            ))))
+        result = tokio::time::timeout(limit, follow(state, &id, limit, events)) => {
+            result.unwrap_or_else(|_| Err(Error::RunTimedOut(limit)))
         }
     };
     if let Err(err) = state.podman.remove_container(&id).await {
@@ -96,13 +103,18 @@ pub(crate) async fn run(
     outcome
 }
 
-async fn follow(state: &AppState, id: &str, events: &mpsc::Sender<Bytes>) -> Result<Option<i32>> {
+async fn follow(
+    state: &AppState,
+    id: &str,
+    limit: Duration,
+    events: &mpsc::Sender<Bytes>,
+) -> Result<Option<i32>> {
     state.podman.start_container(id).await?;
     let mut output = state.podman.follow_output(id).await?;
     if !forward(&mut output, events).await? {
         return Ok(None);
     }
-    Ok(Some(state.podman.wait_container(id, RUN_TIMEOUT).await?))
+    Ok(Some(state.podman.wait_container(id, limit).await?))
 }
 
 // attached before it starts, so the first output and the first prompt reach the client

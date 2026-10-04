@@ -45,7 +45,9 @@ define_id!(
     UserId,
     TokenId,
     OrgId,
-    SessionId
+    SessionId,
+    CronJobId,
+    CronRunId
 );
 
 #[cfg(test)]

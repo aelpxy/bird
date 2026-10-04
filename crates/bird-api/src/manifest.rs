@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use bird_core::{
-    BackupInterval, BackupKeep, BackupSchedule, BuildFile, Command, CpuLimit, EnvKey, HealthCheck,
-    HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
+    BackupInterval, BackupKeep, BackupSchedule, BuildFile, Command, CpuLimit, CronJobSpec, EnvKey,
+    HealthCheck, HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -49,6 +49,9 @@ pub struct Manifest {
     pub volumes: Vec<VolumeSpec>,
     #[serde(default)]
     pub backup: Option<BackupSpec>,
+    /// `[[cron]]` entries; a deploy from bird.toml makes them the service's jobs
+    #[serde(default)]
+    pub cron: Vec<CronJobSpec>,
 }
 
 // `[backup] every = "1d"` backs the volumes up on a schedule, keeping the newest `keep` copies
@@ -100,6 +103,7 @@ impl Manifest {
             env: BTreeMap::new(),
             volumes: Vec::new(),
             backup: None,
+            cron: Vec::new(),
         }
     }
 
@@ -124,6 +128,7 @@ impl Manifest {
                 keep: spec.keep,
             }),
             default_command: false,
+            cron: None,
             allow_image_change: false,
         }
     }
