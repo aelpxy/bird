@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt, clippy, unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  podman:
+    name: integration tests with podman
+    runs-on: ubuntu-24.04
+    # ubuntu's podman is 4.x and bird needs 5; podman keeps its storage on a volume, as overlay
+    # cannot sit on the container's own overlay filesystem
+    container:
+      image: registry.fedoraproject.org/fedora:44
+      options: --privileged -v /var/lib/containers
+    steps:
+      - name: Install podman and build tools
+        run: dnf install -y --setopt=install_weak_deps=False podman gcc git
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # the api is started in the same step, a background process may not outlive its step
+      - name: Run every test against podman
+        run: |
+          mkdir -p /run/podman
+          podman system service --time=0 unix:///run/podman/podman.sock &
+          for _ in $(seq 1 50); do [ -S /run/podman/podman.sock ] && break; sleep 0.2; done
+          cargo test -- --include-ignored

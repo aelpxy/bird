@@ -12,7 +12,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 
 * Build: `cargo build --release` produces `target/release/birdd` (daemon) and `target/release/bird` (CLI).
 * Check: `cargo fmt --check && cargo clippy --all-targets -- -D warnings`
-* Test: `cargo test -- --include-ignored` (ignored tests need a running Podman socket).
+* Test: `cargo test -- --include-ignored` (ignored tests need a running Podman socket). `crates/bird-server/tests/` start an in-process birdd (`run_until`, `tests/support`) with its own data dir, ports and networks, and drive it over HTTP; project names carry a per-birdd prefix so networks never clash with another birdd on the same podman. CI (`.github/workflows/ci.yml`) runs fmt, clippy and unit tests on Ubuntu, and every test in a privileged Fedora container, since Ubuntu's podman is 4.x.
 * Run: `birdd --data-dir <dir>`, then `bird login 127.0.0.1:7070 < <dir>/api-token` once, then `bird deploy <name> <image> --domain <host>`; the proxy listens on `:80` (HTTPS `:443`), the API on `127.0.0.1:7070`. Rootless needs `net.ipv4.ip_unprivileged_port_start=80`, or pass `--proxy-addr`/`--https-addr` with high ports.
 * Service: `contrib/systemd/birdd.service` is a rootless user unit; install steps are in its header.
 * TLS: `birdd --acme-directory <url> [--acme-email <email>]` enables automatic certificates (HTTP-01 on the proxy port, HTTPS on `--https-addr`, default `:443`). Without it no HTTPS listener runs. `*.localhost` domains never get certificates.
