@@ -29,6 +29,8 @@ pub(crate) struct ApiClient {
 struct ApiError {
     status: StatusCode,
     body: ErrorBody,
+    // where the command looked, so a missing service is not mistaken for a missing deploy
+    scope: String,
 }
 
 impl fmt::Display for ApiError {
@@ -41,7 +43,8 @@ impl fmt::Display for ApiError {
         if self.status == StatusCode::NOT_FOUND && is_missing_service(&self.body.error) {
             write!(
                 f,
-                "\nsee your services with `bird ls`, or create this one with `bird deploy`"
+                "\nsee the services in {} with `bird ls`, or create this one there with `bird deploy`",
+                self.scope
             )?;
         }
         if self.status == StatusCode::UNAUTHORIZED {
@@ -184,7 +187,7 @@ impl ApiClient {
         let mut body = response.into_body();
         if !status.is_success() {
             let body = body.collect().await?.to_bytes();
-            return Err(api_error(status, &body));
+            return Err(self.api_error(status, &body));
         }
         let mut buffer = Vec::new();
         while let Some(frame) = body.frame().await {
@@ -222,7 +225,7 @@ impl ApiClient {
             let status = response.status();
             if status != StatusCode::SWITCHING_PROTOCOLS {
                 let body = response.into_body().collect().await?.to_bytes();
-                return Err(api_error(status, &body));
+                return Err(self.api_error(status, &body));
             }
             Ok(TokioIo::new(hyper::upgrade::on(response).await?))
         };
@@ -305,16 +308,24 @@ impl ApiClient {
         if status.is_success() {
             return Ok(body);
         }
-        Err(api_error(status, &body))
+        Err(self.api_error(status, &body))
     }
 }
 
-fn api_error(status: StatusCode, body: &[u8]) -> anyhow::Error {
-    let body = serde_json::from_slice::<ErrorBody>(body).unwrap_or_else(|_| ErrorBody {
-        error: String::from_utf8_lossy(body).trim().to_owned(),
-        logs: Vec::new(),
-    });
-    ApiError { status, body }.into()
+impl ApiClient {
+    fn api_error(&self, status: StatusCode, body: &[u8]) -> anyhow::Error {
+        let body = serde_json::from_slice::<ErrorBody>(body).unwrap_or_else(|_| ErrorBody {
+            error: String::from_utf8_lossy(body).trim().to_owned(),
+            logs: Vec::new(),
+        });
+        let scope = self.scope.to_string();
+        ApiError {
+            status,
+            body,
+            scope,
+        }
+        .into()
+    }
 }
 
 #[cfg(test)]

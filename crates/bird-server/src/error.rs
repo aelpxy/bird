@@ -42,7 +42,7 @@ pub enum Error {
     ProjectExists(Name),
     #[error("project {project} already has an environment {environment}")]
     EnvironmentExists { project: Name, environment: Name },
-    #[error("{scope} still has {}, remove them first with `bird rm`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    #[error("{scope} still has services {}; remove them first with `bird rm -s <service>`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
     EnvironmentHasServices { scope: String, services: Vec<Name> },
     #[error("{scope} still has backups of {}, delete them first with `bird backup rm`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
     EnvironmentHasBackups { scope: String, services: Vec<Name> },

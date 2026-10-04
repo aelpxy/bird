@@ -37,7 +37,7 @@ async fn append(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
         let frame = if out.json {
             serde_json::to_string(&service)?
         } else {
-            describe(&service, unix_now())
+            describe(&service, client.scope(), unix_now())
         };
         show(&format!("{frame}\n"))?;
         tokio::time::sleep(INTERVAL).await;
@@ -53,7 +53,7 @@ async fn redraw(client: &ApiClient, name: &Name, first: ServiceSummary) -> Resul
     let mut latest = Ok(first);
     loop {
         let body = match &latest {
-            Ok(service) => describe(service, unix_now()),
+            Ok(service) => describe(service, client.scope(), unix_now()),
             Err(err) => format!("{} {err:#}\n", style::out(Paint::Red, "error:")),
         };
         let (_, rows) = terminal::size();
