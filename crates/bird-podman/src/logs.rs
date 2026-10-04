@@ -1,5 +1,8 @@
+use hyper::body::Incoming;
+
 use crate::error::check;
 use crate::follow::LogFollower;
+use crate::output::OutputFollower;
 use crate::query::encode;
 use crate::{Error, Podman, Result};
 
@@ -33,19 +36,19 @@ impl Podman {
             "/containers/{}/logs?follow=true&stdout=true&stderr=true&tail={tail}",
             encode(id)
         );
-        self.follow(id, &path).await
+        Ok(LogFollower::new(self.follow(id, &path).await?))
     }
 
-    // everything since the container started, ending when it exits
-    pub async fn follow_output(&self, id: &str) -> Result<LogFollower> {
+    // everything since the container started as written, ending when it exits
+    pub async fn follow_output(&self, id: &str) -> Result<OutputFollower> {
         let path = format!(
             "/containers/{}/logs?follow=true&stdout=true&stderr=true",
             encode(id)
         );
-        self.follow(id, &path).await
+        Ok(OutputFollower::new(self.follow(id, &path).await?))
     }
 
-    async fn follow(&self, id: &str, path: &str) -> Result<LogFollower> {
+    async fn follow(&self, id: &str, path: &str) -> Result<Incoming> {
         let streamed = self.stream(path).await?;
         let status = streamed.status;
         if !status.is_success() {
@@ -55,7 +58,7 @@ impl Podman {
                 message: "unexpected response to a log stream".to_owned(),
             });
         }
-        Ok(LogFollower::new(streamed.body))
+        Ok(streamed.body)
     }
 }
 

@@ -3,7 +3,7 @@ mod run;
 pub(crate) mod tty;
 
 use bird_api::{CommandEvent, LogStream};
-use bird_podman::{LogFollower, LogLine};
+use bird_podman::{OutputChunk, OutputFollower};
 use bytes::Bytes;
 use serde::Serialize;
 use tokio::sync::mpsc;
@@ -14,22 +14,22 @@ pub(crate) use run::{remove_leftover_runs, run, run_target, start_terminal};
 use crate::Result;
 
 // copies a command's output to the client until it ends; false when the client went away
-async fn forward(output: &mut LogFollower, events: &mpsc::Sender<Bytes>) -> Result<bool> {
-    while let Some(line) = output.next().await {
-        if !send(events, &event(line?)).await {
+async fn forward(output: &mut OutputFollower, events: &mpsc::Sender<Bytes>) -> Result<bool> {
+    while let Some(chunk) = output.next().await {
+        if !send(events, &event(chunk?)).await {
             return Ok(false);
         }
     }
     Ok(true)
 }
 
-fn event(line: LogLine) -> CommandEvent {
+fn event(chunk: OutputChunk) -> CommandEvent {
     CommandEvent::Output {
-        stream: match line.stream {
+        stream: match chunk.stream {
             bird_podman::LogStream::Stdout => LogStream::Stdout,
             bird_podman::LogStream::Stderr => LogStream::Stderr,
         },
-        text: line.text,
+        text: chunk.text,
     }
 }
 

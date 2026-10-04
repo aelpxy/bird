@@ -23,9 +23,17 @@ pub struct RunRequest {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CommandEvent {
-    Output { stream: LogStream, text: String },
-    Exited { code: i32 },
-    Failed { error: String },
+    /// Output exactly as written, so a chunk may end mid-line; invalid UTF-8 becomes U+FFFD
+    Output {
+        stream: LogStream,
+        text: String,
+    },
+    Exited {
+        code: i32,
+    },
+    Failed {
+        error: String,
+    },
 }
 
 #[cfg(test)]
