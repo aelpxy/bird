@@ -40,6 +40,8 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::BackupVolumeMissing { .. }
         | Error::ServiceExists { .. }
         | Error::ProjectExists(_)
+        | Error::UserExists(_)
+        | Error::TokenExists { .. }
         | Error::EnvironmentExists { .. }
         | Error::EnvironmentHasServices { .. }
         | Error::EnvironmentHasBackups { .. }
@@ -47,6 +49,8 @@ fn status_of(error: &Error) -> StatusCode {
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
         | Error::ProjectNotFound(_)
+        | Error::UserNotFound(_)
+        | Error::TokenNotFound { .. }
         | Error::EnvironmentNotFound { .. }
         | Error::DomainNotFound(_)
         | Error::VariableNotFound(..)
@@ -69,6 +73,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::InvalidPath(_)
         | Error::CommandConflict
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
+        Error::Forbidden(_) => StatusCode::FORBIDDEN,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
         Error::TooManyTerminals => StatusCode::SERVICE_UNAVAILABLE,

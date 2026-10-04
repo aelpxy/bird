@@ -13,6 +13,7 @@ mod scale;
 mod services;
 mod templates;
 mod tty;
+mod users;
 mod variables;
 mod volumes;
 
@@ -31,5 +32,8 @@ pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, FailedDeploy, MachineStats, MachineSummary, ServiceSummary};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
 pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TTY_UPGRADE};
+pub use users::{
+    CreateToken, CreateUser, CreatedUser, IssuedToken, TokenSummary, UserSummary, Whoami,
+};
 pub use variables::{UpdateVariables, VariableValue, VariablesResponse};
 pub use volumes::VolumeSpec;

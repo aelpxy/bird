@@ -20,6 +20,7 @@ mod status;
 mod table;
 mod templates;
 mod tty;
+mod users;
 mod watch;
 
 use std::path::Path;
@@ -29,7 +30,7 @@ use bird_core::Name;
 
 use crate::args::{
     Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, ProjectCommand,
-    RegistryCommand,
+    RegistryCommand, TokenCommand, UserCommand,
 };
 use crate::client::ApiClient;
 use crate::scope::{Scope, Sources};
@@ -38,6 +39,8 @@ use crate::{manifest, profile};
 
 pub(crate) use exec::RemoteExit;
 
+// one arm per command reads better than splitting the dispatch up
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn run(args: Args) -> Result<()> {
     let Args {
         service,
@@ -119,12 +122,15 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Templates => templates::list(&connect(api)?, out).await,
         Command::Remove { purge, yes } => remove::run(&connect(api)?, &target()?, purge, yes).await,
         Command::Registry { command } => {
-            let command = command.unwrap_or(RegistryCommand::List);
-            registry::run(&connect(api)?, command, out).await
+            registry::run(
+                &connect(api)?,
+                command.unwrap_or(RegistryCommand::List),
+                out,
+            )
+            .await
         }
         Command::Project { command } => {
-            let command = command.unwrap_or(ProjectCommand::List);
-            projects::project(&connect(api)?, command, out).await
+            projects::project(&connect(api)?, command.unwrap_or(ProjectCommand::List), out).await
         }
         Command::Environment { command } => {
             let command = command.unwrap_or(EnvironmentCommand::List);
@@ -134,6 +140,19 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             project,
             environment,
         } => projects::switch(&connect(api)?, project, environment).await,
+        Command::Whoami => users::whoami(&connect(api)?, out).await,
+        Command::User { command } => {
+            users::user(&connect(api)?, command.unwrap_or(UserCommand::List), out).await
+        }
+        Command::Token { user, command } => {
+            users::token(
+                &connect(api)?,
+                user,
+                command.unwrap_or(TokenCommand::List),
+                out,
+            )
+            .await
+        }
         Command::Login { api } => login::run(api).await,
         Command::Completions { shell } => completions::run(shell),
     }

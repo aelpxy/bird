@@ -2,7 +2,7 @@ use std::io::{BufRead, IsTerminal, Write};
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bird_api::ProjectSummary;
+use bird_api::Whoami;
 
 use crate::client::ApiClient;
 use crate::profile::{self, Profile};
@@ -16,8 +16,8 @@ pub(crate) async fn run(api: String) -> Result<()> {
     let token = read_token()?;
 
     let client = ApiClient::new(api.clone(), Some(token.clone()), Scope::fallback());
-    let _: Vec<ProjectSummary> = client
-        .get("/v1/projects", TIMEOUT)
+    let me: Whoami = client
+        .get("/v1/me", TIMEOUT)
         .await
         .context("login failed")?;
 
@@ -31,8 +31,9 @@ pub(crate) async fn run(api: String) -> Result<()> {
         },
     )?;
     println!(
-        "{} logged in to {api}, saved to {}",
+        "{} logged in to {api} as {}, saved to {}",
         style::out(Paint::Green, "✓"),
+        me.name,
         path.display()
     );
     Ok(())

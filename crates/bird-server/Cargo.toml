@@ -27,6 +27,7 @@ hyper-util = { workspace = true, features = ["tokio"] }
 instant-acme.workspace = true
 object_store.workspace = true
 reqwest.workspace = true
+ring.workspace = true
 rustix = { workspace = true, features = ["process"] }
 rustls.workspace = true
 serde.workspace = true

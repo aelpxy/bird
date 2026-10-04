@@ -22,6 +22,7 @@ mod supervisor;
 mod templates;
 mod tls;
 mod token;
+mod users;
 
 pub use config::Config;
 pub use error::{Error, Result};

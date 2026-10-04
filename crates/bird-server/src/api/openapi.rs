@@ -13,6 +13,7 @@ const TOKEN_SCHEME: &str = "api_token";
     modifiers(&BearerToken),
     security(("api_token" = [])),
     tags(
+        (name = "users", description = "Users and their API tokens"),
         (name = "projects", description = "Projects and their environments, each with its own private network"),
         (name = "deployments", description = "Deploy images, inspect history and roll back"),
         (name = "services", description = "List, scale and remove services"),
@@ -109,6 +110,11 @@ mod tests {
         .collect();
         paths.extend(
             [
+                "/v1/me",
+                "/v1/users",
+                "/v1/users/{user}",
+                "/v1/users/{user}/tokens",
+                "/v1/users/{user}/tokens/{token}",
                 "/v1/projects",
                 "/v1/projects/{project}",
                 "/v1/projects/{project}/environments",
