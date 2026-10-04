@@ -15,20 +15,12 @@ pub(crate) async fn sample(
     state: &AppState,
     containers: &[(MachineId, String)],
 ) -> BTreeMap<MachineId, MachineStats> {
-    let ids: Vec<&str> = containers.iter().map(|(_, id)| id.as_str()).collect();
-    let pair = async {
-        let first = state.podman.stats(&ids).await?;
-        tokio::time::sleep(SAMPLE_WINDOW).await;
-        let second = state.podman.stats(&ids).await?;
-        Ok::<_, bird_podman::Error>((first, second))
-    };
-    let (first, second) = match pair.await {
-        Ok(pair) => pair,
-        Err(err) => {
-            tracing::warn!(error = %err, "could not sample machine stats");
-            return BTreeMap::new();
-        }
-    };
+    let first = snapshot(state, containers).await;
+    if first.is_empty() {
+        return BTreeMap::new();
+    }
+    tokio::time::sleep(SAMPLE_WINDOW).await;
+    let second = snapshot(state, containers).await;
     containers
         .iter()
         .filter_map(|(machine, id)| {
@@ -36,6 +28,24 @@ pub(crate) async fn sample(
             Some((*machine, usage))
         })
         .collect()
+}
+
+// one container at a time: podman fails the whole request when any of them was removed meanwhile
+async fn snapshot(
+    state: &AppState,
+    containers: &[(MachineId, String)],
+) -> BTreeMap<String, ContainerStats> {
+    let mut found = BTreeMap::new();
+    for (machine, id) in containers {
+        match state.podman.stats(&[id]).await {
+            Ok(sampled) => found.extend(sampled),
+            Err(bird_podman::Error::NotFound { .. }) => {}
+            Err(err) => {
+                tracing::warn!(machine = %machine, error = %err, "could not sample machine stats");
+            }
+        }
+    }
+    found
 }
 
 fn combine(first: &ContainerStats, second: &ContainerStats) -> Option<MachineStats> {
