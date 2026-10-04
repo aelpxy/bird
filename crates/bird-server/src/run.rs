@@ -8,7 +8,7 @@ use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
 use bird_store::Store;
 use tokio::sync::{Notify, Semaphore};
 
-use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, Scheduler};
+use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, S3, S3Settings, Scheduler};
 use crate::commands::tty;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
@@ -55,7 +55,7 @@ pub async fn run(config: Config) -> Result<()> {
         shutdown: shutdown.clone(),
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
-        backups: Arc::new(backup_storage(&config, &data_dir)),
+        backups: Arc::new(backup_storage(&config, &data_dir).await?),
     };
     supervisor::recover_interrupted(&state).await?;
     // machines keep running across a restart, so their recorded routes serve until the first sweep
@@ -123,12 +123,38 @@ pub async fn run(config: Config) -> Result<()> {
     Ok(())
 }
 
-fn backup_storage(config: &Config, data_dir: &Path) -> BackupStorage {
-    let dir = config
-        .backup_dir
-        .clone()
-        .unwrap_or_else(|| data_dir.join("backups"));
-    BackupStorage::Local(LocalDir::new(dir))
+async fn backup_storage(config: &Config, data_dir: &Path) -> Result<BackupStorage> {
+    let (Some(bucket), Some(access_key_id), Some(secret)) = (
+        &config.s3_bucket,
+        &config.s3_access_key_id,
+        &config.s3_secret_access_key,
+    ) else {
+        let dir = config
+            .backup_dir
+            .clone()
+            .unwrap_or_else(|| data_dir.join("backups"));
+        return Ok(BackupStorage::Local(LocalDir::new(dir)));
+    };
+    let s3 = S3::new(S3Settings {
+        bucket: bucket.clone(),
+        region: config.s3_region.clone(),
+        endpoint: config.s3_endpoint.clone(),
+        prefix: config.s3_prefix.clone(),
+        access_key_id: access_key_id.clone(),
+        secret_access_key: secret.expose().to_owned(),
+    })?;
+    // whatever a crash left mid-transfer is never needed again
+    let staging = data_dir.join("backup-staging");
+    match tokio::fs::remove_dir_all(&staging).await {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(err.into()),
+    }
+    tracing::info!(bucket, endpoint = ?config.s3_endpoint, "backups go to s3");
+    Ok(BackupStorage::S3 {
+        bucket: s3,
+        staging: LocalDir::scratch(staging),
+    })
 }
 
 fn ensure_environment(

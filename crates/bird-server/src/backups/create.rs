@@ -60,6 +60,11 @@ pub(super) async fn snapshot(
         Err(err) => Err(err),
     };
     resume(state, &paused).await;
+    let outcome = match outcome {
+        Ok(()) => upload(state, &copied).await,
+        Err(err) => Err(err),
+    };
+    unstage(state, &copied).await;
 
     let backup = Backup {
         id,
@@ -118,7 +123,10 @@ async fn copy(
     for volume in volumes {
         let key = format!("{id}/{}.tar", volume.name);
         let archive = state.podman.export_volume(&volume.podman_name()).await?;
-        let size_bytes = state.backups.put(&key, archive).await?;
+        let size_bytes = match state.backups.staging() {
+            Some(staging) => staging.put(&key, archive).await?,
+            None => state.backups.put(&key, archive).await?,
+        };
         copied.push(BackupVolume {
             name: volume.name.clone(),
             lineage: volume.lineage.clone(),
@@ -127,6 +135,30 @@ async fn copy(
         });
     }
     Ok(())
+}
+
+// staged archives go to storage once the machines run again; no overall limit, since large
+// volumes take long on slow links and the storage bounds stalls itself
+async fn upload(state: &AppState, copied: &[BackupVolume]) -> Result<()> {
+    let Some(staging) = state.backups.staging() else {
+        return Ok(());
+    };
+    for volume in copied {
+        let archive = staging.get(&volume.key).await?;
+        state.backups.put(&volume.key, archive).await?;
+    }
+    Ok(())
+}
+
+async fn unstage(state: &AppState, copied: &[BackupVolume]) {
+    let Some(staging) = state.backups.staging() else {
+        return;
+    };
+    for volume in copied {
+        if let Err(err) = staging.delete(&volume.key).await {
+            tracing::warn!(key = %volume.key, error = %err, "could not delete a staged backup archive");
+        }
+    }
 }
 
 async fn discard(state: &AppState, copied: &[BackupVolume]) {

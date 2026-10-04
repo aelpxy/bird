@@ -17,11 +17,24 @@ const CHUNK_BYTES: usize = 64 * 1024;
 // archives as files under a directory on this server, readable only by birdd's user
 pub(crate) struct LocalDir {
     root: PathBuf,
+    durable: bool,
 }
 
 impl LocalDir {
     pub(crate) fn new(root: PathBuf) -> Self {
-        Self { root }
+        Self {
+            root,
+            durable: true,
+        }
+    }
+
+    // for copies that are thrown away after a crash: skipping fsync keeps a paused service's
+    // pause short on a busy disk
+    pub(crate) fn scratch(root: PathBuf) -> Self {
+        Self {
+            root,
+            durable: false,
+        }
     }
 
     fn path(&self, key: &str) -> Result<PathBuf> {
@@ -75,7 +88,11 @@ impl Adapter for LocalDir {
                     size = size.saturating_add(u64::try_from(data.len()).unwrap_or(u64::MAX));
                 }
             }
-            file.sync_all().await
+            if self.durable {
+                file.sync_all().await
+            } else {
+                file.flush().await
+            }
         }
         .await;
         if let Err(err) = written {

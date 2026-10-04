@@ -11,7 +11,7 @@ pub(crate) use database::DatabaseBackups;
 pub(crate) use restore::restore;
 pub(crate) use schedule::Scheduler;
 pub(crate) use schedule::{clear as clear_schedule, set as set_schedule};
-pub(crate) use storage::{BackupStorage, LocalDir};
+pub(crate) use storage::{BackupStorage, LocalDir, S3, S3Settings};
 
 use crate::state::AppState;
 use crate::{Error, Result};
