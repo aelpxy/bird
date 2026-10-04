@@ -4,6 +4,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use bird_core::{Command, EnvKey, ImageRef, Name, Service};
 use bird_podman::{ContainerSpec, Lifecycle, Limits};
 use bytes::Bytes;
+use hyper::upgrade::Upgraded;
+use hyper_util::rt::TokioIo;
 use tokio::sync::mpsc;
 
 use super::forward;
@@ -54,7 +56,7 @@ pub(crate) async fn run(
     events: &mpsc::Sender<Bytes>,
 ) -> Result<Option<i32>> {
     ensure_image(state, &target.image).await?;
-    let spec = spec(state, target, command);
+    let spec = spec(state, target, command, Lifecycle::OneOff);
     let id = state.podman.create_container(&spec).await?;
     tracing::info!(service = %target.service.name, container = %spec.name, "running one-off command");
     let outcome = tokio::select! {
@@ -82,7 +84,45 @@ async fn follow(state: &AppState, id: &str, events: &mpsc::Sender<Bytes>) -> Res
     Ok(Some(state.podman.wait_container(id, RUN_TIMEOUT).await?))
 }
 
-fn spec(state: &AppState, target: &RunTarget, command: &Command) -> ContainerSpec {
+// attached before it starts, so the first output and the first prompt reach the client
+pub(crate) async fn start_terminal(
+    state: &AppState,
+    target: &RunTarget,
+    command: &Command,
+    (cols, rows): (u16, u16),
+) -> Result<(String, TokioIo<Upgraded>)> {
+    ensure_image(state, &target.image).await?;
+    let spec = spec(state, target, command, Lifecycle::Terminal);
+    let id = state.podman.create_container(&spec).await?;
+    let attached = async {
+        let io = state.podman.attach(&id).await?;
+        state.podman.start_container(&id).await?;
+        if let Err(err) = state.podman.resize_container(&id, cols, rows).await {
+            tracing::debug!(error = %err, "could not size the new terminal");
+        }
+        Ok::<_, Error>(io)
+    }
+    .await;
+    match attached {
+        Ok(io) => {
+            tracing::info!(service = %target.service.name, container = %spec.name, "running one-off terminal");
+            Ok((id, io))
+        }
+        Err(err) => {
+            if let Err(cleanup) = state.podman.remove_container(&id).await {
+                tracing::warn!(container = %spec.name, error = %cleanup, "could not remove one-off container");
+            }
+            Err(err)
+        }
+    }
+}
+
+fn spec(
+    state: &AppState,
+    target: &RunTarget,
+    command: &Command,
+    lifecycle: Lifecycle,
+) -> ContainerSpec {
     let service = &target.service;
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -91,7 +131,7 @@ fn spec(state: &AppState, target: &RunTarget, command: &Command) -> ContainerSpe
         name: format!("bird-run-{}-{millis}", service.name),
         image: target.image.clone(),
         command: Some(command.args().to_vec()),
-        lifecycle: Lifecycle::OneOff,
+        lifecycle,
         network: state.network.to_string(),
         aliases: Vec::new(),
         mounts: Vec::new(),

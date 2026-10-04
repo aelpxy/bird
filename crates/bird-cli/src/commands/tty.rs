@@ -25,10 +25,16 @@ const DEFAULT_SHELL: [&str; 3] = [
     "if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi",
 ];
 
+// where the terminal runs: in a running machine, or in a fresh container from the service's image
+pub(crate) enum Place<'a> {
+    Machine(Option<&'a str>),
+    NewContainer,
+}
+
 pub(crate) async fn session(
     client: &ApiClient,
     name: &Name,
-    machine: Option<&str>,
+    place: Place<'_>,
     command: Vec<String>,
 ) -> Result<()> {
     let command = if command.is_empty() {
@@ -37,11 +43,15 @@ pub(crate) async fn session(
         command
     };
     let (cols, rows) = terminal::size();
+    let endpoint = match place {
+        Place::Machine(_) => "exec",
+        Place::NewContainer => "run",
+    };
     let mut path = format!(
-        "/v1/services/{name}/exec/tty?command={}&cols={cols}&rows={rows}",
+        "/v1/services/{name}/{endpoint}/tty?command={}&cols={cols}&rows={rows}",
         encode(&serde_json::to_string(&command)?)
     );
-    if let Some(machine) = machine {
+    if let Place::Machine(Some(machine)) = place {
         path.push_str("&machine=");
         path.push_str(&encode(machine));
     }

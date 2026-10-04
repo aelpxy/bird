@@ -158,3 +158,52 @@ async fn tty_exec_is_interactive_and_resizable() {
     assert!(info.pid.is_some());
     podman.remove_container(&id).await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "requires a running podman socket"]
+async fn terminal_container_is_attached_from_the_start() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let podman = podman();
+    podman
+        .pull_image(&IMAGE.parse().unwrap(), None)
+        .await
+        .unwrap();
+    let name = "bird-test-terminal";
+    let _ = podman.remove_container(name).await;
+    let mut terminal = spec(name, "unused");
+    terminal.lifecycle = Lifecycle::Terminal;
+    terminal.command = Some(vec!["sh".to_owned()]);
+    let id = podman.create_container(&terminal).await.unwrap();
+    let mut io = podman.attach(&id).await.unwrap();
+    podman.start_container(&id).await.unwrap();
+    podman.resize_container(&id, 111, 33).await.unwrap();
+    // busybox asks the terminal for the cursor position before its prompt, so type after the prompt
+    let mut early = Vec::new();
+    let mut chunk = [0_u8; 1024];
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !String::from_utf8_lossy(&early).contains("# ") {
+            let read = io.read(&mut chunk).await.unwrap();
+            early.extend_from_slice(&chunk[..read]);
+        }
+    })
+    .await
+    .unwrap();
+    io.write_all(b"echo greet=$GREETING; stty size; exit 6\n")
+        .await
+        .unwrap();
+    let mut output = Vec::new();
+    tokio::time::timeout(Duration::from_secs(10), io.read_to_end(&mut output))
+        .await
+        .unwrap()
+        .unwrap();
+    let output = String::from_utf8_lossy(&output);
+    assert!(output.contains("greet=hi"), "{output}");
+    assert!(output.contains("33 111"), "{output}");
+    let code = podman
+        .wait_container(&id, Duration::from_secs(10))
+        .await
+        .unwrap();
+    assert_eq!(code, 6);
+    podman.remove_container(&id).await.unwrap();
+}
