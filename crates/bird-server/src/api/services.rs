@@ -3,12 +3,12 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use bird_api::ErrorBody;
 use bird_api::{DeploymentSummary, MachineSummary, ServiceSummary, VolumeSpec};
-use bird_core::{MachineState, Name};
+use bird_core::{MachineId, MachineState, Name};
 use bird_store::Store;
 use serde::Deserialize;
 
 use crate::state::AppState;
-use crate::{Result, deploy};
+use crate::{Result, deploy, stats};
 
 /// List services
 #[utoipa::path(get, path = "/v1/services", tag = "services", responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
@@ -27,13 +27,46 @@ pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<Servi
     Ok(Json(summaries))
 }
 
+#[derive(Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct GetQuery {
+    /// Also sample cpu, memory and network for running machines, which takes about half a second
+    #[serde(default)]
+    stats: bool,
+}
+
 /// Show one service
-#[utoipa::path(get, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name"), GetQuery), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn get(
     State(state): State<AppState>,
     Path(name): Path<Name>,
+    Query(query): Query<GetQuery>,
 ) -> Result<Json<ServiceSummary>> {
-    Ok(Json(summary(&state, &name).await?))
+    let mut summary = summary(&state, &name).await?;
+    if query.stats {
+        add_stats(&state, &mut summary).await?;
+    }
+    Ok(Json(summary))
+}
+
+async fn add_stats(state: &AppState, summary: &mut ServiceSummary) -> Result<()> {
+    let Some(deployment) = &mut summary.deployment else {
+        return Ok(());
+    };
+    let deployment_id = deployment.id;
+    let containers: Vec<(MachineId, String)> = state
+        .db
+        .call(move |store| store.list_machines(deployment_id))
+        .await?
+        .into_iter()
+        .filter(|m| m.state == MachineState::Running)
+        .filter_map(|m| Some((m.id, m.container_id?)))
+        .collect();
+    let mut sampled = stats::sample(state, &containers).await;
+    for machine in &mut deployment.machines {
+        machine.stats = sampled.remove(&machine.id);
+    }
+    Ok(())
 }
 
 pub(super) async fn summary(state: &AppState, name: &Name) -> Result<ServiceSummary> {
@@ -103,6 +136,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             id: m.id,
             state: m.state,
             updated_at: m.updated_at,
+            stats: None,
         })
         .collect();
     Ok(ServiceSummary {

@@ -46,7 +46,7 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Deploy(deploy) => {
             deploy::run(&connect(api)?, *deploy, service, config.as_deref(), out).await
         }
-        Command::Status => status::run(&connect(api)?, &target()?, out).await,
+        Command::Status { watch } => status::run(&connect(api)?, &target()?, watch, out).await,
         Command::List => list::run(&connect(api)?, out).await,
         Command::Logs { tail, follow } => {
             logs::run(&connect(api)?, &target()?, tail, follow, out).await

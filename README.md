@@ -62,7 +62,8 @@ To run it as a service, use the rootless systemd unit in [contrib/systemd/birdd.
 cd my-app
 bird init                              # bird.toml named after the directory, builds ./Dockerfile
 bird deploy
-bird status                            # deployment, machines, domains, health
+bird status                            # deployment, machines with cpu/memory/network, domains, health
+bird status -w                         # same, refreshed every 2s
 bird logs -f
 bird scale 3
 bird restart                           # one machine at a time, each waits to be healthy
