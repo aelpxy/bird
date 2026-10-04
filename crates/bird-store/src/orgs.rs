@@ -165,7 +165,10 @@ mod tests {
             [(team.clone(), OrgRole::Owner)]
         );
 
-        assert_eq!(store.sole_owned_orgs(ada.id).unwrap(), [team.clone()]);
+        assert_eq!(
+            store.sole_owned_orgs(ada.id).unwrap(),
+            std::slice::from_ref(&team)
+        );
         let bob = store.create_user(&name("bob"), UserRole::Member).unwrap();
         store.set_member(team.id, bob.id, OrgRole::Owner).unwrap();
         assert_eq!(store.sole_owned_orgs(ada.id).unwrap(), Vec::new());

@@ -108,7 +108,9 @@ pub(crate) async fn remove_member(state: &AppState, org: &Org, user: &User) -> R
                 }
                 let projects = store.list_org_projects(org_id)?;
                 if !projects.is_empty() {
-                    return Ok(Left::Refused(projects.into_iter().map(|p| p.name).collect()));
+                    return Ok(Left::Refused(
+                        projects.into_iter().map(|p| p.name).collect(),
+                    ));
                 }
                 store.delete_org(org_id)?;
                 Ok(Left::OrgDeleted)

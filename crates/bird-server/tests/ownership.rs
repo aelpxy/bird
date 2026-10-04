@@ -20,36 +20,92 @@ async fn last_owners_stay_until_their_org_is_empty() {
     let mia = birdd.user("mia", "member").await;
     let org = birdd.project("team");
     let project = birdd.project("shop");
-    assert_eq!(birdd.post(&root, "/v1/orgs", json!({ "name": org })).await.status, StatusCode::CREATED);
+    assert_eq!(
+        birdd
+            .post(&root, "/v1/orgs", json!({ "name": org }))
+            .await
+            .status,
+        StatusCode::CREATED
+    );
     add(&birdd, &org, "olive", "owner").await;
     add(&birdd, &org, "mia", "member").await;
-    let created = birdd.post(&olive, "/v1/projects", json!({ "name": project })).await;
+    let created = birdd
+        .post(&olive, "/v1/projects", json!({ "name": project }))
+        .await;
     assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.body);
 
     // while the org owns a project, its last owner can neither leave nor be deleted
-    let leave = birdd.delete(&olive, &format!("/v1/orgs/{org}/members/olive")).await;
+    let leave = birdd
+        .delete(&olive, &format!("/v1/orgs/{org}/members/olive"))
+        .await;
     assert_eq!(leave.status, StatusCode::CONFLICT);
     assert!(leave.body["error"].as_str().unwrap().contains(&project));
-    assert_eq!(birdd.delete(&root, "/v1/users/olive").await.status, StatusCode::CONFLICT);
+    assert_eq!(
+        birdd.delete(&root, "/v1/users/olive").await.status,
+        StatusCode::CONFLICT
+    );
 
     // with a second owner, the first may leave, and the new last owner cannot step down
     add(&birdd, &org, "mia", "owner").await;
-    assert_eq!(birdd.delete(&olive, &format!("/v1/orgs/{org}/members/olive")).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        birdd
+            .delete(&olive, &format!("/v1/orgs/{org}/members/olive"))
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
     let demote = birdd
-        .put(&root, &format!("/v1/orgs/{org}/members/mia"), json!({ "role": "admin" }))
+        .put(
+            &root,
+            &format!("/v1/orgs/{org}/members/mia"),
+            json!({ "role": "admin" }),
+        )
         .await;
     assert_eq!(demote.status, StatusCode::CONFLICT);
 
     // once the org owns nothing, its last owner leaves and the org is gone
-    assert_eq!(birdd.delete(&mia, &format!("/v1/projects/{project}")).await.status, StatusCode::NO_CONTENT);
-    assert_eq!(birdd.delete(&mia, &format!("/v1/orgs/{org}/members/mia")).await.status, StatusCode::NO_CONTENT);
-    assert_eq!(birdd.get(&root, &format!("/v1/orgs/{org}/members")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        birdd
+            .delete(&mia, &format!("/v1/projects/{project}"))
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        birdd
+            .delete(&mia, &format!("/v1/orgs/{org}/members/mia"))
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        birdd
+            .get(&root, &format!("/v1/orgs/{org}/members"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
 
     // deleting the last owner of an empty org deletes the org too
     let solo = birdd.project("solo");
-    assert_eq!(birdd.post(&root, "/v1/orgs", json!({ "name": solo })).await.status, StatusCode::CREATED);
+    assert_eq!(
+        birdd
+            .post(&root, "/v1/orgs", json!({ "name": solo }))
+            .await
+            .status,
+        StatusCode::CREATED
+    );
     add(&birdd, &solo, "olive", "owner").await;
-    assert_eq!(birdd.delete(&root, "/v1/users/olive").await.status, StatusCode::NO_CONTENT);
-    assert_eq!(birdd.get(&root, &format!("/v1/orgs/{solo}/members")).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        birdd.delete(&root, "/v1/users/olive").await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        birdd
+            .get(&root, &format!("/v1/orgs/{solo}/members"))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
     birdd.stop().await;
 }
