@@ -1,27 +1,29 @@
 use std::collections::BTreeMap;
 
 use bird_core::reference::{ServiceVariables, referenced_services, resolve};
-use bird_core::{EnvKey, Name};
+use bird_core::{EnvKey, EnvironmentId, Name};
 
 use crate::Result;
 use crate::state::AppState;
 
 pub(crate) async fn resolve_for(
     state: &AppState,
+    environment: EnvironmentId,
     service: &Name,
 ) -> Result<BTreeMap<EnvKey, String>> {
-    let variables = load(state).await?;
+    let variables = load(state, environment).await?;
     Ok(resolve(service, &variables)?)
 }
 
 // resolves as if the change were saved, so a broken reference is refused before anything is stored
 pub(crate) async fn check_change(
     state: &AppState,
+    environment: EnvironmentId,
     service: &Name,
     set: &BTreeMap<EnvKey, String>,
     unset: &[EnvKey],
 ) -> Result<()> {
-    let mut variables = load(state).await?;
+    let mut variables = load(state, environment).await?;
     let own = variables.entry(service.clone()).or_default();
     own.extend(set.iter().map(|(k, v)| (k.clone(), v.clone())));
     for key in unset {
@@ -41,8 +43,12 @@ pub(crate) async fn check_change(
 }
 
 // services whose variables read from this one, which would break if it disappeared
-pub(crate) async fn dependents(state: &AppState, service: &Name) -> Result<Vec<Name>> {
-    let variables = load(state).await?;
+pub(crate) async fn dependents(
+    state: &AppState,
+    environment: EnvironmentId,
+    service: &Name,
+) -> Result<Vec<Name>> {
+    let variables = load(state, environment).await?;
     Ok(variables
         .into_iter()
         .filter(|(name, vars)| {
@@ -55,13 +61,13 @@ pub(crate) async fn dependents(state: &AppState, service: &Name) -> Result<Vec<N
         .collect())
 }
 
-async fn load(state: &AppState) -> Result<ServiceVariables> {
-    let environment_id = state.environment_id;
+// references only reach services in the same environment
+async fn load(state: &AppState, environment: EnvironmentId) -> Result<ServiceVariables> {
     state
         .db
         .call(move |store| {
             store
-                .list_services(environment_id)?
+                .list_services(environment)?
                 .into_iter()
                 .map(|s| {
                     let vars = store

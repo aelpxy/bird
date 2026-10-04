@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::HeaderMap;
 use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use axum::response::{IntoResponse, Response};
@@ -15,6 +15,7 @@ use http_body_util::Limited;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
+use super::scope::ServiceScope;
 use super::stream::ChannelBody;
 use crate::state::AppState;
 use crate::{Error, Result};
@@ -34,10 +35,11 @@ pub(crate) struct BuildQuery {
 }
 
 /// Build an image from source
-#[utoipa::path(post, path = "/v1/services/{name}/builds", tag = "builds", params(("name" = String, Path, description = "Service the image is for"), BuildQuery), request_body(content = Vec<u8>, content_type = "application/x-tar", description = "Build context as a tar archive, optionally gzipped, at most 512 MiB"), responses((status = 200, description = "Newline-delimited JSON stream of BuildEvent, ending with built or failed", body = BuildEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 413, description = "Build context too large", body = ErrorBody)))]
+#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/builds", tag = "builds", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service the image is for"), BuildQuery), request_body(content = Vec<u8>, content_type = "application/x-tar", description = "Build context as a tar archive, optionally gzipped, at most 512 MiB"), responses((status = 200, description = "Newline-delimited JSON stream of BuildEvent, ending with built or failed", body = BuildEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 413, description = "Build context too large", body = ErrorBody)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    // built images are named by service only; rollbacks and cleanup go by deployment records
+    ServiceScope { name, .. }: ServiceScope,
     Query(query): Query<BuildQuery>,
     headers: HeaderMap,
     body: Body,

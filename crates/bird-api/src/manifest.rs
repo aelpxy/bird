@@ -18,6 +18,11 @@ pub const MANIFEST_FILE: &str = "bird.toml";
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub name: Name,
+    /// Project and environment the CLI deploys to and acts in; flags override them
+    #[serde(default)]
+    pub project: Option<Name>,
+    #[serde(default)]
+    pub environment: Option<Name>,
     #[serde(default)]
     pub image: Option<ImageRef>,
     #[serde(default)]
@@ -80,6 +85,8 @@ impl Manifest {
     pub fn named(name: Name) -> Self {
         Self {
             name,
+            project: None,
+            environment: None,
             image: None,
             build: None,
             port: None,

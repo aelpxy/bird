@@ -10,7 +10,7 @@ pub(crate) fn setup() -> (Store, Service) {
     let store = Store::open_in_memory().unwrap();
     let project = store.create_project(&name("default")).unwrap();
     let env = store
-        .create_environment(project.id, &name("production"))
+        .create_environment(project.id, &name("production"), None)
         .unwrap();
     let service = store
         .create_service(

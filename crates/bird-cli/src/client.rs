@@ -15,11 +15,14 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
 
+use crate::scope::Scope;
+
 const JSON: &str = "application/json";
 
 pub(crate) struct ApiClient {
     addr: String,
     token: Option<String>,
+    scope: Scope,
 }
 
 #[derive(Debug)]
@@ -68,8 +71,17 @@ fn is_missing_service(error: &str) -> bool {
 }
 
 impl ApiClient {
-    pub(crate) fn new(addr: String, token: Option<String>) -> Self {
-        Self { addr, token }
+    pub(crate) fn new(addr: String, token: Option<String>, scope: Scope) -> Self {
+        Self { addr, token, scope }
+    }
+
+    pub(crate) const fn scope(&self) -> &Scope {
+        &self.scope
+    }
+
+    // an api path inside the project and environment this command acts in
+    pub(crate) fn scoped(&self, rest: &str) -> String {
+        self.scope.path(rest)
     }
 
     pub(crate) async fn get<T: DeserializeOwned>(

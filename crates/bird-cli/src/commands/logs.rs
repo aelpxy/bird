@@ -20,7 +20,7 @@ pub(crate) async fn run(
     follow: bool,
     out: Output,
 ) -> Result<()> {
-    let path = format!("/v1/services/{name}/logs?tail={tail}");
+    let path = client.scoped(&format!("services/{name}/logs?tail={tail}"));
     if follow {
         let mut labels = Labels::new(running_machines(client, name).await? > 1);
         return client
@@ -54,7 +54,9 @@ pub(crate) async fn run(
 }
 
 async fn running_machines(client: &ApiClient, name: &Name) -> Result<usize> {
-    let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
+    let service: ServiceSummary = client
+        .get(&client.scoped(&format!("services/{name}")), TIMEOUT)
+        .await?;
     Ok(service
         .deployment
         .iter()

@@ -16,8 +16,8 @@ pub(crate) struct AppState {
     pub(crate) db: Db,
     pub(crate) podman: Podman,
     pub(crate) routes: Routes,
-    pub(crate) environment_id: EnvironmentId,
-    pub(crate) network: Arc<str>,
+    // the network of environments created before each had its own
+    pub(crate) default_network: Arc<str>,
     pub(crate) deploys: DeployGuard,
     pub(crate) domains_changed: Arc<Notify>,
     pub(crate) reconcile_now: Arc<Notify>,
@@ -29,12 +29,23 @@ pub(crate) struct AppState {
 }
 
 impl AppState {
-    pub(crate) async fn service(&self, name: &Name) -> Result<Service> {
-        let environment_id = self.environment_id;
+    pub(crate) async fn service(&self, environment: EnvironmentId, name: &Name) -> Result<Service> {
         let lookup = name.clone();
         self.db
-            .call(move |store| store.service_by_name(environment_id, &lookup))
+            .call(move |store| store.service_by_name(environment, &lookup))
             .await?
             .ok_or_else(|| Error::ServiceNotFound(name.clone()))
+    }
+
+    // the podman network an environment's machines share, so their names stay private to it
+    pub(crate) async fn network(&self, environment: EnvironmentId) -> Result<String> {
+        let found = self
+            .db
+            .call(move |store| store.environment(environment))
+            .await?
+            .ok_or(Error::Store(bird_store::Error::NotFound("environment")))?;
+        Ok(found
+            .network
+            .unwrap_or_else(|| self.default_network.to_string()))
     }
 }

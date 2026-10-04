@@ -1,4 +1,4 @@
-use bird_core::Name;
+use bird_core::{EnvironmentId, Name};
 
 use crate::state::AppState;
 use crate::{Error, Result, images, routing};
@@ -7,17 +7,19 @@ use super::OPERATION_PATIENCE;
 use super::machine::destroy_container;
 use super::references::dependents;
 
-pub(crate) async fn remove_service(state: &AppState, name: Name, purge: bool) -> Result<()> {
-    let _ticket = state.deploys.wait_for(&name, OPERATION_PATIENCE).await?;
-    let environment_id = state.environment_id;
-    let lookup = name.clone();
-    let service = state
-        .db
-        .call(move |store| store.service_by_name(environment_id, &lookup))
-        .await?
-        .ok_or_else(|| Error::ServiceNotFound(name.clone()))?;
+pub(crate) async fn remove_service(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: Name,
+    purge: bool,
+) -> Result<()> {
+    let _ticket = state
+        .deploys
+        .wait_for(environment, &name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, &name).await?;
 
-    let dependents = dependents(state, &name).await?;
+    let dependents = dependents(state, environment, &name).await?;
     if !dependents.is_empty() {
         return Err(Error::HasDependents(name, dependents));
     }

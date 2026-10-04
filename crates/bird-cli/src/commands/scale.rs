@@ -15,7 +15,7 @@ const CONVERGE_TIMEOUT: Duration = Duration::from_mins(5);
 pub(crate) async fn run(client: &ApiClient, name: &Name, replicas: Replicas) -> Result<()> {
     client
         .put(
-            &format!("/v1/services/{name}/scale"),
+            &client.scoped(&format!("services/{name}/scale")),
             &ScaleRequest { replicas },
             TIMEOUT,
         )
@@ -53,7 +53,9 @@ pub(super) async fn converge(
 ) -> Result<Converged> {
     let deadline = tokio::time::Instant::now() + CONVERGE_TIMEOUT;
     while tokio::time::Instant::now() < deadline {
-        let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
+        let service: ServiceSummary = client
+            .get(&client.scoped(&format!("services/{name}")), TIMEOUT)
+            .await?;
         if service.state == ServiceState::Stopped {
             return Ok(Converged::Stopped);
         }

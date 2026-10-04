@@ -6,6 +6,7 @@ mod config;
 mod data_dir;
 mod db;
 mod deploy;
+mod environments;
 mod error;
 mod health;
 mod images;

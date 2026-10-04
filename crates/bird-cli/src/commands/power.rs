@@ -11,7 +11,11 @@ use crate::ui::{Output, Spinner, duration};
 pub(crate) async fn stop(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let spinner = Spinner::start(format!("stopping {name}"));
     let summary: ServiceSummary = client
-        .post(&format!("/v1/services/{name}/stop"), &(), DEPLOY_TIMEOUT)
+        .post(
+            &client.scoped(&format!("services/{name}/stop")),
+            &(),
+            DEPLOY_TIMEOUT,
+        )
         .await?;
     let elapsed = spinner.elapsed();
     drop(spinner);
@@ -36,7 +40,11 @@ pub(crate) async fn stop(client: &ApiClient, name: &Name, out: Output) -> Result
 pub(crate) async fn start(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let spinner = Spinner::start(format!("starting {name}"));
     let summary: ServiceSummary = client
-        .post(&format!("/v1/services/{name}/start"), &(), DEPLOY_TIMEOUT)
+        .post(
+            &client.scoped(&format!("services/{name}/start")),
+            &(),
+            DEPLOY_TIMEOUT,
+        )
         .await?;
     // replicas without a stopped machine to start come from the supervisor shortly after
     let reached = converge(client, name, &spinner).await?;
@@ -62,7 +70,11 @@ pub(crate) async fn start(client: &ApiClient, name: &Name, out: Output) -> Resul
 pub(crate) async fn restart(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let spinner = Spinner::start(format!("restarting {name}, one machine at a time"));
     let summary: ServiceSummary = client
-        .post(&format!("/v1/services/{name}/restart"), &(), DEPLOY_TIMEOUT)
+        .post(
+            &client.scoped(&format!("services/{name}/restart")),
+            &(),
+            DEPLOY_TIMEOUT,
+        )
         .await?;
     let elapsed = spinner.elapsed();
     drop(spinner);

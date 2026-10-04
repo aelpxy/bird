@@ -1,5 +1,5 @@
 use bird_api::{DeployRequest, VolumeSpec};
-use bird_core::{ImageLineage, ImageRef, Volume};
+use bird_core::{EnvironmentId, ImageLineage, ImageRef, Volume};
 use bird_podman::VolumeMount;
 
 use crate::state::AppState;
@@ -8,14 +8,14 @@ use crate::{Error, Result, labels};
 // checks that run before any config is saved, so a refused deploy changes nothing
 pub(super) async fn preflight(
     state: &AppState,
+    environment: EnvironmentId,
     request: &DeployRequest,
 ) -> Result<Vec<VolumeSpec>> {
-    let environment_id = state.environment_id;
     let name = request.name.clone();
     let (service, existing) = state
         .db
         .call(move |store| {
-            let Some(service) = store.service_by_name(environment_id, &name)? else {
+            let Some(service) = store.service_by_name(environment, &name)? else {
                 return Ok((None, Vec::new()));
             };
             let volumes = store.list_volumes(service.id)?;

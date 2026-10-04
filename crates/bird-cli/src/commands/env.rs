@@ -46,7 +46,10 @@ pub(crate) async fn run(
 
 async fn list(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let keys: Vec<EnvKey> = client
-        .get(&format!("/v1/services/{name}/variables"), TIMEOUT)
+        .get(
+            &client.scoped(&format!("services/{name}/variables")),
+            TIMEOUT,
+        )
         .await?;
     if out.json(&keys)? {
         return Ok(());
@@ -71,7 +74,10 @@ async fn get(
     out: Output,
 ) -> Result<()> {
     let variable: VariableValue = client
-        .get(&format!("/v1/services/{name}/variables/{key}"), TIMEOUT)
+        .get(
+            &client.scoped(&format!("services/{name}/variables/{key}")),
+            TIMEOUT,
+        )
         .await?;
     if out.json(&variable)? {
         return Ok(());
@@ -102,7 +108,7 @@ async fn apply(
     });
     let response: VariablesResponse = client
         .patch(
-            &format!("/v1/services/{name}/variables"),
+            &client.scoped(&format!("services/{name}/variables")),
             update,
             DEPLOY_TIMEOUT,
         )

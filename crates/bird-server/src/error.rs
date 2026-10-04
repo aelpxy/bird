@@ -34,6 +34,20 @@ pub enum Error {
     InvalidToken(PathBuf),
     #[error("the database worker has stopped")]
     DbClosed,
+    #[error("project {0} not found, see `bird project list`")]
+    ProjectNotFound(Name),
+    #[error("project {project} has no environment {environment}, see `bird environment list`")]
+    EnvironmentNotFound { project: Name, environment: Name },
+    #[error("project {0} already exists")]
+    ProjectExists(Name),
+    #[error("project {project} already has an environment {environment}")]
+    EnvironmentExists { project: Name, environment: Name },
+    #[error("{scope} still has {}, remove them first with `bird rm`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    EnvironmentHasServices { scope: String, services: Vec<Name> },
+    #[error("{scope} still has backups of {}, delete them first with `bird backup rm`", .services.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    EnvironmentHasBackups { scope: String, services: Vec<Name> },
+    #[error("invalid path: {0}")]
+    InvalidPath(String),
     #[error("service {0} not found")]
     ServiceNotFound(Name),
     #[error("deployment {0} not found")]

@@ -3,29 +3,32 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use bird_api::AddDomain;
 use bird_api::ErrorBody;
-use bird_core::{Hostname, Name, ServiceId};
+use bird_core::{Hostname, ServiceId};
 
+use serde::Deserialize;
+
+use super::scope::ServiceScope;
 use crate::state::AppState;
 use crate::{Error, Result, routing};
 
 /// List domains of a service
-#[utoipa::path(get, path = "/v1/services/{name}/domains", tag = "domains", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Domains routed to the service", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Domains routed to the service", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
 ) -> Result<Json<Vec<Hostname>>> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     Ok(Json(hostnames(&state, service.id).await?))
 }
 
 /// Route a domain to a service
-#[utoipa::path(post, path = "/v1/services/{name}/domains", tag = "domains", params(("name" = String, Path, description = "Service name")), request_body = AddDomain, responses((status = 201, description = "Domain added, returns all domains of the service", body = Vec<String>), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = AddDomain, responses((status = 201, description = "Domain added, returns all domains of the service", body = Vec<String>), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn add(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Json(request): Json<AddDomain>,
 ) -> Result<(StatusCode, Json<Vec<Hostname>>)> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     let service_id = service.id;
     let hostname = request.hostname;
     let claimed = hostname.clone();
@@ -45,12 +48,13 @@ pub(crate) async fn add(
 }
 
 /// Stop routing a domain to a service
-#[utoipa::path(delete, path = "/v1/services/{name}/domains/{hostname}", tag = "domains", params(("name" = String, Path, description = "Service name"), ("hostname" = String, Path, description = "Domain to remove")), responses((status = 204, description = "Domain removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(delete, path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains/{hostname}", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("hostname" = String, Path, description = "Domain to remove")), responses((status = 204, description = "Domain removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
-    Path((name, hostname)): Path<(Name, Hostname)>,
+    ServiceScope { environment, name }: ServiceScope,
+    Path(DomainPath { hostname }): Path<DomainPath>,
 ) -> Result<StatusCode> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     let service_id = service.id;
     let owned = hostnames(&state, service_id).await?.contains(&hostname);
     if !owned {
@@ -62,6 +66,11 @@ pub(crate) async fn remove(
         .await?;
     applied(&state).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+pub(crate) struct DomainPath {
+    hostname: Hostname,
 }
 
 async fn applied(state: &AppState) -> Result<()> {

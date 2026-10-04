@@ -28,7 +28,7 @@ pub(crate) async fn run(
             ));
             let backup: BackupInfo = client
                 .post(
-                    &format!("/v1/services/{name}/backups"),
+                    &client.scoped(&format!("services/{name}/backups")),
                     &(),
                     TRANSFER_TIMEOUT,
                 )
@@ -60,7 +60,7 @@ pub(crate) async fn run(
             let spinner = Spinner::start(format!("restoring {name} from backup {backup}"));
             let response: RestoreResponse = client
                 .post(
-                    &format!("/v1/services/{name}/backups/{backup}/restore"),
+                    &client.scoped(&format!("services/{name}/backups/{backup}/restore")),
                     &RestoreRequest { allow_image_change },
                     TRANSFER_TIMEOUT,
                 )
@@ -92,7 +92,10 @@ pub(crate) async fn run(
         BackupCommand::Remove { backup, yes } => {
             prompt::confirm(&format!("delete backup {backup} of {name}?"), yes)?;
             client
-                .delete(&format!("/v1/services/{name}/backups/{backup}"), TIMEOUT)
+                .delete(
+                    &client.scoped(&format!("services/{name}/backups/{backup}")),
+                    TIMEOUT,
+                )
                 .await?;
             println!("{} deleted backup {backup}", style::out(Paint::Green, "✓"));
         }
@@ -107,7 +110,7 @@ async fn schedule(
     keep: BackupKeep,
     out: Output,
 ) -> Result<()> {
-    let path = format!("/v1/services/{name}/backups/schedule");
+    let path = client.scoped(&format!("services/{name}/backups/schedule"));
     let Some(every) = every else {
         client.delete(&path, TIMEOUT).await?;
         println!(
@@ -138,7 +141,7 @@ async fn schedule(
 
 async fn list(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let backups: Vec<BackupInfo> = client
-        .get(&format!("/v1/services/{name}/backups"), TIMEOUT)
+        .get(&client.scoped(&format!("services/{name}/backups")), TIMEOUT)
         .await?;
     if out.json(&backups)? {
         return Ok(());

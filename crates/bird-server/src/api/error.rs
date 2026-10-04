@@ -39,9 +39,15 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::BackupStorageMismatch(_)
         | Error::BackupVolumeMissing { .. }
         | Error::ServiceExists { .. }
+        | Error::ProjectExists(_)
+        | Error::EnvironmentExists { .. }
+        | Error::EnvironmentHasServices { .. }
+        | Error::EnvironmentHasBackups { .. }
         | Error::ServiceStopped(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
+        | Error::ProjectNotFound(_)
+        | Error::EnvironmentNotFound { .. }
         | Error::DomainNotFound(_)
         | Error::VariableNotFound(..)
         | Error::DeploymentNotFound(_)
@@ -60,6 +66,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::InvalidBuildArgs(_)
         | Error::AmbiguousMachine(_)
         | Error::InvalidTtyRequest(_)
+        | Error::InvalidPath(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,

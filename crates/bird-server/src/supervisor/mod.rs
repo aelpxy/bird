@@ -95,7 +95,11 @@ impl Supervisor {
             if service.state == ServiceState::Stopped {
                 continue;
             }
-            let Ok(_ticket) = self.state.deploys.begin(&service.name) else {
+            let Ok(_ticket) = self
+                .state
+                .deploys
+                .begin(service.environment_id, &service.name)
+            else {
                 tracing::debug!(service = %service.name, "operation in progress, skipping");
                 continue;
             };

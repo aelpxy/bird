@@ -1,4 +1,5 @@
 mod deploy;
+mod projects;
 
 use std::path::PathBuf;
 
@@ -11,6 +12,7 @@ use clap_complete::Shell;
 
 pub(crate) use deploy::DeployArgs;
 use deploy::{parse_env, parse_port};
+pub(crate) use projects::{EnvironmentCommand, ProjectCommand};
 
 const EXAMPLES: &str = "\
 Examples:
@@ -23,7 +25,8 @@ Examples:
   bird env set DATABASE_URL='${{postgres.DATABASE_URL}}'
   bird deploy web nginx:alpine --domain web.example.com
 
-Commands act on the service named in ./bird.toml, or on the one given with -s <name>.";
+Commands act on the service named in ./bird.toml, or on the one given with -s <name>, in the
+project and environment from -p/-E, then bird.toml, then `bird switch`, else default/production.";
 
 const EXEC_EXAMPLES: &str = "\
 Examples:
@@ -58,6 +61,18 @@ pub(crate) struct Args {
     /// Service manifest to read instead of ./bird.toml
     #[arg(short, long, global = true, value_name = "FILE")]
     pub(crate) config: Option<PathBuf>,
+    /// Project to act in, defaults to bird.toml, then `bird switch`, then `default`
+    #[arg(short, long, global = true, env = "BIRD_PROJECT", value_name = "NAME")]
+    pub(crate) project: Option<Name>,
+    /// Environment to act in, defaults to bird.toml, then `bird switch`, then `production`
+    #[arg(
+        short = 'E',
+        long,
+        global = true,
+        env = "BIRD_ENVIRONMENT",
+        value_name = "NAME"
+    )]
+    pub(crate) environment: Option<Name>,
     /// Print JSON for scripts instead of tables and messages
     #[arg(long, global = true)]
     pub(crate) json: bool,
@@ -89,7 +104,7 @@ pub(crate) enum Command {
         #[arg(short, long)]
         watch: bool,
     },
-    /// List all services
+    /// List the services in the environment
     #[command(visible_alias = "ls")]
     List,
     /// Show the logs of a service
@@ -184,6 +199,23 @@ pub(crate) enum Command {
     Registry {
         #[command(subcommand)]
         command: Option<RegistryCommand>,
+    },
+    /// Manage projects, lists them by default
+    Project {
+        #[command(subcommand)]
+        command: Option<ProjectCommand>,
+    },
+    /// Manage the environments of the project, lists them by default
+    #[command(visible_alias = "environments")]
+    Environment {
+        #[command(subcommand)]
+        command: Option<EnvironmentCommand>,
+    },
+    /// Act in another project and environment from now on, where bird.toml does not say
+    Switch {
+        project: Name,
+        /// Defaults to `production`
+        environment: Option<Name>,
     },
     /// Save a birdd address and its API token, read from stdin
     Login {

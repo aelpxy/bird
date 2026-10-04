@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
 use bird_core::{
-    Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Name, Port, Service, ServiceState,
-    Volume,
+    Deployment, DeploymentStatus, EnvKey, EnvironmentId, Hostname, ImageRef, Name, Port, Service,
+    ServiceState, Volume,
 };
 use bird_store::Store;
 use tokio::task::JoinSet;
@@ -49,31 +49,35 @@ pub(crate) async fn redeploy(
         backup: None,
         allow_image_change: false,
     };
-    deploy(state, request).await
+    deploy(state, service.environment_id, request).await
 }
 
-pub(crate) async fn deploy(state: &AppState, mut request: DeployRequest) -> Result<DeployResponse> {
+pub(crate) async fn deploy(
+    state: &AppState,
+    environment: EnvironmentId,
+    mut request: DeployRequest,
+) -> Result<DeployResponse> {
     if !request.image.has_lowercase_repository() {
         return Err(bird_core::ValidationError::Image(request.image.to_string()).into());
     }
     request.env = secrets::expand_all(request.env)?;
-    references::check_change(state, &request.name, &request.env, &[]).await?;
+    references::check_change(state, environment, &request.name, &request.env, &[]).await?;
     if request.backup.is_some()
         && request.volumes.is_empty()
-        && !has_volumes(state, &request.name).await?
+        && !has_volumes(state, environment, &request.name).await?
     {
         return Err(crate::Error::NothingToBackUp(request.name.clone()));
     }
     let _ticket = state
         .deploys
-        .wait_for(&request.name, OPERATION_PATIENCE)
+        .wait_for(environment, &request.name, OPERATION_PATIENCE)
         .await?;
-    let new_volumes = volumes::preflight(state, &request).await?;
+    let new_volumes = volumes::preflight(state, environment, &request).await?;
     let (service, previous_settings, domains, attached) =
-        save_config(state, request, new_volumes).await?;
+        save_config(state, environment, request, new_volumes).await?;
     state.domains_changed.notify_one();
 
-    let resolved = references::resolve_for(state, &service.name).await?;
+    let resolved = references::resolve_for(state, environment, &service.name).await?;
     let snapshot = service.clone();
     let (deployment, previous, env) = state
         .db
@@ -174,10 +178,10 @@ async fn restore_settings(state: &AppState, previous: Option<Service>) {
 
 async fn save_config(
     state: &AppState,
+    environment_id: EnvironmentId,
     request: DeployRequest,
     new_volumes: Vec<VolumeSpec>,
 ) -> Result<(Service, Option<Service>, Vec<Hostname>, Vec<Volume>)> {
-    let environment_id = state.environment_id;
     state
         .db
         .call(move |store| {
@@ -302,8 +306,7 @@ fn apply_settings(
     Ok(service)
 }
 
-async fn has_volumes(state: &AppState, name: &Name) -> Result<bool> {
-    let environment_id = state.environment_id;
+async fn has_volumes(state: &AppState, environment_id: EnvironmentId, name: &Name) -> Result<bool> {
     let name = name.clone();
     state
         .db

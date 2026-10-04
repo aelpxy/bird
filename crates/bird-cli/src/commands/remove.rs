@@ -18,13 +18,13 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, purge: bool, yes: bool)
             name,
             yes,
         )?;
-        format!("/v1/services/{name}?purge=true")
+        client.scoped(&format!("services/{name}?purge=true"))
     } else {
         prompt::confirm(
             &format!("remove {name} and destroy its machines? its volumes are kept"),
             yes,
         )?;
-        format!("/v1/services/{name}")
+        client.scoped(&format!("services/{name}"))
     };
     let spinner = Spinner::start(format!("removing {name}"));
     client.delete(&path, TIMEOUT).await?;

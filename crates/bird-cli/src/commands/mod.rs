@@ -12,6 +12,7 @@ mod login;
 mod logs;
 mod pipe;
 mod power;
+mod projects;
 mod registry;
 mod remove;
 mod scale;
@@ -26,8 +27,12 @@ use std::path::Path;
 use anyhow::Result;
 use bird_core::Name;
 
-use crate::args::{Args, BackupCommand, Command, DomainsCommand, EnvCommand, RegistryCommand};
+use crate::args::{
+    Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, ProjectCommand,
+    RegistryCommand,
+};
 use crate::client::ApiClient;
+use crate::scope::{Scope, Sources};
 use crate::ui::Output;
 use crate::{manifest, profile};
 
@@ -37,12 +42,21 @@ pub(crate) async fn run(args: Args) -> Result<()> {
     let Args {
         service,
         config,
+        project,
+        environment,
         json,
         api,
         command,
     } = args;
     let out = Output { json };
     let target = || target(service.clone(), config.as_deref());
+    let connect = |api| {
+        connect(
+            api,
+            (project.clone(), environment.clone()),
+            config.as_deref(),
+        )
+    };
     match command {
         Command::Init { name, image, port } => init::run(name, image.as_ref(), port),
         Command::Deploy(deploy) => {
@@ -58,29 +72,19 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             no_tty,
             command,
         } => {
-            let client = connect(api)?;
-            let name = target()?;
+            let (client, name) = (connect(api)?, target()?);
             if out.json {
                 return exec::exec(&client, &name, machine, command).await;
             }
             let place = tty::Place::Machine(machine.as_deref());
-            if !no_tty && crate::ui::terminal::interactive() {
-                tty::session(&client, &name, place, command).await
-            } else {
-                pipe::session(&client, &name, place, command).await
-            }
+            attach(&client, &name, place, no_tty, command).await
         }
         Command::Run { no_tty, command } => {
-            let client = connect(api)?;
-            let name = target()?;
-            let place = tty::Place::NewContainer;
+            let (client, name) = (connect(api)?, target()?);
             if out.json {
-                exec::run(&client, &name, command).await
-            } else if !no_tty && crate::ui::terminal::interactive() {
-                tty::session(&client, &name, place, command).await
-            } else {
-                pipe::session(&client, &name, place, command).await
+                return exec::run(&client, &name, command).await;
             }
+            attach(&client, &name, tty::Place::NewContainer, no_tty, command).await
         }
         Command::Env { command } => {
             let command = command.unwrap_or(EnvCommand::List);
@@ -111,8 +115,35 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             let command = command.unwrap_or(RegistryCommand::List);
             registry::run(&connect(api)?, command, out).await
         }
+        Command::Project { command } => {
+            let command = command.unwrap_or(ProjectCommand::List);
+            projects::project(&connect(api)?, command, out).await
+        }
+        Command::Environment { command } => {
+            let command = command.unwrap_or(EnvironmentCommand::List);
+            projects::environment(&connect(api)?, command, out).await
+        }
+        Command::Switch {
+            project,
+            environment,
+        } => projects::switch(&connect(api)?, project, environment).await,
         Command::Login { api } => login::run(api).await,
         Command::Completions { shell } => completions::run(shell),
+    }
+}
+
+// a terminal session from a terminal, otherwise bytes in and out
+async fn attach(
+    client: &ApiClient,
+    name: &Name,
+    place: tty::Place<'_>,
+    no_tty: bool,
+    command: Vec<String>,
+) -> Result<()> {
+    if !no_tty && crate::ui::terminal::interactive() {
+        tty::session(client, name, place, command).await
+    } else {
+        pipe::session(client, name, place, command).await
     }
 }
 
@@ -130,12 +161,24 @@ fn target(explicit: Option<Name>, config: Option<&Path>) -> Result<Name> {
     }
 }
 
-fn connect(api_override: Option<String>) -> Result<ApiClient> {
+fn connect(
+    api_override: Option<String>,
+    flags: (Option<Name>, Option<Name>),
+    config: Option<&Path>,
+) -> Result<ApiClient> {
     let saved = match profile::path() {
         Some(path) => profile::load(&path)?,
         None => None,
     };
+    let manifest = manifest::load(config)?
+        .map(|loaded| (loaded.manifest.project, loaded.manifest.environment))
+        .unwrap_or_default();
+    let scope = Scope::resolve(Sources {
+        flags,
+        manifest,
+        saved: saved.as_ref(),
+    });
     let env_token = std::env::var(profile::TOKEN_ENV).ok();
     let target = profile::resolve(api_override, env_token, saved);
-    Ok(ApiClient::new(target.api, target.token))
+    Ok(ApiClient::new(target.api, target.token, scope))
 }

@@ -2,7 +2,7 @@ use std::future::IntoFuture;
 use std::path::Path;
 use std::sync::Arc;
 
-use bird_core::{EnvironmentId, Name};
+use bird_core::Name;
 use bird_podman::{Podman, default_socket};
 use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
 use bird_store::Store;
@@ -17,10 +17,9 @@ use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
 use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
-use crate::{Config, Error, Result, api, data_dir, listen, routing};
+use crate::{Config, Error, Result, api, data_dir, environments, listen, routing};
 
 const DEFAULT_PROJECT: &str = "default";
-const DEFAULT_ENVIRONMENT: &str = "production";
 
 // builds use a lot of cpu and memory, one at a time keeps a small server responsive
 const MAX_CONCURRENT_BUILDS: usize = 1;
@@ -33,9 +32,8 @@ pub async fn run(config: Config) -> Result<()> {
     let token = ApiToken::load_or_create(&token_path)?;
 
     let project: Name = DEFAULT_PROJECT.parse()?;
-    let environment: Name = DEFAULT_ENVIRONMENT.parse()?;
-    let environment_id = db
-        .call(move |store| ensure_environment(store, &project, &environment))
+    let environment: Name = environments::FIRST_ENVIRONMENT.parse()?;
+    db.call(move |store| ensure_environment(store, &project, &environment))
         .await?;
 
     let podman = Podman::new(config.podman_socket.clone().unwrap_or_else(default_socket));
@@ -47,8 +45,7 @@ pub async fn run(config: Config) -> Result<()> {
         db,
         podman,
         routes: Routes::new(),
-        environment_id,
-        network: Arc::from(config.network.as_str()),
+        default_network: Arc::from(config.network.as_str()),
         deploys: DeployGuard::default(),
         domains_changed: Arc::new(Notify::new()),
         reconcile_now: Arc::new(Notify::new()),
@@ -57,6 +54,7 @@ pub async fn run(config: Config) -> Result<()> {
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
         backups: Arc::new(backup_storage(&config, &data_dir).await?),
     };
+    environments::ensure_networks(&state).await?;
     supervisor::recover_interrupted(&state).await?;
     // machines keep running across a restart, so their recorded routes serve until the first sweep
     routing::refresh(&state).await?;
@@ -157,21 +155,24 @@ async fn backup_storage(config: &Config, data_dir: &Path) -> Result<BackupStorag
     })
 }
 
+// the network birdd was started with serves it, as it did before environments had their own
 fn ensure_environment(
     store: &mut Store,
     project: &Name,
     environment: &Name,
-) -> bird_store::Result<EnvironmentId> {
+) -> bird_store::Result<()> {
     store.transaction(|store| {
         let project = match store.project_by_name(project)? {
             Some(existing) => existing,
             None => store.create_project(project)?,
         };
-        let environment = match store.environment_by_name(project.id, environment)? {
-            Some(existing) => existing,
-            None => store.create_environment(project.id, environment)?,
-        };
-        Ok(environment.id)
+        if store
+            .environment_by_name(project.id, environment)?
+            .is_none()
+        {
+            store.create_environment(project.id, environment, None)?;
+        }
+        Ok(())
     })
 }
 

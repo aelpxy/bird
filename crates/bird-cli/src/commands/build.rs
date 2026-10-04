@@ -33,10 +33,10 @@ pub(crate) async fn run(
         packed.files,
         mebibytes(packed.archive.len())
     );
-    let mut path = format!(
-        "/v1/services/{name}/builds?dockerfile={}",
+    let mut path = client.scoped(&format!(
+        "services/{name}/builds?dockerfile={}",
         encode(dockerfile.as_str())
-    );
+    ));
     if !args.is_empty() {
         path.push_str("&args=");
         path.push_str(&encode(&serde_json::to_string(args)?));

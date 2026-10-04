@@ -5,6 +5,7 @@ mod context;
 mod dockerignore;
 mod manifest;
 mod profile;
+mod scope;
 mod ui;
 
 use std::process::ExitCode;

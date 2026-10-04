@@ -13,6 +13,7 @@ const TOKEN_SCHEME: &str = "api_token";
     modifiers(&BearerToken),
     security(("api_token" = [])),
     tags(
+        (name = "projects", description = "Projects and their environments, each with its own private network"),
         (name = "deployments", description = "Deploy images, inspect history and roll back"),
         (name = "services", description = "List, scale and remove services"),
         (name = "domains", description = "Route domains to services"),
@@ -86,24 +87,39 @@ mod tests {
     #[test]
     fn documents_every_route_and_the_token() {
         let (_, spec) = documented_routes().split_for_parts();
-        for path in [
-            "/v1/deploy",
-            "/v1/services",
-            "/v1/services/{name}",
-            "/v1/services/{name}/domains",
-            "/v1/services/{name}/domains/{hostname}",
-            "/v1/services/{name}/deployments",
-            "/v1/services/{name}/rollback",
-            "/v1/services/{name}/logs",
-            "/v1/services/{name}/scale",
-            "/v1/services/{name}/variables",
-            "/v1/services/{name}/variables/{key}",
-            "/v1/templates",
-            "/v1/registries",
-            "/v1/services/{name}/builds",
-            "/v1/registries/{host}",
-            "/v1/templates/{template}/deploy",
-        ] {
+        let scoped =
+            |rest: &str| format!("/v1/projects/{{project}}/environments/{{environment}}{rest}");
+        let mut paths: Vec<String> = [
+            "/deploy",
+            "/services",
+            "/services/{name}",
+            "/services/{name}/domains",
+            "/services/{name}/domains/{hostname}",
+            "/services/{name}/deployments",
+            "/services/{name}/rollback",
+            "/services/{name}/logs",
+            "/services/{name}/scale",
+            "/services/{name}/variables",
+            "/services/{name}/variables/{key}",
+            "/services/{name}/builds",
+            "/templates/{template}/deploy",
+        ]
+        .into_iter()
+        .map(scoped)
+        .collect();
+        paths.extend(
+            [
+                "/v1/projects",
+                "/v1/projects/{project}",
+                "/v1/projects/{project}/environments",
+                "/v1/projects/{project}/environments/{environment}",
+                "/v1/templates",
+                "/v1/registries",
+                "/v1/registries/{host}",
+            ]
+            .map(str::to_owned),
+        );
+        for path in &paths {
             assert!(
                 spec.paths.paths.contains_key(path),
                 "{path} is not documented"
