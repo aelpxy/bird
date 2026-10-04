@@ -69,6 +69,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(backups::create, backups::list))
         .routes(routes!(backups::restore))
         .routes(routes!(backups::remove))
+        .routes(routes!(backups::set_schedule, backups::clear_schedule))
         .routes(routes!(commands::exec))
         .routes(routes!(commands::run))
         .routes(routes!(power::stop))

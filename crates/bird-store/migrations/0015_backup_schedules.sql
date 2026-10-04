@@ -1,0 +1,5 @@
+CREATE TABLE backup_schedules (
+    service_id TEXT PRIMARY KEY REFERENCES services (id) ON DELETE CASCADE,
+    every_secs INTEGER NOT NULL CHECK (every_secs BETWEEN 3600 AND 2592000),
+    keep INTEGER NOT NULL CHECK (keep BETWEEN 1 AND 1000)
+) STRICT;

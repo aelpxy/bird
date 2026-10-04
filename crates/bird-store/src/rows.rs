@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
 use bird_core::{
-    Backup, BackupVolume, Certificate, Command, Deployment, Domain, EnvKey, Environment,
-    HealthCheck, Hostname, ImageRef, Machine, MachineId, Port, Project, Registry, Replicas,
-    Service, Variable, Volume,
+    Backup, BackupKeep, BackupSchedule, BackupVolume, Certificate, Command, Deployment, Domain,
+    EnvKey, Environment, HealthCheck, Hostname, ImageRef, Machine, MachineId, Port, Project,
+    Registry, Replicas, Service, ServiceId, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -228,4 +228,21 @@ pub(crate) fn registry(row: &Row<'_>) -> rusqlite::Result<Registry> {
         password: row.get(2)?,
         insecure: row.get(3)?,
     })
+}
+
+pub(crate) fn backup_schedule(row: &Row<'_>) -> rusqlite::Result<BackupSchedule> {
+    Ok(BackupSchedule {
+        every: limit(row, 0)?,
+        keep: keep(row, 1)?,
+    })
+}
+
+pub(crate) fn scheduled_service(row: &Row<'_>) -> rusqlite::Result<(ServiceId, BackupSchedule)> {
+    Ok((parse(row, 2)?, backup_schedule(row)?))
+}
+
+fn keep(row: &Row<'_>, idx: usize) -> rusqlite::Result<BackupKeep> {
+    let raw: u16 = row.get(idx)?;
+    BackupKeep::try_from(raw)
+        .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
 }

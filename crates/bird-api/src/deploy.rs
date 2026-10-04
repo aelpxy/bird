@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use bird_core::{
-    Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef,
-    MemoryLimit, Name, Port, Replicas,
+    BackupSchedule, Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, HealthTimeout, Hostname,
+    ImageRef, MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +36,9 @@ pub struct DeployRequest {
     /// Machines to run; left out, a new service gets 1 and an existing one keeps its count
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replicas: Option<Replicas>,
+    /// Back the volumes up on a schedule; left out, an existing schedule is kept
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<BackupSchedule>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub allow_image_change: bool,
 }

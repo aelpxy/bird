@@ -81,6 +81,7 @@ string_enum!(MachineState, "machine state" {
 string_enum!(BackupTrigger, "backup trigger" {
     Manual => "manual",
     Restore => "restore",
+    Scheduled => "scheduled",
 });
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

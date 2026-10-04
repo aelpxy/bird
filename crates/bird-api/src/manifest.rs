@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use bird_core::{
-    BuildFile, Command, CpuLimit, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef,
-    MemoryLimit, Name, Port, Replicas,
+    BackupInterval, BackupKeep, BackupSchedule, BuildFile, Command, CpuLimit, EnvKey, HealthCheck,
+    HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -42,6 +42,22 @@ pub struct Manifest {
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default)]
     pub volumes: Vec<VolumeSpec>,
+    #[serde(default)]
+    pub backup: Option<BackupSpec>,
+}
+
+// `[backup] every = "1d"` backs the volumes up on a schedule, keeping the newest `keep` copies
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BackupSpec {
+    #[serde(deserialize_with = "required_text_or_number")]
+    pub every: BackupInterval,
+    #[serde(default = "default_keep")]
+    pub keep: BackupKeep,
+}
+
+const fn default_keep() -> BackupKeep {
+    BackupKeep::WEEK
 }
 
 // builds the image from source on the server instead of pulling one
@@ -76,6 +92,7 @@ impl Manifest {
             replicas: None,
             env: BTreeMap::new(),
             volumes: Vec::new(),
+            backup: None,
         }
     }
 
@@ -95,6 +112,10 @@ impl Manifest {
             cpus: self.cpus,
             volumes: self.volumes,
             replicas: self.replicas,
+            backup: self.backup.map(|spec| BackupSchedule {
+                every: spec.every,
+                keep: spec.keep,
+            }),
             allow_image_change: false,
         }
     }
@@ -121,4 +142,13 @@ where
         TextOrNumber::Float(number) => number.to_string(),
     };
     raw.parse().map(Some).map_err(serde::de::Error::custom)
+}
+
+fn required_text_or_number<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    T::Err: fmt::Display,
+{
+    text_or_number(deserializer)?.ok_or_else(|| serde::de::Error::custom("a value is required"))
 }

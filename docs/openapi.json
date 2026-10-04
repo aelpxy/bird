@@ -466,6 +466,121 @@
         }
       }
     },
+    "/v1/services/{name}/backups/schedule": {
+      "put": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Back up a service's volumes on a schedule",
+        "operationId": "set_schedule",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSchedule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Schedule saved; the first backup runs within a minute when none was scheduled before",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSchedule"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The service has no volumes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Stop backing up a service on a schedule, keeping the backups it made",
+        "operationId": "clear_schedule",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Schedule removed"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services/{name}/backups/{id}": {
       "delete": {
         "tags": [
@@ -1910,11 +2025,40 @@
           }
         }
       },
+      "BackupInterval": {
+        "type": "integer",
+        "format": "int32",
+        "description": "Seconds between backups",
+        "maximum": 2592000,
+        "minimum": 3600
+      },
+      "BackupKeep": {
+        "type": "integer",
+        "format": "int32",
+        "maximum": 1000,
+        "minimum": 1
+      },
+      "BackupSchedule": {
+        "type": "object",
+        "required": [
+          "every",
+          "keep"
+        ],
+        "properties": {
+          "every": {
+            "$ref": "#/components/schemas/BackupInterval"
+          },
+          "keep": {
+            "$ref": "#/components/schemas/BackupKeep"
+          }
+        }
+      },
       "BackupTrigger": {
         "type": "string",
         "enum": [
           "manual",
-          "restore"
+          "restore",
+          "scheduled"
         ]
       },
       "BackupVolumeInfo": {
@@ -2093,6 +2237,17 @@
         "properties": {
           "allow_image_change": {
             "type": "boolean"
+          },
+          "backup": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupSchedule",
+                "description": "Back the volumes up on a schedule; left out, an existing schedule is kept"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "command": {
             "oneOf": [
@@ -2559,6 +2714,16 @@
           "volumes"
         ],
         "properties": {
+          "backup_schedule": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupSchedule"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cpus": {
             "$ref": "#/components/schemas/CpuLimit"
           },

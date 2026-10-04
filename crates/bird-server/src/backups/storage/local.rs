@@ -116,6 +116,25 @@ impl Adapter for LocalDir {
         }
         Ok(())
     }
+
+    async fn list(&self, prefix: &str) -> Result<Vec<String>> {
+        let mut entries = match tokio::fs::read_dir(self.path(prefix)?).await {
+            Ok(entries) => entries,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(err.into()),
+        };
+        let mut keys = Vec::new();
+        while let Some(entry) = entries.next_entry().await? {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+            if entry.file_type().await?.is_file() && !name.ends_with(".partial") {
+                keys.push(format!("{prefix}/{name}"));
+            }
+        }
+        Ok(keys)
+    }
 }
 
 struct FileBody {
@@ -213,6 +232,24 @@ mod tests {
         assert!(storage.put("b2/data.tar", Broken).await.is_err());
         assert!(!storage.exists("b2/data.tar").await.unwrap());
         assert!(!root.join("b2/data.partial").exists());
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[tokio::test]
+    async fn lists_complete_archives_under_a_prefix() {
+        let (storage, root) = storage();
+        assert_eq!(
+            storage.list("database").await.unwrap(),
+            Vec::<String>::new()
+        );
+        for key in ["database/bird-1.db", "database/bird-2.db", "b1/data.tar"] {
+            storage.put(key, Full::new(Bytes::from("x"))).await.unwrap();
+        }
+        std::fs::write(root.join("database/bird-3.partial"), "half").unwrap();
+        let mut keys = storage.list("database").await.unwrap();
+        keys.sort();
+        assert_eq!(keys, ["database/bird-1.db", "database/bird-2.db"]);
+        assert!(storage.list("../outside").await.is_err());
         std::fs::remove_dir_all(root).ok();
     }
 

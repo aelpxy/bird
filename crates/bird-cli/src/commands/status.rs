@@ -90,6 +90,14 @@ fn describe(service: &ServiceSummary, now: i64) -> String {
     for volume in &service.volumes {
         field("volume", format!("{} → {}", volume.name, volume.path));
     }
+    if let Some(schedule) = service.backup_schedule {
+        field(
+            "backups",
+            format!("every {}, keep {}", schedule.every, schedule.keep),
+        );
+    } else if !service.volumes.is_empty() {
+        field("backups", style::out(Paint::Dim, "not scheduled"));
+    }
 
     let machines = service
         .deployment
@@ -131,6 +139,7 @@ mod tests {
             health_timeout: bird_core::HealthTimeout::DEFAULT,
             domains: vec!["web.localhost".parse().unwrap()],
             volumes: Vec::new(),
+            backup_schedule: None,
             deployment: Some(DeploymentSummary {
                 id: "01a10467-92a5-7040-8b88-e1572362b0c3".parse().unwrap(),
                 status: DeploymentStatus::Active,

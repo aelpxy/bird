@@ -8,7 +8,7 @@ use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
 use bird_store::Store;
 use tokio::sync::{Notify, Semaphore};
 
-use crate::backups::{BackupStorage, LocalDir};
+use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, Scheduler};
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
@@ -59,23 +59,8 @@ pub async fn run(config: Config) -> Result<()> {
     let mut supervisor = Supervisor::new(state.clone());
     supervisor.sweep().await;
 
-    let edge = match &config.acme_directory {
-        Some(directory) => {
-            let tls = Tls {
-                certificates: CertStore::new(),
-                challenges: Challenges::new(),
-                https_port: config.https_addr.port(),
-            };
-            tls::load_certificates(&state, &tls.certificates).await?;
-            let settings = AcmeSettings {
-                directory: directory.clone(),
-                email: config.acme_email.clone(),
-                ca_cert: config.acme_ca_cert.clone(),
-            };
-            Some((tls, settings))
-        }
-        None => None,
-    };
+    let edge = edge(&config, &state).await?;
+    let scheduler = Scheduler::new(state.clone(), database_backups(&config, &data_dir));
 
     let api_listener = listen::bind(config.api_addr)?;
     let proxy_listener = listen::bind(config.proxy_addr)?;
@@ -119,12 +104,13 @@ pub async fn run(config: Config) -> Result<()> {
     let api = axum::serve(api_listener, api::router(state, token))
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
-    let ((), https_result, api_result, (), ()) = tokio::join!(
+    let ((), https_result, api_result, (), (), ()) = tokio::join!(
         proxy.serve(proxy_listener, shutdown.wait()),
         https,
         api,
         supervisor.run(shutdown.wait()),
-        renewals
+        renewals,
+        scheduler.run(shutdown.wait())
     );
     https_result.map_err(|err| Error::Certificate(err.to_string()))?;
     api_result?;
@@ -156,4 +142,33 @@ fn ensure_environment(
         };
         Ok(environment.id)
     })
+}
+
+async fn edge(config: &Config, state: &AppState) -> Result<Option<(Tls, AcmeSettings)>> {
+    let Some(directory) = &config.acme_directory else {
+        return Ok(None);
+    };
+    let tls = Tls {
+        certificates: CertStore::new(),
+        challenges: Challenges::new(),
+        https_port: config.https_addr.port(),
+    };
+    tls::load_certificates(state, &tls.certificates).await?;
+    let settings = AcmeSettings {
+        directory: directory.clone(),
+        email: config.acme_email.clone(),
+        ca_cert: config.acme_ca_cert.clone(),
+    };
+    Ok(Some((tls, settings)))
+}
+
+fn database_backups(config: &Config, data_dir: &Path) -> Option<DatabaseBackups> {
+    if config.no_db_backup {
+        return None;
+    }
+    Some(DatabaseBackups::new(
+        config.db_backup_every,
+        config.db_backup_keep,
+        data_dir.join("bird.db.backup"),
+    ))
 }
