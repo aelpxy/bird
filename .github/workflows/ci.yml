@@ -38,8 +38,13 @@ jobs:
       image: registry.fedoraproject.org/fedora:44
       options: --privileged -v /var/lib/containers
     steps:
+      # no journald in the container: container logs and podman events go to files
       - name: Install podman and build tools
-        run: dnf install -y --setopt=install_weak_deps=False podman gcc git
+        run: |
+          dnf install -y --setopt=install_weak_deps=False podman gcc git
+          mkdir -p /etc/containers/containers.conf.d
+          printf '[containers]\nlog_driver = "k8s-file"\n\n[engine]\nevents_logger = "file"\n' \
+            > /etc/containers/containers.conf.d/ci.conf
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -49,4 +54,4 @@ jobs:
           mkdir -p /run/podman
           podman system service --time=0 unix:///run/podman/podman.sock &
           for _ in $(seq 1 50); do [ -S /run/podman/podman.sock ] && break; sleep 0.2; done
-          cargo test -- --include-ignored
+          cargo test --no-fail-fast -- --include-ignored
