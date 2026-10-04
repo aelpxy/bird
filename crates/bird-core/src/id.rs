@@ -41,7 +41,9 @@ define_id!(
     DeploymentId,
     MachineId,
     VolumeId,
-    BackupId
+    BackupId,
+    UserId,
+    TokenId
 );
 
 #[cfg(test)]

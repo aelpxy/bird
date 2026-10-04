@@ -18,6 +18,7 @@ mod services;
 mod stream;
 mod templates;
 mod terminals;
+mod users;
 mod variables;
 
 use std::sync::Arc;
@@ -38,8 +39,12 @@ const MAX_BODY_BYTES: usize = 64 * 1024;
 pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
     let (api, spec) = documented_routes().split_for_parts();
     let spec: Arc<str> = openapi::render(&spec).into();
+    let auth = auth::Auth {
+        root: token,
+        db: state.db.clone(),
+    };
     api.layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .layer(middleware::from_fn_with_state(token, auth::require_token))
+        .layer(middleware::from_fn_with_state(auth, auth::authenticate))
         .route("/docs", get(docs::page))
         .route(
             "/v1/openapi.json",
@@ -53,6 +58,11 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
 
 fn documented_routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(openapi::document())
+        .routes(routes!(users::whoami))
+        .routes(routes!(users::list, users::create))
+        .routes(routes!(users::remove))
+        .routes(routes!(users::list_tokens, users::create_token))
+        .routes(routes!(users::remove_token))
         .routes(routes!(projects::list, projects::create))
         .routes(routes!(projects::remove))
         .routes(routes!(projects::create_environment))

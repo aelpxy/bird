@@ -50,7 +50,7 @@ impl fmt::Display for ApiError {
         if self.status == StatusCode::UNAUTHORIZED {
             write!(
                 f,
-                "\nlog in with the token from birdd's data dir: bird login <host:port> < api-token"
+                "\nlog in with your token, from an admin's `bird user create` or birdd's data dir: bird login <host:port>"
             )?;
         }
         if !self.body.logs.is_empty() {

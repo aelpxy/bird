@@ -313,6 +313,7 @@ dependencies = [
  "object_store",
  "rcgen",
  "reqwest",
+ "ring",
  "rustix",
  "rustls",
  "serde",

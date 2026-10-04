@@ -50,6 +50,16 @@ pub enum Error {
     CommandConflict,
     #[error("invalid path: {0}")]
     InvalidPath(String),
+    #[error("user {0} not found, see `bird user list`")]
+    UserNotFound(Name),
+    #[error("user {0} already exists")]
+    UserExists(Name),
+    #[error("{user} has no token {token}, see `bird token list`")]
+    TokenNotFound { user: Name, token: Name },
+    #[error("{user} already has a token {token}")]
+    TokenExists { user: Name, token: Name },
+    #[error("{0}")]
+    Forbidden(&'static str),
     #[error("service {0} not found")]
     ServiceNotFound(Name),
     #[error("deployment {0} not found")]

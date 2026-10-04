@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, HealthCheck, HealthTimeout,
     Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost,
-    Replicas, ServiceId, VolumeId,
+    Replicas, ServiceId, TokenId, UserId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -78,11 +78,38 @@ string_enum!(MachineState, "machine state" {
     Destroyed => "destroyed",
 });
 
+// admins manage users; everyone manages their own tokens
+string_enum!(UserRole, "user role" {
+    Admin => "admin",
+    Member => "member",
+});
+
 string_enum!(BackupTrigger, "backup trigger" {
     Manual => "manual",
     Restore => "restore",
     Scheduled => "scheduled",
 });
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct User {
+    pub id: UserId,
+    pub name: Name,
+    pub role: UserRole,
+    pub created_at: i64,
+}
+
+// the secret itself is never stored, only its sha-256, which is what requests are looked up by
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiToken {
+    pub id: TokenId,
+    pub user_id: UserId,
+    pub name: Name,
+    // the start of the secret, so a user can tell their tokens apart
+    pub prefix: String,
+    pub created_at: i64,
+    pub last_used_at: Option<i64>,
+    pub expires_at: Option<i64>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {

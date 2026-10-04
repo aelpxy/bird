@@ -1,5 +1,6 @@
 mod deploy;
 mod projects;
+mod users;
 
 use std::path::PathBuf;
 
@@ -13,6 +14,7 @@ use clap_complete::Shell;
 pub(crate) use deploy::DeployArgs;
 use deploy::{parse_env, parse_port};
 pub(crate) use projects::{EnvironmentCommand, ProjectCommand};
+pub(crate) use users::{TokenCommand, UserCommand};
 
 const EXAMPLES: &str = "\
 Examples:
@@ -221,6 +223,21 @@ pub(crate) enum Command {
         project: Name,
         /// Defaults to `production`
         environment: Option<Name>,
+    },
+    /// Show who your token belongs to
+    Whoami,
+    /// Manage users, lists them by default; for admins
+    User {
+        #[command(subcommand)]
+        command: Option<UserCommand>,
+    },
+    /// Manage API tokens, yours unless --user names someone else; lists them by default
+    Token {
+        /// Whose tokens; admins may manage anyone's
+        #[arg(long, global = true, value_name = "NAME")]
+        user: Option<Name>,
+        #[command(subcommand)]
+        command: Option<TokenCommand>,
     },
     /// Save a birdd address and its API token, read from stdin
     Login {
