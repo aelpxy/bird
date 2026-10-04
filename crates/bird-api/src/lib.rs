@@ -11,6 +11,7 @@ mod registries;
 mod scale;
 mod services;
 mod templates;
+mod tty;
 mod variables;
 mod volumes;
 
@@ -27,5 +28,6 @@ pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
+pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TTY_UPGRADE};
 pub use variables::{UpdateVariables, VariableValue, VariablesResponse};
 pub use volumes::VolumeSpec;

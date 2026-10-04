@@ -21,7 +21,10 @@ bytes.workspace = true
 clap.workspace = true
 http-body.workspace = true
 http-body-util.workspace = true
+hyper = { workspace = true, features = ["http1", "server"] }
+hyper-util = { workspace = true, features = ["tokio"] }
 instant-acme.workspace = true
+rustix = { workspace = true, features = ["process"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

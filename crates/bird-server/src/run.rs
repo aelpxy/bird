@@ -9,6 +9,7 @@ use bird_store::Store;
 use tokio::sync::{Notify, Semaphore};
 
 use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, Scheduler};
+use crate::commands::tty;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
@@ -53,6 +54,7 @@ pub async fn run(config: Config) -> Result<()> {
         reconcile_now: Arc::new(Notify::new()),
         shutdown: shutdown.clone(),
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
+        terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
         backups: Arc::new(backup_storage(&config, &data_dir)),
     };
     supervisor::recover_interrupted(&state).await?;
@@ -101,6 +103,7 @@ pub async fn run(config: Config) -> Result<()> {
             manager.run(shutdown.wait()).await;
         }
     };
+    let terminals = Arc::clone(&state.terminals);
     let api = axum::serve(api_listener, api::router(state, token))
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
@@ -114,6 +117,7 @@ pub async fn run(config: Config) -> Result<()> {
     );
     https_result.map_err(|err| Error::Certificate(err.to_string()))?;
     api_result?;
+    tty::wait_for_hang_ups(&terminals).await;
     tracing::info!("birdd stopped");
     Ok(())
 }

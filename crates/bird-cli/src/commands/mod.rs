@@ -17,6 +17,7 @@ mod scale;
 mod status;
 mod table;
 mod templates;
+mod tty;
 
 use std::path::Path;
 
@@ -50,8 +51,18 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Logs { tail, follow } => {
             logs::run(&connect(api)?, &target()?, tail, follow, out).await
         }
-        Command::Exec { machine, command } => {
-            exec::exec(&connect(api)?, &target()?, machine, command, out).await
+        Command::Exec {
+            machine,
+            no_tty,
+            command,
+        } => {
+            let client = connect(api)?;
+            let name = target()?;
+            if !no_tty && !out.json && crate::ui::terminal::interactive() {
+                tty::session(&client, &name, machine.as_deref(), command).await
+            } else {
+                exec::exec(&client, &name, machine, command, out).await
+            }
         }
         Command::Run { command } => exec::run(&connect(api)?, &target()?, command, out).await,
         Command::Env { command } => {

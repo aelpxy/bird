@@ -1,5 +1,6 @@
 mod exec;
 mod run;
+pub(crate) mod tty;
 
 use bird_api::{CommandEvent, LogStream};
 use bird_podman::{LogFollower, LogLine};

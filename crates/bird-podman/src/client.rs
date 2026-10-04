@@ -77,6 +77,15 @@ impl Podman {
             .await
     }
 
+    pub(crate) async fn upgrade(
+        &self,
+        path: &str,
+        body: &impl Serialize,
+    ) -> Result<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>> {
+        let body = serde_json::to_vec(body)?;
+        self.transport.upgrade(path, body, DEFAULT_TIMEOUT).await
+    }
+
     pub(crate) async fn stream(&self, path: &str) -> Result<Streamed> {
         self.transport.stream(path, DEFAULT_TIMEOUT).await
     }

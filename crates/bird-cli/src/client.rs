@@ -7,7 +7,8 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::client::conn::http1::{Connection, SendRequest};
-use hyper::header::{AUTHORIZATION, CONTENT_TYPE, HOST};
+use hyper::header::{AUTHORIZATION, CONNECTION, CONTENT_TYPE, HOST, UPGRADE};
+use hyper::upgrade::Upgraded;
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
@@ -178,6 +179,36 @@ impl ApiClient {
             }
         }
         Ok(())
+    }
+
+    // asks birdd to switch the connection to `protocol`; afterwards both sides speak it directly
+    pub(crate) async fn upgrade(
+        &self,
+        path: &str,
+        protocol: &str,
+        timeout: Duration,
+    ) -> Result<TokioIo<Upgraded>> {
+        let mut request = self.request(Method::GET, path, None, JSON)?;
+        let headers = request.headers_mut();
+        headers.insert(
+            CONNECTION,
+            hyper::header::HeaderValue::from_static("upgrade"),
+        );
+        headers.insert(UPGRADE, protocol.parse()?);
+        let exchange = async {
+            let (mut sender, conn) = self.connect().await?;
+            tokio::spawn(conn.with_upgrades());
+            let response = sender.send_request(request).await?;
+            let status = response.status();
+            if status != StatusCode::SWITCHING_PROTOCOLS {
+                let body = response.into_body().collect().await?.to_bytes();
+                return Err(api_error(status, &body));
+            }
+            Ok(TokioIo::new(hyper::upgrade::on(response).await?))
+        };
+        tokio::time::timeout(timeout, exchange)
+            .await
+            .map_err(|_| anyhow!("birdd did not respond within {}s", timeout.as_secs()))?
     }
 
     async fn open_stream(

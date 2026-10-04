@@ -32,6 +32,9 @@ pub(crate) async fn exec(
     command: Vec<String>,
     out: Output,
 ) -> Result<()> {
+    if command.is_empty() {
+        bail!("give a command to run; an interactive shell needs a terminal on stdin and stdout");
+    }
     let request = ExecRequest {
         command: Command::try_from(command)?,
         machine,

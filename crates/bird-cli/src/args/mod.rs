@@ -25,6 +25,15 @@ Examples:
 
 Commands act on the service named in ./bird.toml, or on the one given with -s <name>.";
 
+const EXEC_EXAMPLES: &str = "\
+Examples:
+  bird exec                            a shell in the service's first running machine
+  bird exec -s db psql -U postgres     an interactive psql prompt
+  bird exec -s db -T pg_dump -U postgres > dump.sql
+  bird exec -m a516d4 ls /data         in a specific machine
+
+Ctrl-C and Ctrl-D go to the remote program; exit the shell or program to leave.";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "bird",
@@ -79,13 +88,17 @@ pub(crate) enum Command {
         #[arg(short, long)]
         follow: bool,
     },
-    /// Run a command in a running machine, like `bird exec psql -U postgres -c 'select 1'`
+    /// Run a command or open a shell in a running machine; interactive when used from a terminal
+    #[command(after_help = EXEC_EXAMPLES)]
     Exec {
         /// Machine to run in, as `bird status` shows it; defaults to the first running one
         #[arg(short, long)]
         machine: Option<String>,
+        /// Stream output without a terminal, keeping stderr apart, even when run from one
+        #[arg(short = 'T', long)]
+        no_tty: bool,
+        /// Command and its arguments; left out, a shell
         #[arg(
-            required = true,
             trailing_var_arg = true,
             allow_hyphen_values = true,
             value_name = "COMMAND"
@@ -310,11 +323,20 @@ mod tests {
     fn commands_keep_their_own_flags() {
         let args =
             Args::try_parse_from(["bird", "-s", "db", "exec", "psql", "-c", "select 1"]).unwrap();
-        let Command::Exec { machine, command } = args.command else {
+        let Command::Exec {
+            machine,
+            no_tty,
+            command,
+        } = args.command
+        else {
             panic!("expected exec");
         };
-        assert_eq!(machine, None);
+        assert_eq!((machine, no_tty), (None, false));
         assert_eq!(command, ["psql", "-c", "select 1"]);
+        let args = Args::try_parse_from(["bird", "exec"]).unwrap();
+        assert!(matches!(args.command, Command::Exec { command, .. } if command.is_empty()));
+        let args = Args::try_parse_from(["bird", "exec", "-T", "env"]).unwrap();
+        assert!(matches!(args.command, Command::Exec { no_tty: true, .. }));
         let args =
             Args::try_parse_from(["bird", "exec", "-m", "a516d4", "--", "ls", "-la"]).unwrap();
         assert!(matches!(args.command, Command::Exec { machine: Some(m), .. } if m == "a516d4"));

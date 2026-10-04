@@ -101,6 +101,12 @@ pub enum Error {
     NeverDeployed(Name),
     #[error("command failed: {0}")]
     CommandFailed(String),
+    #[error("too many terminals are open, close one and try again")]
+    TooManyTerminals,
+    #[error("a terminal needs a connection upgraded to bird-tty")]
+    UpgradeRequired,
+    #[error("invalid terminal request: {0}")]
+    InvalidTtyRequest(String),
     #[error("{0} has no volumes, there is nothing to back up")]
     NothingToBackUp(Name),
     #[error("backup {0} not found")]
