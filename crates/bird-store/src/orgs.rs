@@ -4,7 +4,7 @@ use rusqlite::{Row, params};
 use crate::error::{expect_changed, write_error};
 use crate::rows::parse;
 use crate::store::now;
-use crate::users::user;
+use crate::users::{user, user_columns};
 use crate::{Result, Store};
 
 const COLUMNS: &str = "id, name, created_at";
@@ -83,11 +83,14 @@ impl Store {
 
     pub fn list_members(&self, org_id: OrgId) -> Result<Vec<(User, OrgRole)>> {
         self.query_all(
-            "SELECT u.id, u.name, u.role, u.created_at, m.role
-             FROM org_members m JOIN users u ON u.id = m.user_id
-             WHERE m.org_id = ?1 ORDER BY u.name",
+            &format!(
+                "SELECT {}, m.role
+                 FROM org_members m JOIN users u ON u.id = m.user_id
+                 WHERE m.org_id = ?1 ORDER BY u.name",
+                user_columns("u")
+            ),
             [org_id.to_string()],
-            |row| Ok((user(row)?, parse(row, 4)?)),
+            |row| Ok((user(row)?, parse(row, 6)?)),
         )
     }
 

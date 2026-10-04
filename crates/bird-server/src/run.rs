@@ -1,4 +1,5 @@
 use std::future::{Future, IntoFuture};
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -15,6 +16,7 @@ use crate::deploy::DeployGuard;
 use crate::shutdown::{self, Shutdown};
 use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
+use crate::throttle::LoginThrottle;
 use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
 use crate::{Config, Error, Result, api, data_dir, environments, listen, routing};
@@ -26,7 +28,8 @@ const DEFAULT_PROJECT: &str = "default";
 const MAX_CONCURRENT_BUILDS: usize = 1;
 
 pub async fn run(config: Config) -> Result<()> {
-    run_until(config, shutdown::signal_received()).await
+    // boxed: the whole daemon's state machine is too large for the stack
+    Box::pin(run_until(config, shutdown::signal_received())).await
 }
 
 // stops when `stop` completes, which tests use instead of a signal
@@ -62,6 +65,7 @@ pub async fn run_until(
         shutdown: shutdown.clone(),
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
+        logins: Arc::new(LoginThrottle::default()),
         backups: Arc::new(backup_storage(&config, &data_dir).await?),
     };
     environments::ensure_networks(&state).await?;
@@ -113,7 +117,9 @@ pub async fn run_until(
         }
     };
     let terminals = Arc::clone(&state.terminals);
-    let api = axum::serve(api_listener, api::router(state, token))
+    // the peer address is kept with sign-ins and sessions
+    let app = api::router(state, token).into_make_service_with_connect_info::<SocketAddr>();
+    let api = axum::serve(api_listener, app)
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
     let ((), https_result, api_result, (), (), ()) = tokio::join!(

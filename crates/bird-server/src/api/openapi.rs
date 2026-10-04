@@ -61,7 +61,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::api::documented_routes;
+    use crate::api::spec;
 
     const UPDATE_ENV: &str = "BIRD_UPDATE_OPENAPI";
 
@@ -72,7 +72,7 @@ mod tests {
     // the committed document is part of the api contract, so drift fails the build
     #[test]
     fn committed_document_is_current() {
-        let (_, spec) = documented_routes().split_for_parts();
+        let spec = spec();
         let rendered = render(&spec);
         let path = committed_path();
         if std::env::var_os(UPDATE_ENV).is_some() {
@@ -88,7 +88,7 @@ mod tests {
 
     #[test]
     fn documents_every_route_and_the_token() {
-        let (_, spec) = documented_routes().split_for_parts();
+        let spec = spec();
         let scoped =
             |rest: &str| format!("/v1/projects/{{project}}/environments/{{environment}}{rest}");
         let mut paths: Vec<String> = [
@@ -112,6 +112,14 @@ mod tests {
         paths.extend(
             [
                 "/v1/me",
+                "/v1/login",
+                "/v1/logout",
+                "/v1/users/{user}/password",
+                "/v1/users/{user}/two-factor",
+                "/v1/users/{user}/two-factor/confirm",
+                "/v1/users/{user}/two-factor/disable",
+                "/v1/users/{user}/sessions",
+                "/v1/users/{user}/sessions/{id}",
                 "/v1/orgs",
                 "/v1/orgs/{org}",
                 "/v1/orgs/{org}/members",

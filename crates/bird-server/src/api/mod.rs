@@ -3,11 +3,13 @@ mod auth;
 mod backups;
 mod builds;
 mod commands;
+mod credentials;
 mod deploy;
 mod deployments;
 mod docs;
 mod domains;
 mod error;
+mod login;
 mod logs;
 mod openapi;
 mod orgs;
@@ -17,6 +19,7 @@ mod registries;
 mod scale;
 mod scope;
 mod services;
+mod sessions;
 mod stream;
 mod templates;
 mod terminals;
@@ -39,14 +42,18 @@ use crate::token::ApiToken;
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
 pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
-    let (api, spec) = documented_routes().split_for_parts();
+    let (protected, mut spec) = documented_routes().split_for_parts();
+    let (public, public_spec) = public_routes().split_for_parts();
+    spec.merge(public_spec);
     let spec: Arc<str> = openapi::render(&spec).into();
     let auth = auth::Auth {
         root: token,
         db: state.db.clone(),
     };
-    api.layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+    protected
         .layer(middleware::from_fn_with_state(auth, auth::authenticate))
+        .merge(public)
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .route("/docs", get(docs::page))
         .route(
             "/v1/openapi.json",
@@ -58,8 +65,27 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
         .with_state(state)
 }
 
+// reachable without a token, which is what signing in needs
+fn public_routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new().routes(routes!(login::login))
+}
+
+#[cfg(test)]
+fn spec() -> utoipa::openapi::OpenApi {
+    let (_, mut spec) = documented_routes().split_for_parts();
+    spec.merge(public_routes().split_for_parts().1);
+    spec
+}
+
 fn documented_routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(openapi::document())
+        .routes(routes!(login::logout))
+        .routes(routes!(credentials::set_password))
+        .routes(routes!(credentials::start_two_factor))
+        .routes(routes!(credentials::confirm_two_factor))
+        .routes(routes!(credentials::disable_two_factor))
+        .routes(routes!(sessions::list))
+        .routes(routes!(sessions::remove))
         .routes(routes!(users::whoami))
         .routes(routes!(users::list, users::create))
         .routes(routes!(users::remove))

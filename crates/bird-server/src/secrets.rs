@@ -18,6 +18,12 @@ pub(crate) fn expand_all(variables: BTreeMap<EnvKey, String>) -> Result<BTreeMap
         .collect()
 }
 
+pub(crate) fn random_bytes(count: usize) -> std::io::Result<Vec<u8>> {
+    let mut bytes = vec![0_u8; count];
+    File::open("/dev/urandom")?.read_exact(&mut bytes)?;
+    Ok(bytes)
+}
+
 pub(crate) fn generate(length: usize) -> std::io::Result<String> {
     let mut random = File::open("/dev/urandom")?;
     let mut secret = String::with_capacity(length);

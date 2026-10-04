@@ -10,6 +10,10 @@ use serde::{Deserialize, Serialize};
 pub struct Whoami {
     pub name: String,
     pub role: UserRole,
+    #[serde(default)]
+    pub has_password: bool,
+    #[serde(default)]
+    pub two_factor: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,6 +21,8 @@ pub struct Whoami {
 pub struct UserSummary {
     pub name: Name,
     pub role: UserRole,
+    pub has_password: bool,
+    pub two_factor: bool,
     pub created_at: i64,
 }
 

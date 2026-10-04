@@ -7,7 +7,7 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::client::conn::http1::{Connection, SendRequest};
-use hyper::header::{AUTHORIZATION, CONNECTION, CONTENT_TYPE, HOST, UPGRADE};
+use hyper::header::{AUTHORIZATION, CONNECTION, CONTENT_TYPE, HOST, UPGRADE, USER_AGENT};
 use hyper::upgrade::Upgraded;
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
@@ -18,6 +18,8 @@ use tokio::net::TcpStream;
 use crate::scope::Scope;
 
 const JSON: &str = "application/json";
+// shown in `bird session` to tell a signed-in CLI from a browser
+const AGENT: &str = concat!("bird-cli/", env!("CARGO_PKG_VERSION"));
 
 pub(crate) struct ApiClient {
     addr: String,
@@ -107,6 +109,19 @@ impl ApiClient {
             .send(Method::POST, path, Some(payload), timeout)
             .await?;
         serde_json::from_slice(&body).context("birdd sent an unexpected response")
+    }
+
+    // for endpoints that answer with no body
+    pub(crate) async fn post_empty<B: Serialize>(
+        &self,
+        path: &str,
+        payload: &B,
+        timeout: Duration,
+    ) -> Result<()> {
+        let payload = serde_json::to_vec(payload)?;
+        self.send(Method::POST, path, Some(payload), timeout)
+            .await?;
+        Ok(())
     }
 
     pub(crate) async fn patch<B: Serialize, T: DeserializeOwned>(
@@ -270,7 +285,8 @@ impl ApiClient {
         let mut request = Request::builder()
             .method(method)
             .uri(path)
-            .header(HOST, &self.addr);
+            .header(HOST, &self.addr)
+            .header(USER_AGENT, AGENT);
         if let Some(token) = &self.token {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));
         }

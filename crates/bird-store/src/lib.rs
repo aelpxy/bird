@@ -5,6 +5,7 @@ mod deployments;
 mod domains;
 mod environments;
 mod error;
+mod logins;
 mod machines;
 mod migrate;
 mod orgs;
@@ -14,6 +15,7 @@ mod routes;
 mod rows;
 mod service_state;
 mod services;
+mod sessions;
 mod store;
 mod supervision;
 #[cfg(test)]
@@ -24,7 +26,9 @@ mod variables;
 mod volumes;
 
 pub use error::{Error, Result};
+pub use logins::LoginSecrets;
 pub use routes::RouteEntry;
+pub use sessions::NewSession;
 pub use store::Store;
 pub use supervision::Interrupted;
 pub use tokens::NewToken;

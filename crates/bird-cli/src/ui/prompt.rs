@@ -3,6 +3,7 @@ use std::io::{BufRead, IsTerminal, Write};
 
 use anyhow::{Result, bail};
 use bird_core::Name;
+use rustix::termios::{LocalModes, OptionalActions, tcgetattr, tcsetattr};
 
 use super::style::{self, Paint};
 
@@ -58,4 +59,37 @@ fn ask(prompt: &str) -> Result<String> {
     let mut line = String::new();
     stdin.lock().read_line(&mut line)?;
     Ok(line.trim().to_owned())
+}
+
+// a visible answer; without a terminal the next line of stdin
+pub(crate) fn line(prompt: &str) -> Result<String> {
+    if std::io::stdin().is_terminal() {
+        eprint!("{prompt}");
+        std::io::stderr().flush()?;
+    }
+    read_line()
+}
+
+// typed without echo; without a terminal the next line of stdin, so scripts can pipe it in
+pub(crate) fn secret(prompt: &str) -> Result<String> {
+    let stdin = std::io::stdin();
+    if !stdin.is_terminal() {
+        return read_line();
+    }
+    eprint!("{prompt}");
+    std::io::stderr().flush()?;
+    let original = tcgetattr(&stdin)?;
+    let mut hidden = original.clone();
+    hidden.local_modes.remove(LocalModes::ECHO);
+    tcsetattr(&stdin, OptionalActions::Now, &hidden)?;
+    let answer = read_line();
+    let _ = tcsetattr(&stdin, OptionalActions::Now, &original);
+    eprintln!();
+    answer
+}
+
+fn read_line() -> Result<String> {
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    Ok(line.trim_end_matches(['\n', '\r']).to_owned())
 }

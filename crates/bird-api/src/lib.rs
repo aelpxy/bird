@@ -5,6 +5,7 @@ mod deploy;
 mod deployments;
 mod domains;
 mod error;
+mod logins;
 mod logs;
 mod manifest;
 mod orgs;
@@ -25,6 +26,10 @@ pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};
 pub use domains::AddDomain;
 pub use error::ErrorBody;
+pub use logins::{
+    DisableTwoFactor, LoginRequest, LoginResponse, RecoveryCodes, SessionSummary, SetPassword,
+    TwoFactorCode, TwoFactorSetup,
+};
 pub use logs::{LogEntry, LogStream};
 pub use manifest::{BuildSpec, MANIFEST_FILE, Manifest};
 pub use orgs::{CreateOrg, OrgMember, OrgSummary, SetMember};

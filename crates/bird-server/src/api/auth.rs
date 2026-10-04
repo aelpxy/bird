@@ -5,10 +5,11 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use bird_api::ErrorBody;
-use bird_core::{Name, User, UserRole};
+use bird_core::{Name, SessionId, User, UserRole};
 use tracing::Instrument;
 
 use crate::db::Db;
+use crate::login::{SESSION_IDLE, SESSION_PREFIX};
 use crate::token::ApiToken;
 use crate::{Error, Result, users};
 
@@ -20,6 +21,10 @@ pub(crate) struct Auth {
     pub(crate) root: ApiToken,
     pub(crate) db: Db,
 }
+
+// the session a request signed in with, also put in its extensions, so it can sign out
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CurrentSession(pub(crate) SessionId);
 
 // who a request acts as, put in its extensions by `authenticate`
 #[derive(Debug, Clone)]
@@ -71,6 +76,28 @@ pub(crate) async fn authenticate(
     };
     let principal = if auth.root.matches(candidate) {
         Principal::Root
+    } else if candidate.starts_with(SESSION_PREFIX) {
+        let hashed = users::hash(candidate);
+        let idle = i64::try_from(SESSION_IDLE.as_secs()).unwrap_or(i64::MAX);
+        match auth
+            .db
+            .call(move |store| store.authenticate_session(&hashed, idle))
+            .await
+        {
+            Ok(Some((user, session))) => {
+                let db = auth.db.clone();
+                let id = session.id;
+                tokio::spawn(async move {
+                    if let Err(err) = db.call(move |store| store.record_session_use(id)).await {
+                        tracing::debug!(error = %err, "could not record session use");
+                    }
+                });
+                request.extensions_mut().insert(CurrentSession(id));
+                Principal::User(user)
+            }
+            Ok(None) => return unauthorized(),
+            Err(err) => return err.into_response(),
+        }
     } else {
         let hashed = users::hash(candidate);
         match auth.db.call(move |store| store.authenticate(&hashed)).await {

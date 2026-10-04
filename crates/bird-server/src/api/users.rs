@@ -26,9 +26,15 @@ pub(crate) struct TokenPath {
 /// Show who the token belongs to
 #[utoipa::path(get, path = "/v1/me", tag = "users", responses((status = 200, description = "The token's user and role", body = Whoami), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn whoami(Extension(principal): Extension<Principal>) -> Json<Whoami> {
+    let (has_password, two_factor) = match &principal {
+        Principal::Root => (false, false),
+        Principal::User(user) => (user.has_password, user.two_factor),
+    };
     Json(Whoami {
         name: principal.name().to_owned(),
         role: principal.role(),
+        has_password,
+        two_factor,
     })
 }
 
@@ -114,7 +120,7 @@ pub(crate) async fn remove_token(
 }
 
 // checked before the lookup, so members cannot learn which users exist
-async fn owner(state: &AppState, principal: &Principal, name: &Name) -> Result<User> {
+pub(super) async fn owner(state: &AppState, principal: &Principal, name: &Name) -> Result<User> {
     principal.require_self_or_admin(name)?;
     users::find(state, name).await
 }
@@ -123,6 +129,8 @@ fn summary(user: User) -> UserSummary {
     UserSummary {
         name: user.name,
         role: user.role,
+        has_password: user.has_password,
+        two_factor: user.two_factor,
         created_at: user.created_at,
     }
 }

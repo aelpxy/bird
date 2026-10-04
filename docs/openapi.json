@@ -10,6 +10,94 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/v1/login": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Sign in with a username and password, and a code when two-factor is on",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in, or asked for a two-factor code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong username, password or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many failed sign-ins, wait before trying again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/v1/logout": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Sign out the session this request came in with",
+        "operationId": "logout",
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          },
+          "400": {
+            "description": "The request used an api token, not a session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me": {
       "get": {
         "tags": [
@@ -3888,6 +3976,210 @@
         }
       }
     },
+    "/v1/users/{user}/password": {
+      "put": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Set a password: your own, with the current one once you have one, or anyone's for admins",
+        "operationId": "set_password",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPassword"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password set; the user's other sessions are signed out"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user, or the current password is wrong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user}/sessions": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "List where a user is signed in: your own, or anyone's for admins",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sessions that have not expired, newest use first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user}/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Sign a session out: your own, or anyone's for admins",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Session id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/users/{user}/tokens": {
       "get": {
         "tags": [
@@ -4086,6 +4378,195 @@
           },
           "403": {
             "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user}/two-factor": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Start turning on two-factor for yourself: a secret for the authenticator app",
+        "operationId": "start_two_factor",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The secret and its otpauth uri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorSetup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user}/two-factor/confirm": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Finish turning on two-factor with a code from the app; returns the recovery codes",
+        "operationId": "confirm_two_factor",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TwoFactorCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Two-factor is on; recovery codes, shown only this once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong code, or missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No setup was started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/users/{user}/two-factor/disable": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Turn off two-factor: your own with your password, or anyone's for admins",
+        "operationId": "disable_two_factor",
+        "parameters": [
+          {
+            "name": "user",
+            "in": "path",
+            "description": "User name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableTwoFactor"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Two-factor is off"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user, or the password is wrong",
             "content": {
               "application/json": {
                 "schema": {
@@ -4689,6 +5170,19 @@
           }
         }
       },
+      "DisableTwoFactor": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Needed when turning off your own; admins resetting someone else's leave it out"
+          }
+        },
+        "additionalProperties": false
+      },
       "EnvKey": {
         "type": "string"
       },
@@ -4809,6 +5303,76 @@
         "enum": [
           "stdout",
           "stderr"
+        ]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A code from the authenticator app or a recovery code, for users with two-factor on"
+          },
+          "password": {
+            "type": "string"
+          },
+          "username": {
+            "$ref": "#/components/schemas/Name"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginResponse": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The session token to send as a bearer token, shown only this once",
+            "required": [
+              "token",
+              "user",
+              "expires_at",
+              "status"
+            ],
+            "properties": {
+              "expires_at": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "signed_in"
+                ]
+              },
+              "token": {
+                "type": "string"
+              },
+              "user": {
+                "$ref": "#/components/schemas/Name"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The password was right; send it again with a code",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "two_factor_required"
+                ]
+              }
+            }
+          }
         ]
       },
       "MachineId": {
@@ -4980,6 +5544,21 @@
           },
           "org": {
             "$ref": "#/components/schemas/Name"
+          }
+        }
+      },
+      "RecoveryCodes": {
+        "type": "object",
+        "description": "Single-use codes for signing in without the authenticator, shown only this once",
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -5192,6 +5771,53 @@
           }
         }
       },
+      "SessionId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "SessionSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "last_used_at",
+          "expires_at",
+          "current"
+        ],
+        "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The session this request came in with"
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "$ref": "#/components/schemas/SessionId"
+          },
+          "last_used_at": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "SetMember": {
         "type": "object",
         "required": [
@@ -5200,6 +5826,25 @@
         "properties": {
           "role": {
             "$ref": "#/components/schemas/OrgRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetPassword": {
+        "type": "object",
+        "required": [
+          "new"
+        ],
+        "properties": {
+          "current": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Needed when changing your own password once you have one; admins resetting someone else's leave it out"
+          },
+          "new": {
+            "type": "string"
           }
         },
         "additionalProperties": false
@@ -5280,6 +5925,34 @@
           }
         }
       },
+      "TwoFactorCode": {
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "TwoFactorSetup": {
+        "type": "object",
+        "description": "The secret to add to an authenticator app, by its uri as a qr code or by hand",
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "uri": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateVariables": {
         "type": "object",
         "properties": {
@@ -5315,6 +5988,8 @@
         "required": [
           "name",
           "role",
+          "has_password",
+          "two_factor",
           "created_at"
         ],
         "properties": {
@@ -5322,11 +5997,17 @@
             "type": "integer",
             "format": "int64"
           },
+          "has_password": {
+            "type": "boolean"
+          },
           "name": {
             "$ref": "#/components/schemas/Name"
           },
           "role": {
             "$ref": "#/components/schemas/UserRole"
+          },
+          "two_factor": {
+            "type": "boolean"
           }
         }
       },
@@ -5400,11 +6081,17 @@
           "role"
         ],
         "properties": {
+          "has_password": {
+            "type": "boolean"
+          },
           "name": {
             "type": "string"
           },
           "role": {
             "$ref": "#/components/schemas/UserRole"
+          },
+          "two_factor": {
+            "type": "boolean"
           }
         }
       }
