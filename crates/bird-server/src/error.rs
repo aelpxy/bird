@@ -91,7 +91,7 @@ pub enum Error {
     DomainNotFound(bird_core::Hostname),
     #[error("{0} is stopped, start it with `bird start`")]
     ServiceStopped(Name),
-    #[error("service {0} has no running machines")]
+    #[error("{0} has no running machines, see `bird status`")]
     NoMachines(Name),
     #[error("{service} has no running machine matching {machine:?}, see `bird status`")]
     MachineNotFound { service: Name, machine: String },
