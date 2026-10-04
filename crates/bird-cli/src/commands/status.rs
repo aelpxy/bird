@@ -11,6 +11,7 @@ use super::logs::label;
 use super::table::render;
 use super::watch;
 use crate::client::ApiClient;
+use crate::scope::Scope;
 use crate::ui::Output;
 use crate::ui::style::{self, Paint};
 
@@ -25,7 +26,7 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, watch: bool, out: Outpu
     if out.json(&service)? {
         return Ok(());
     }
-    print!("{}", describe(&service, unix_now()));
+    print!("{}", describe(&service, client.scope(), unix_now()));
     Ok(())
 }
 
@@ -38,7 +39,7 @@ pub(super) async fn fetch(client: &ApiClient, name: &Name) -> Result<ServiceSumm
         .await
 }
 
-pub(super) fn describe(service: &ServiceSummary, now: i64) -> String {
+pub(super) fn describe(service: &ServiceSummary, scope: &Scope, now: i64) -> String {
     let mut text = String::new();
     let headline = match &service.deployment {
         _ if service.state == ServiceState::Stopped => style::out(Paint::Dim, "stopped"),
@@ -56,6 +57,7 @@ pub(super) fn describe(service: &ServiceSummary, now: i64) -> String {
         let _ = writeln!(text, "  {}{value}", style::out(Paint::Dim, label));
     };
     field("image", service.image.to_string());
+    field("project", scope.to_string());
     if let Some(deployment) = &service.deployment {
         let age = ago(now.saturating_sub(deployment.created_at));
         field(
@@ -224,7 +226,7 @@ mod tests {
 
     #[test]
     fn describes_a_running_service() {
-        let text = describe(&service(), 1160);
+        let text = describe(&service(), &Scope::fallback(), 1160);
         assert!(text.starts_with("web  active\n"), "{text}");
         assert!(text.contains("  machines   1/1 running\n"), "{text}");
         assert!(text.contains("  internal   web.internal:80\n"), "{text}");
@@ -242,7 +244,7 @@ mod tests {
             created_at: 1100,
         };
         service.failed_deploy = Some(failed);
-        let text = describe(&service, 1160);
+        let text = describe(&service, &Scope::fallback(), 1160);
         assert!(text.starts_with("web  active\n"), "{text}");
         assert!(
             text.contains(
@@ -251,7 +253,7 @@ mod tests {
             "{text}"
         );
         service.deployment = None;
-        assert!(describe(&service, 1160).starts_with("web  failed\n"));
+        assert!(describe(&service, &Scope::fallback(), 1160).starts_with("web  failed\n"));
     }
 
     #[test]
@@ -269,7 +271,7 @@ mod tests {
         stopped.state = MachineState::Stopped;
         stopped.stats = None;
         deployment.machines.push(stopped);
-        let text = describe(&service, 1160);
+        let text = describe(&service, &Scope::fallback(), 1160);
         assert!(
             text.contains("MACHINE  STATE    SINCE   CPU  MEMORY"),
             "{text}"
