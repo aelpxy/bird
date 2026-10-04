@@ -35,6 +35,9 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::HasVolumes(_)
         | Error::HasDependents(..)
         | Error::VolumeMissing(_)
+        | Error::NothingToBackUp(_)
+        | Error::BackupStorageMismatch(_)
+        | Error::BackupVolumeMissing { .. }
         | Error::ServiceExists(_) => StatusCode::CONFLICT,
         Error::Store(bird_store::Error::NotFound(_))
         | Error::ServiceNotFound(_)
@@ -44,6 +47,8 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NoRollbackTarget(_)
         | Error::TemplateNotFound(_)
         | Error::NoMachines(_)
+        | Error::BackupNotFound(_)
+        | Error::BackupDataMissing(_)
         | Error::LocalImageMissing(_) => StatusCode::NOT_FOUND,
         Error::Podman(bird_podman::Error::Pull { .. })
         | Error::Validation(_)

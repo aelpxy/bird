@@ -128,6 +128,20 @@ impl Podman {
         Ok(())
     }
 
+    pub async fn pause_container(&self, id: &str) -> Result<()> {
+        let path = format!("/containers/{}/pause", encode(id));
+        let response = self.send(Method::POST, &path, DEFAULT_TIMEOUT).await?;
+        check(response, || format!("container {id}"))?;
+        Ok(())
+    }
+
+    pub async fn unpause_container(&self, id: &str) -> Result<()> {
+        let path = format!("/containers/{}/unpause", encode(id));
+        let response = self.send(Method::POST, &path, DEFAULT_TIMEOUT).await?;
+        check(response, || format!("container {id}"))?;
+        Ok(())
+    }
+
     pub async fn remove_container(&self, id: &str) -> Result<()> {
         // volumes=true also drops anonymous volumes from VOLUME lines in the image; named ones stay
         let path = format!("/containers/{}?force=true&volumes=true", encode(id));

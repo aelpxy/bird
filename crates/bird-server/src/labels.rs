@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bird_core::{DeploymentId, EnvironmentId, MachineId, Service};
+use bird_core::{DeploymentId, EnvironmentId, MachineId, Service, Volume};
 
 pub(crate) const MACHINE: &str = "bird.machine";
 const ENVIRONMENT: &str = "bird.environment-id";
@@ -15,6 +15,13 @@ pub(crate) fn aliases(service: &Service) -> Vec<String> {
 
 pub(crate) fn environment_filter(environment: EnvironmentId) -> String {
     format!("{ENVIRONMENT}={environment}")
+}
+
+pub(crate) fn for_volume(volume: &Volume) -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("bird.managed".to_owned(), "true".to_owned()),
+        ("bird.volume".to_owned(), volume.id.to_string()),
+    ])
 }
 
 pub(crate) fn for_machine(

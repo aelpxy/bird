@@ -109,6 +109,17 @@ async fn container_lifecycle() {
         "{logs:?}"
     );
 
+    podman.pause_container(&id).await.unwrap();
+    assert_eq!(
+        podman.inspect_container(&id).await.unwrap().state,
+        ContainerState::Paused
+    );
+    podman.unpause_container(&id).await.unwrap();
+    assert_eq!(
+        podman.inspect_container(&id).await.unwrap().state,
+        ContainerState::Running
+    );
+
     podman
         .stop_container(&id, Duration::from_secs(5))
         .await

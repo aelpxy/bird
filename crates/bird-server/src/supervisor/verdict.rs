@@ -26,7 +26,9 @@ pub(super) fn judge(state: ContainerState, responded: Option<bool>, strikes: u32
         return Verdict::Fail;
     }
     match state {
-        ContainerState::Created | ContainerState::Exited => Verdict::Start { strikes },
+        ContainerState::Created | ContainerState::Exited | ContainerState::Paused => {
+            Verdict::Start { strikes }
+        }
         _ => Verdict::Strike { strikes },
     }
 }
@@ -60,6 +62,10 @@ mod tests {
         assert_eq!(
             judge(ContainerState::Created, None, 1),
             Verdict::Start { strikes: 2 }
+        );
+        assert_eq!(
+            judge(ContainerState::Paused, None, 0),
+            Verdict::Start { strikes: 1 }
         );
     }
 

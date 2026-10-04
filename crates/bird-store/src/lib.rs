@@ -1,3 +1,4 @@
+mod backups;
 mod certificates;
 mod deployments;
 mod domains;

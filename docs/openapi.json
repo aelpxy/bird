@@ -311,6 +311,246 @@
         }
       }
     },
+    "/v1/services/{name}/backups": {
+      "get": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "List backups of a service, newest first",
+        "operationId": "list",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name, also of a removed service",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backups, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackupInfo"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Back up a service's volumes",
+        "operationId": "create",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Every volume copied while the machines were paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The service has no volumes, or another operation is in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/backups/{id}": {
+      "delete": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Delete a backup and its archives",
+        "operationId": "remove",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Backup id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Backup deleted"
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Backup not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/backups/{id}/restore": {
+      "post": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "Replace a service's volume data with a backup",
+        "operationId": "restore",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Backup id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Data restored and machines started again; the replaced data is kept as a new backup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or backup not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The backup does not fit the service, or another operation is in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services/{name}/builds": {
       "post": {
         "tags": [
@@ -1228,6 +1468,72 @@
           }
         }
       },
+      "BackupId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "BackupInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "service",
+          "trigger",
+          "storage",
+          "volumes",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds"
+          },
+          "id": {
+            "$ref": "#/components/schemas/BackupId"
+          },
+          "service": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "storage": {
+            "type": "string",
+            "description": "Where the archives are kept, such as local"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/BackupTrigger",
+            "description": "manual, or restore for the copy taken automatically before a restore"
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BackupVolumeInfo"
+            }
+          }
+        }
+      },
+      "BackupTrigger": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "restore"
+        ]
+      },
+      "BackupVolumeInfo": {
+        "type": "object",
+        "required": [
+          "name",
+          "size_bytes"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "BuildEvent": {
         "oneOf": [
           {
@@ -1659,6 +1965,31 @@
         "maximum": 32,
         "minimum": 1
       },
+      "RestoreRequest": {
+        "type": "object",
+        "properties": {
+          "allow_image_change": {
+            "type": "boolean",
+            "description": "Restore data written by a different image than the service runs now"
+          }
+        }
+      },
+      "RestoreResponse": {
+        "type": "object",
+        "required": [
+          "restored",
+          "safety_backup"
+        ],
+        "properties": {
+          "restored": {
+            "$ref": "#/components/schemas/BackupId"
+          },
+          "safety_backup": {
+            "$ref": "#/components/schemas/BackupId",
+            "description": "Backup of the data that was replaced, to undo the restore"
+          }
+        }
+      },
       "RollbackRequest": {
         "type": "object",
         "properties": {
@@ -1915,6 +2246,10 @@
     {
       "name": "builds",
       "description": "Images built from source on the server"
+    },
+    {
+      "name": "backups",
+      "description": "Copies of service volumes, and restoring them"
     }
   ]
 }

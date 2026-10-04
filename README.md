@@ -123,6 +123,17 @@ bird deploy db docker.io/library/postgres:18 --port 5432 --health tcp -v data:/v
 
 A service with volumes runs one machine and stops the old one before starting the new one. A volume remembers the image family that first used it, and bird refuses a different one (such as postgres 17 → 18) unless you pass `--allow-image-change`.
 
+### Backups
+
+```sh
+bird backup create db                  # copies every volume of the service
+bird backup ls db
+bird backup restore db <backup-id>
+bird backup rm db <backup-id>
+```
+
+A backup pauses the service's machines for the few seconds the copy takes, so the data is consistent the way it would be after a crash, which databases recover from. Restoring first saves the current data as a new backup, so you can undo it, then restarts the service on the restored data. Backups are kept in `~/.local/share/bird/backups` (`--backup-dir` to change it) and survive `bird rm --purge`. A recreated service generates new secrets, but restored database data keeps its old passwords: note them with `bird env get` before removing a service, and set them on the new one.
+
 ### Private registries
 
 ```sh

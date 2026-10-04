@@ -40,7 +40,8 @@ define_id!(
     ServiceId,
     DeploymentId,
     MachineId,
-    VolumeId
+    VolumeId,
+    BackupId
 );
 
 #[cfg(test)]

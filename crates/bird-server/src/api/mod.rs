@@ -1,4 +1,5 @@
 mod auth;
+mod backups;
 mod builds;
 mod deploy;
 mod deployments;
@@ -63,4 +64,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(registries::login, registries::logout))
         .routes(routes!(templates::list))
         .routes(routes!(templates::deploy))
+        .routes(routes!(backups::create, backups::list))
+        .routes(routes!(backups::restore))
+        .routes(routes!(backups::remove))
 }
