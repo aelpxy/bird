@@ -98,7 +98,24 @@ impl Supervisor {
                 tracing::debug!(service = %service.name, "operation in progress, skipping");
                 continue;
             };
-            self.supervise(&service, deployment, &mut seen).await?;
+            // re-read under the ticket, or a deploy that just finished gets its old machines launched again
+            let (service, current) = self
+                .state
+                .db
+                .call(move |store| {
+                    Ok((
+                        store.service(service_id)?,
+                        store.active_deployment(service_id)?,
+                    ))
+                })
+                .await?;
+            let (Some(service), Some(current)) = (service, current) else {
+                continue;
+            };
+            if service.state == ServiceState::Stopped || current.id != deployment.id {
+                continue;
+            }
+            self.supervise(&service, &current, &mut seen).await?;
         }
         self.strikes.retain(|id, _| seen.contains(id));
         let active: HashSet<DeploymentId> = deployments.iter().map(|d| d.id).collect();
