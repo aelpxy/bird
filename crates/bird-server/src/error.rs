@@ -99,6 +99,8 @@ pub enum Error {
     AmbiguousMachine(String),
     #[error("{0} has never been deployed, so there is no image to run")]
     NeverDeployed(Name),
+    #[error("{0} has no working deployment to start, deploy it with `bird deploy`")]
+    NothingToStart(Name),
     #[error("command failed: {0}")]
     CommandFailed(String),
     #[error("too many terminals are open, close one and try again")]

@@ -50,6 +50,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::NoMachines(_)
         | Error::MachineNotFound { .. }
         | Error::NeverDeployed(_)
+        | Error::NothingToStart(_)
         | Error::BackupNotFound(_)
         | Error::BackupDataMissing(_)
         | Error::LocalImageMissing(_) => StatusCode::NOT_FOUND,
