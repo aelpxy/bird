@@ -43,6 +43,8 @@ x509-parser.workspace = true
 
 [dev-dependencies]
 rcgen.workspace = true
+# talks to an in-process birdd over http in the integration tests
+reqwest = { workspace = true, features = ["json"] }
 
 [lints]
 workspace = true

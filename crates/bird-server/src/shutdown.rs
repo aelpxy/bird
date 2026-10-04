@@ -9,11 +9,12 @@ pub(crate) struct Shutdown {
 }
 
 impl Shutdown {
-    pub(crate) fn on_signal() -> Self {
+    // starts stopping once `stop` completes, like a signal arriving
+    pub(crate) fn when(stop: impl Future<Output = ()> + Send + 'static) -> Self {
         let (trigger, stopping) = watch::channel(false);
         tokio::spawn(async move {
-            wait_for_signal().await;
-            tracing::info!("shutdown signal received");
+            stop.await;
+            tracing::info!("shutting down");
             let _ = trigger.send(true);
         });
         Self { stopping }
@@ -27,7 +28,7 @@ impl Shutdown {
     }
 }
 
-async fn wait_for_signal() {
+pub(crate) async fn signal_received() {
     let mut terminate = match signal(SignalKind::terminate()) {
         Ok(terminate) => terminate,
         Err(err) => {
