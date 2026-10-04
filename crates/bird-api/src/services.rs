@@ -41,4 +41,20 @@ pub struct MachineSummary {
     pub state: MachineState,
     /// When the machine entered its current state, in unix seconds
     pub updated_at: i64,
+    /// Only sampled when asked for, and only for running machines
+    #[serde(default)]
+    pub stats: Option<MachineStats>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct MachineStats {
+    /// Thousandths of a core in use, measured over half a second
+    pub cpu_millicores: u64,
+    pub memory_bytes: u64,
+    /// Received since the machine started
+    pub net_rx_bytes: u64,
+    /// Sent since the machine started
+    pub net_tx_bytes: u64,
+    pub processes: u64,
 }

@@ -26,7 +26,7 @@ pub use logs::{LogEntry, LogStream};
 pub use manifest::{BuildSpec, MANIFEST_FILE, Manifest};
 pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
-pub use services::{DeploymentSummary, MachineSummary, ServiceSummary};
+pub use services::{DeploymentSummary, MachineStats, MachineSummary, ServiceSummary};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
 pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TTY_UPGRADE};
 pub use variables::{UpdateVariables, VariableValue, VariablesResponse};

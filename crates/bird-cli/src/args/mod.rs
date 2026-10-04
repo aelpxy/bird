@@ -82,8 +82,12 @@ pub(crate) enum Command {
     },
     /// Deploy a service from bird.toml, an image or a Dockerfile, creating it if needed
     Deploy(Box<DeployArgs>),
-    /// Show a service, its deployment and its machines
-    Status,
+    /// Show a service, its deployment and its machines with their cpu, memory and network
+    Status {
+        /// Refresh every 2 seconds until interrupted
+        #[arg(short, long)]
+        watch: bool,
+    },
     /// List all services
     #[command(visible_alias = "ls")]
     List,
@@ -308,6 +312,8 @@ mod tests {
         let args = Args::try_parse_from(["bird", "-s", "db", "status"]).unwrap();
         assert_eq!(args.service.unwrap().as_str(), "db");
         assert!(Args::try_parse_from(["bird", "status", "-s", "Web"]).is_err());
+        let args = Args::try_parse_from(["bird", "status", "-w"]).unwrap();
+        assert!(matches!(args.command, Command::Status { watch: true }));
     }
 
     #[test]

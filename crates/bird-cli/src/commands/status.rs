@@ -1,10 +1,12 @@
 use std::fmt::Write;
+use std::io::{IsTerminal, Write as _};
 use std::time::Duration;
 
 use anyhow::Result;
-use bird_api::ServiceSummary;
+use bird_api::{MachineStats, MachineSummary, ServiceSummary};
 use bird_core::{MachineState, Name, ServiceState};
 
+use super::backup::size;
 use super::history::{ago, unix_now};
 use super::logs::label;
 use super::table::render;
@@ -14,14 +16,60 @@ use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 const LABEL_WIDTH: usize = 11;
+const WATCH_INTERVAL: Duration = Duration::from_secs(2);
 
-pub(crate) async fn run(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
-    let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
+pub(crate) async fn run(client: &ApiClient, name: &Name, watch: bool, out: Output) -> Result<()> {
+    if watch {
+        return run_watch(client, name, out).await;
+    }
+    let service = fetch(client, name).await?;
     if out.json(&service)? {
         return Ok(());
     }
     print!("{}", describe(&service, unix_now()));
     Ok(())
+}
+
+// redrawn in place on a terminal; piped, each refresh is appended (one JSON line each with --json)
+async fn run_watch(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
+    let redraw = !out.json && std::io::stdout().is_terminal();
+    loop {
+        let service = fetch(client, name).await?;
+        let frame = if out.json {
+            format!("{}\n", serde_json::to_string(&service)?)
+        } else if redraw {
+            let hint = format!("every {}s, ctrl-c to stop", WATCH_INTERVAL.as_secs());
+            repaint(&format!(
+                "{}\n\n{}",
+                style::out(Paint::Dim, hint),
+                describe(&service, unix_now())
+            ))
+        } else {
+            format!("{}\n", describe(&service, unix_now()))
+        };
+        let mut stdout = std::io::stdout().lock();
+        stdout.write_all(frame.as_bytes())?;
+        stdout.flush()?;
+        drop(stdout);
+        tokio::time::sleep(WATCH_INTERVAL).await;
+    }
+}
+
+async fn fetch(client: &ApiClient, name: &Name) -> Result<ServiceSummary> {
+    client
+        .get(&format!("/v1/services/{name}?stats=true"), TIMEOUT)
+        .await
+}
+
+// overwrites the previous frame line by line instead of clearing first, so it does not flicker
+fn repaint(frame: &str) -> String {
+    let mut text = String::from("\x1b[H");
+    for line in frame.lines() {
+        text.push_str(line);
+        text.push_str("\x1b[K\n");
+    }
+    text.push_str("\x1b[J");
+    text
 }
 
 fn describe(service: &ServiceSummary, now: i64) -> String {
@@ -99,35 +147,76 @@ fn describe(service: &ServiceSummary, now: i64) -> String {
         field("backups", style::out(Paint::Dim, "not scheduled"));
     }
 
-    let machines = service
+    text.push_str(&machine_table(service, now));
+    text
+}
+
+fn machine_table(service: &ServiceSummary, now: i64) -> String {
+    let machines: Vec<&MachineSummary> = service
         .deployment
         .iter()
         .flat_map(|d| &d.machines)
+        .collect();
+    let sampled = machines.iter().any(|m| m.stats.is_some());
+    let rows = machines
+        .iter()
         .map(|m| {
-            vec![
+            let mut row = vec![
                 label(m.id),
                 style::out(style::machine(m.state), m.state),
                 ago(now.saturating_sub(m.updated_at)),
-            ]
+            ];
+            if sampled {
+                row.extend(usage(service, m.stats.as_ref()));
+            }
+            row
         })
         .collect::<Vec<_>>();
-    if !machines.is_empty() {
-        text.push('\n');
-        text.push_str(&render(&["MACHINE", "STATE", "SINCE"], &machines));
+    if rows.is_empty() {
+        return String::new();
     }
-    text
+    let mut header = vec!["MACHINE", "STATE", "SINCE"];
+    if sampled {
+        header.extend(["CPU", "MEMORY", "NET"]);
+    }
+    format!("\n{}", render(&header, &rows))
+}
+
+// cpu and memory as a share of the service's limits, since that is what runs out
+fn usage(service: &ServiceSummary, stats: Option<&MachineStats>) -> [String; 3] {
+    let Some(stats) = stats else {
+        return ["-", "-", "-"].map(|cell| style::out(Paint::Dim, cell));
+    };
+    let cpu = percent(stats.cpu_millicores, u64::from(service.cpus.millicores()));
+    let memory = percent(stats.memory_bytes, service.memory.bytes());
+    [
+        format!("{cpu}%"),
+        format!(
+            "{} {}",
+            size(stats.memory_bytes),
+            style::out(Paint::Dim, format!("{memory}%"))
+        ),
+        format!(
+            "↓{} ↑{}",
+            size(stats.net_rx_bytes),
+            size(stats.net_tx_bytes)
+        ),
+    ]
+}
+
+fn percent(used: u64, limit: u64) -> u64 {
+    used.saturating_mul(100).checked_div(limit).unwrap_or(0)
 }
 
 #[cfg(test)]
 mod tests {
-    use bird_api::{DeploymentSummary, MachineSummary};
+    use bird_api::DeploymentSummary;
     use bird_core::{DeploymentStatus, HealthCheck};
 
     use super::*;
 
-    #[test]
-    fn describes_a_running_service() {
-        let service = ServiceSummary {
+    fn service() -> ServiceSummary {
+        ServiceSummary {
             name: "web".parse().unwrap(),
             state: ServiceState::Running,
             image: "nginx:alpine".parse().unwrap(),
@@ -148,14 +237,52 @@ mod tests {
                     id: "01a10467-9f40-7541-b34b-b7cfd4a516d4".parse().unwrap(),
                     state: MachineState::Running,
                     updated_at: 1100,
+                    stats: None,
                 }],
             }),
-        };
-        let text = describe(&service, 1160);
+        }
+    }
+
+    #[test]
+    fn describes_a_running_service() {
+        let text = describe(&service(), 1160);
         assert!(text.starts_with("web  active\n"), "{text}");
         assert!(text.contains("  machines   1/1 running\n"), "{text}");
         assert!(text.contains("  internal   web.internal:80\n"), "{text}");
         assert!(text.contains("  health     http (1m to start)\n"), "{text}");
         assert!(text.contains("a516d4   running  1m ago"), "{text}");
+        assert!(!text.contains("CPU"), "{text}");
+    }
+
+    #[test]
+    fn shows_usage_against_the_limits() {
+        let mut service = service();
+        let deployment = service.deployment.as_mut().unwrap();
+        deployment.machines[0].stats = Some(MachineStats {
+            cpu_millicores: 250,
+            memory_bytes: 128 * 1024 * 1024,
+            net_rx_bytes: 1536,
+            net_tx_bytes: 100,
+            processes: 3,
+        });
+        let mut stopped = deployment.machines[0].clone();
+        stopped.state = MachineState::Stopped;
+        stopped.stats = None;
+        deployment.machines.push(stopped);
+        let text = describe(&service, 1160);
+        assert!(
+            text.contains("MACHINE  STATE    SINCE   CPU  MEMORY"),
+            "{text}"
+        );
+        assert!(
+            text.contains("running  1m ago  25%  128.0 MiB 12%  ↓1.5 KiB ↑100 B"),
+            "{text}"
+        );
+        assert!(text.contains("stopped  1m ago  -    -"), "{text}");
+    }
+
+    #[test]
+    fn repaints_over_the_previous_frame() {
+        assert_eq!(repaint("a\nb\n"), "\x1b[Ha\x1b[K\nb\x1b[K\n\x1b[J");
     }
 }

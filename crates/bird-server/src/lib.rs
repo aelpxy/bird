@@ -16,6 +16,7 @@ mod run;
 mod secrets;
 mod shutdown;
 mod state;
+mod stats;
 mod supervisor;
 mod templates;
 mod tls;

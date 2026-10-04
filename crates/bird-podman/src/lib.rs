@@ -9,6 +9,7 @@ mod image;
 mod logs;
 mod network;
 mod query;
+mod stats;
 mod transport;
 mod volume;
 
@@ -22,4 +23,5 @@ pub use error::{Error, Result};
 pub use exec::{ExecInfo, ExecSession, TtySession};
 pub use follow::LogFollower;
 pub use logs::{LogLine, LogStream};
+pub use stats::ContainerStats;
 pub use volume::VolumeMount;

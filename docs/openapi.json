@@ -263,6 +263,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "stats",
+            "in": "query",
+            "description": "Also sample cpu, memory and network for running machines, which takes about half a second",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2765,6 +2774,46 @@
           "destroyed"
         ]
       },
+      "MachineStats": {
+        "type": "object",
+        "required": [
+          "cpu_millicores",
+          "memory_bytes",
+          "net_rx_bytes",
+          "net_tx_bytes",
+          "processes"
+        ],
+        "properties": {
+          "cpu_millicores": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Thousandths of a core in use, measured over half a second",
+            "minimum": 0
+          },
+          "memory_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "net_rx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Received since the machine started",
+            "minimum": 0
+          },
+          "net_tx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sent since the machine started",
+            "minimum": 0
+          },
+          "processes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "MachineSummary": {
         "type": "object",
         "required": [
@@ -2778,6 +2827,17 @@
           },
           "state": {
             "$ref": "#/components/schemas/MachineState"
+          },
+          "stats": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MachineStats",
+                "description": "Only sampled when asked for, and only for running machines"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "updated_at": {
             "type": "integer",

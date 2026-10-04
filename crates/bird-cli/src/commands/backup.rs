@@ -175,7 +175,7 @@ async fn list(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     Ok(())
 }
 
-fn size(bytes: u64) -> String {
+pub(crate) fn size(bytes: u64) -> String {
     if bytes < 1024 {
         return format!("{bytes} B");
     }
