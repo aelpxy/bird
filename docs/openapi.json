@@ -2713,6 +2713,22 @@
           }
         }
       },
+      "FailedDeploy": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "$ref": "#/components/schemas/DeploymentId"
+          }
+        }
+      },
       "HealthCheck": {
         "type": "string",
         "description": "http (any HTTP response on /), tcp (accepts connections) or a path like /healthz that must answer 2xx",
@@ -3023,6 +3039,17 @@
             "items": {
               "$ref": "#/components/schemas/Hostname"
             }
+          },
+          "failed_deploy": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FailedDeploy",
+                "description": "The newest deployment when it failed; an older active one may still be serving"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "health": {
             "$ref": "#/components/schemas/HealthCheck"

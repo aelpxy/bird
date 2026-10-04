@@ -2,8 +2,8 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use bird_api::ErrorBody;
-use bird_api::{DeploymentSummary, MachineSummary, ServiceSummary, VolumeSpec};
-use bird_core::{MachineId, MachineState, Name};
+use bird_api::{DeploymentSummary, FailedDeploy, MachineSummary, ServiceSummary, VolumeSpec};
+use bird_core::{DeploymentStatus, MachineId, MachineState, Name};
 use bird_store::Store;
 use serde::Deserialize;
 
@@ -111,6 +111,15 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         .map(|d| d.hostname)
         .collect();
     let backup_schedule = store.backup_schedule(service.id)?;
+    let failed_deploy = store
+        .list_deployments(service.id)?
+        .into_iter()
+        .next()
+        .filter(|d| d.status == DeploymentStatus::Failed)
+        .map(|d| FailedDeploy {
+            id: d.id,
+            created_at: d.created_at,
+        });
     let Some(active) = store.active_deployment(service.id)? else {
         return Ok(ServiceSummary {
             name: service.name,
@@ -126,6 +135,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             volumes,
             backup_schedule,
             deployment: None,
+            failed_deploy,
         });
     };
     let machines = store
@@ -158,5 +168,6 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             created_at: active.created_at,
             machines,
         }),
+        failed_deploy,
     })
 }

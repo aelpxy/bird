@@ -40,6 +40,7 @@ pub(super) fn describe(service: &ServiceSummary, now: i64) -> String {
     let headline = match &service.deployment {
         _ if service.state == ServiceState::Stopped => style::out(Paint::Dim, "stopped"),
         Some(deployment) => style::out(style::deployment(deployment.status), deployment.status),
+        None if service.failed_deploy.is_some() => style::out(Paint::Red, "failed"),
         None => style::out(Paint::Dim, "not deployed"),
     };
     let _ = writeln!(
@@ -71,6 +72,17 @@ pub(super) fn describe(service: &ServiceSummary, now: i64) -> String {
         field(
             "machines",
             style::out(paint, format!("{running}/{} running", service.replicas)),
+        );
+    }
+    if let Some(failed) = service.failed_deploy {
+        let age = ago(now.saturating_sub(failed.created_at));
+        field(
+            "failed",
+            format!(
+                "{} {}",
+                style::out(Paint::Red, failed.id),
+                style::out(Paint::Dim, format!("{age}, see `bird history`"))
+            ),
         );
     }
     let domains: Vec<String> = service.domains.iter().map(ToString::to_string).collect();
@@ -203,6 +215,7 @@ mod tests {
                     stats: None,
                 }],
             }),
+            failed_deploy: None,
         }
     }
 
@@ -215,6 +228,27 @@ mod tests {
         assert!(text.contains("  health     http (1m to start)\n"), "{text}");
         assert!(text.contains("a516d4   running  1m ago"), "{text}");
         assert!(!text.contains("CPU"), "{text}");
+        assert!(!text.contains("failed"), "{text}");
+    }
+
+    #[test]
+    fn shows_a_failed_deploy() {
+        let mut service = service();
+        let failed = bird_api::FailedDeploy {
+            id: "01a10467-92a5-7040-8b88-e1572362b0c4".parse().unwrap(),
+            created_at: 1100,
+        };
+        service.failed_deploy = Some(failed);
+        let text = describe(&service, 1160);
+        assert!(text.starts_with("web  active\n"), "{text}");
+        assert!(
+            text.contains(
+                "  failed     01a10467-92a5-7040-8b88-e1572362b0c4 1m ago, see `bird history`\n"
+            ),
+            "{text}"
+        );
+        service.deployment = None;
+        assert!(describe(&service, 1160).starts_with("web  failed\n"));
     }
 
     #[test]
