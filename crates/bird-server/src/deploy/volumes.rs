@@ -93,15 +93,15 @@ fn check_lineage(existing: &[Volume], image: &ImageRef, allow_change: bool) -> R
     if allow_change {
         return Ok(());
     }
-    let now = ImageLineage::of(image).to_string();
+    let now = ImageLineage::of(image);
     match existing
         .iter()
-        .find(|v| v.lineage.as_ref().is_some_and(|was| *was != now))
+        .find(|v| v.lineage.as_ref().is_some_and(|was| !now.matches(was)))
     {
         Some(volume) => Err(Error::ImageChange {
             volume: volume.name.clone(),
             was: volume.lineage.clone().unwrap_or_default(),
-            now,
+            now: now.to_string(),
         }),
         None => Ok(()),
     }
@@ -162,5 +162,11 @@ mod tests {
         assert!(check_lineage(&existing, &image("postgres:19"), true).is_ok());
         let unused = [volume("data", "/d", None)];
         assert!(check_lineage(&unused, &image("anything:1"), false).is_ok());
+        let built = vec![volume(
+            "data",
+            "/data",
+            Some("localhost/bird/notes:1791077958876"),
+        )];
+        assert!(check_lineage(&built, &image("localhost/bird/notes:1791082579769"), false).is_ok());
     }
 }

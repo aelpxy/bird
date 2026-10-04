@@ -14,6 +14,9 @@ use crate::{Error, Podman, Result};
 // covers uploading the context; the build itself streams for as long as it takes
 const UPLOAD_TIMEOUT: Duration = Duration::from_mins(10);
 const MAX_LINE_BYTES: usize = 1024 * 1024;
+// podman's build api stores layers but only reuses them when the output format is named
+// (podman 5.8), so leaving it out silently rebuilds every step
+const OUTPUT_FORMAT: &str = "application/vnd.oci.image.manifest.v1+json";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuildLine {
@@ -49,9 +52,10 @@ impl Podman {
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     {
         let mut path = format!(
-            "/build?t={}&dockerfile={}&rm=true&layers=true",
+            "/build?t={}&dockerfile={}&rm=true&layers=true&outputformat={}",
             encode(&tag.qualified()),
-            encode(dockerfile)
+            encode(dockerfile),
+            encode(OUTPUT_FORMAT)
         );
         if !args.is_empty() {
             path.push_str("&buildargs=");

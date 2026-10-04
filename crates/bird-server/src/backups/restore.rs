@@ -92,18 +92,18 @@ fn pair<'a>(
 
 // the next machine runs the current image on the restored data, so it must be the same kind
 fn check_lineage(targets: &[(&BackupVolume, &Volume)], image: &ImageRef) -> Result<()> {
-    let now = ImageLineage::of(image).to_string();
+    let now = ImageLineage::of(image);
     match targets.iter().find_map(|(saved, _)| {
         saved
             .lineage
             .as_ref()
-            .filter(|was| **was != now)
+            .filter(|was| !now.matches(was))
             .map(|was| (saved, was))
     }) {
         Some((saved, was)) => Err(Error::ImageChange {
             volume: saved.name.clone(),
             was: was.clone(),
-            now,
+            now: now.to_string(),
         }),
         None => Ok(()),
     }
