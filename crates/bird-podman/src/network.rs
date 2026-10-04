@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use hyper::{Method, StatusCode};
 use serde::Serialize;
 
@@ -11,6 +13,7 @@ struct CreateNetwork<'a> {
     name: &'a str,
     driver: &'a str,
     dns_enabled: bool,
+    options: BTreeMap<&'a str, &'a str>,
 }
 
 impl Podman {
@@ -28,6 +31,8 @@ impl Podman {
             name,
             driver: "bridge",
             dns_enabled: true,
+            // without it any other bridge on the host routes into this one; published ports still work
+            options: BTreeMap::from([("isolate", "strict")]),
         };
         let response = self.post_json("/networks/create", &request).await?;
         match check(response, subject) {
