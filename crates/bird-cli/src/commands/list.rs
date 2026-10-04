@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bird_api::ServiceSummary;
-use bird_core::MachineState;
+use bird_core::{MachineState, ServiceState};
 
 use super::table::render;
 use crate::client::ApiClient;
@@ -31,6 +31,10 @@ pub(crate) async fn run(client: &ApiClient, out: Output) -> Result<()> {
 
 fn row(service: &ServiceSummary) -> Vec<String> {
     let (status, machines) = match &service.deployment {
+        Some(_) if service.state == ServiceState::Stopped => (
+            style::out(Paint::Dim, "stopped"),
+            style::out(Paint::Dim, format!("0/{}", service.replicas)),
+        ),
         Some(deployment) => {
             let running = deployment
                 .machines

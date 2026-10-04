@@ -10,6 +10,7 @@ mod init;
 mod list;
 mod login;
 mod logs;
+mod power;
 mod registry;
 mod remove;
 mod scale;
@@ -62,6 +63,9 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             domains::run(&connect(api)?, &target()?, command, out).await
         }
         Command::Scale { replicas } => scale::run(&connect(api)?, &target()?, replicas).await,
+        Command::Stop => power::stop(&connect(api)?, &target()?, out).await,
+        Command::Start => power::start(&connect(api)?, &target()?, out).await,
+        Command::Restart => power::restart(&connect(api)?, &target()?, out).await,
         Command::History => history::history(&connect(api)?, &target()?, out).await,
         Command::Rollback { deployment } => {
             history::rollback(&connect(api)?, &target()?, deployment, out).await

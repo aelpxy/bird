@@ -1,6 +1,6 @@
 use bird_core::{
     Backup, BackupId, BackupTrigger, BackupVolume, Deployment, ImageLineage, ImageRef, Machine,
-    MachineState, Name, Service, Volume,
+    MachineState, Name, Service, ServiceState, Volume,
 };
 
 use super::create::snapshot;
@@ -150,8 +150,9 @@ async fn replace_data(
     Ok(())
 }
 
+// a stopped service gets its data back and stays stopped until `bird start`
 async fn relaunch(state: &AppState, service: &Service, active: Option<Deployment>) -> Result<()> {
-    let Some(deployment) = active else {
+    let Some(deployment) = active.filter(|_| service.state == ServiceState::Running) else {
         return Ok(());
     };
     let deployment_id = deployment.id;

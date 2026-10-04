@@ -1,6 +1,6 @@
 use bird_core::{
     CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout, Hostname, ImageRef,
-    MachineId, MachineState, MemoryLimit, Name, Port, Replicas,
+    MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,8 @@ use crate::VolumeSpec;
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ServiceSummary {
     pub name: Name,
+    /// Stopped services keep their machines stopped until started again
+    pub state: ServiceState,
     pub image: ImageRef,
     pub port: Port,
     pub replicas: Replicas,

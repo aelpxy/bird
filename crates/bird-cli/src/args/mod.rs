@@ -111,6 +111,12 @@ pub(crate) enum Command {
     },
     /// Run a number of machines for a service
     Scale { replicas: Replicas },
+    /// Stop a service; its machines, data and settings are kept until `bird start`
+    Stop,
+    /// Start a stopped service and wait until its machines are healthy
+    Start,
+    /// Restart a service's machines one at a time, each waiting to be healthy
+    Restart,
     /// List the deployments of a service, newest first
     History,
     /// Redeploy an earlier deployment, the previous one by default

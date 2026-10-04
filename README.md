@@ -65,6 +65,8 @@ bird deploy
 bird status                            # deployment, machines, domains, health
 bird logs -f
 bird scale 3
+bird restart                           # one machine at a time, each waits to be healthy
+bird stop                              # keeps machines, data and settings; `bird start` resumes
 bird history
 bird rollback                          # previous deployment, or pass an id
 bird rm                                # asks first; --purge also deletes its volumes

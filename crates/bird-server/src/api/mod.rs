@@ -9,6 +9,7 @@ mod domains;
 mod error;
 mod logs;
 mod openapi;
+mod power;
 mod registries;
 mod scale;
 mod services;
@@ -70,4 +71,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(backups::remove))
         .routes(routes!(commands::exec))
         .routes(routes!(commands::run))
+        .routes(routes!(power::stop))
+        .routes(routes!(power::start))
+        .routes(routes!(power::restart))
 }

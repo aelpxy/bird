@@ -1,6 +1,6 @@
 use bird_core::{
     Command, CpuLimit, EnvironmentId, HealthCheck, HealthTimeout, ImageRef, MemoryLimit, Name,
-    Port, Replicas, Service, ServiceId,
+    Port, Replicas, Service, ServiceId, ServiceState,
 };
 use rusqlite::params;
 
@@ -25,6 +25,7 @@ impl Store {
             replicas: Replicas::ONE,
             health: HealthCheck::Http,
             health_timeout: HealthTimeout::DEFAULT,
+            state: ServiceState::Running,
             command: None,
             memory: MemoryLimit::DEFAULT,
             cpus: CpuLimit::DEFAULT,
@@ -107,7 +108,8 @@ impl Store {
         let (health, health_path) = health_columns(&service.health);
         let changed = self.execute(
             "UPDATE services SET image = ?2, port = ?3, health = ?4, health_path = ?5,
-             health_timeout_secs = ?6, command = ?7, memory_mb = ?8, cpu_millicores = ?9
+             health_timeout_secs = ?6, command = ?7, memory_mb = ?8, cpu_millicores = ?9,
+             state = ?10
              WHERE id = ?1",
             params![
                 service.id.to_string(),
@@ -118,7 +120,8 @@ impl Store {
                 service.health_timeout.secs(),
                 command,
                 service.memory.mebibytes(),
-                service.cpus.millicores()
+                service.cpus.millicores(),
+                service.state.as_str()
             ],
         )?;
         expect_changed(changed, "service")
@@ -127,7 +130,7 @@ impl Store {
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
              FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
@@ -141,7 +144,7 @@ impl Store {
     ) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
              FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
@@ -152,7 +155,7 @@ impl Store {
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
              FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],

@@ -38,7 +38,7 @@ pub(crate) async fn logs(
     Path(name): Path<Name>,
     Query(query): Query<LogsQuery>,
 ) -> Result<Response> {
-    let machines = running_machines(&state, &name).await?;
+    let machines = logged_machines(&state, &name).await?;
     let tail = query.tail.unwrap_or(DEFAULT_TAIL).min(MAX_TAIL);
     if query.follow {
         return Ok(follow(&state, machines, tail));
@@ -51,7 +51,8 @@ pub(crate) async fn logs(
     Ok(Json(entries).into_response())
 }
 
-async fn running_machines(state: &AppState, name: &Name) -> Result<Vec<(MachineId, String)>> {
+// stopped machines keep their containers, so a stopped service still shows its last logs
+async fn logged_machines(state: &AppState, name: &Name) -> Result<Vec<(MachineId, String)>> {
     let service = state.service(name).await?;
     let service_id = service.id;
     let machines = state
@@ -63,15 +64,15 @@ async fn running_machines(state: &AppState, name: &Name) -> Result<Vec<(MachineI
             store.list_machines(deployment.id)
         })
         .await?;
-    let running: Vec<(MachineId, String)> = machines
+    let logged: Vec<(MachineId, String)> = machines
         .into_iter()
-        .filter(|m| m.state == MachineState::Running)
+        .filter(|m| matches!(m.state, MachineState::Running | MachineState::Stopped))
         .filter_map(|m| Some((m.id, m.container_id?)))
         .collect();
-    if running.is_empty() {
+    if logged.is_empty() {
         return Err(Error::NoMachines(name.clone()));
     }
-    Ok(running)
+    Ok(logged)
 }
 
 fn follow(state: &AppState, machines: Vec<(MachineId, String)>, tail: u32) -> Response {

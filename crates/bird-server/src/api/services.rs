@@ -33,12 +33,12 @@ pub(crate) async fn get(
     State(state): State<AppState>,
     Path(name): Path<Name>,
 ) -> Result<Json<ServiceSummary>> {
-    let service = state.service(&name).await?;
-    let summary = state
-        .db
-        .call(move |store| summarize(store, service))
-        .await?;
-    Ok(Json(summary))
+    Ok(Json(summary(&state, &name).await?))
+}
+
+pub(super) async fn summary(state: &AppState, name: &Name) -> Result<ServiceSummary> {
+    let service = state.service(name).await?;
+    state.db.call(move |store| summarize(store, service)).await
 }
 
 #[derive(Deserialize, utoipa::IntoParams)]
@@ -80,6 +80,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
     let Some(active) = store.active_deployment(service.id)? else {
         return Ok(ServiceSummary {
             name: service.name,
+            state: service.state,
             image: service.image,
             port: service.port,
             replicas: service.replicas,
@@ -104,6 +105,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         .collect();
     Ok(ServiceSummary {
         name: service.name,
+        state: service.state,
         image: active.image,
         port: active.port,
         replicas: service.replicas,

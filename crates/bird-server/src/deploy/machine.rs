@@ -112,7 +112,7 @@ pub(crate) async fn launch(
     }
 }
 
-async fn boot(
+pub(super) async fn boot(
     state: &AppState,
     container_id: &str,
     deployment: &Deployment,

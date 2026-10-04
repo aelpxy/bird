@@ -106,6 +106,7 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         replicas: replicas(row, 6)?,
         health: health(row, 7, 11)?,
         health_timeout: limit(row, 12)?,
+        state: parse(row, 13)?,
         command: command(row, 8)?,
         memory: limit(row, 9)?,
         cpus: limit(row, 10)?,
