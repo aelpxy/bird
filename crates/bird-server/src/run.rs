@@ -1,4 +1,5 @@
 use std::future::IntoFuture;
+use std::path::Path;
 use std::sync::Arc;
 
 use bird_core::{EnvironmentId, Name};
@@ -7,6 +8,7 @@ use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
 use bird_store::Store;
 use tokio::sync::{Notify, Semaphore};
 
+use crate::backups::{BackupStorage, LocalDir};
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
@@ -51,6 +53,7 @@ pub async fn run(config: Config) -> Result<()> {
         reconcile_now: Arc::new(Notify::new()),
         shutdown: shutdown.clone(),
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
+        backups: Arc::new(backup_storage(&config, &data_dir)),
     };
     supervisor::recover_interrupted(&state).await?;
     let mut supervisor = Supervisor::new(state.clone());
@@ -127,6 +130,14 @@ pub async fn run(config: Config) -> Result<()> {
     api_result?;
     tracing::info!("birdd stopped");
     Ok(())
+}
+
+fn backup_storage(config: &Config, data_dir: &Path) -> BackupStorage {
+    let dir = config
+        .backup_dir
+        .clone()
+        .unwrap_or_else(|| data_dir.join("backups"));
+    BackupStorage::Local(LocalDir::new(dir))
 }
 
 fn ensure_environment(

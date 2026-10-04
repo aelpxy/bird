@@ -21,6 +21,7 @@ const TOKEN_SCHEME: &str = "api_token";
         (name = "templates", description = "Ready-made services such as Postgres and Valkey"),
         (name = "registries", description = "Credentials for pulling private images"),
         (name = "builds", description = "Images built from source on the server"),
+        (name = "backups", description = "Copies of service volumes, and restoring them"),
     )
 )]
 struct ApiDoc;

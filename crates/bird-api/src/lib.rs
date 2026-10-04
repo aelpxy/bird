@@ -1,3 +1,4 @@
+mod backups;
 mod builds;
 mod deploy;
 mod deployments;
@@ -12,6 +13,7 @@ mod templates;
 mod variables;
 mod volumes;
 
+pub use backups::{BackupInfo, BackupVolumeInfo, RestoreRequest, RestoreResponse};
 pub use builds::BuildEvent;
 pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};

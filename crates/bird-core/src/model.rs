@@ -5,8 +5,9 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef, MachineId,
-    MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost, Replicas, ServiceId, VolumeId,
+    BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef,
+    MachineId, MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost, Replicas, ServiceId,
+    VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -74,6 +75,11 @@ string_enum!(MachineState, "machine state" {
     Stopped => "stopped",
     Failed => "failed",
     Destroyed => "destroyed",
+});
+
+string_enum!(BackupTrigger, "backup trigger" {
+    Manual => "manual",
+    Restore => "restore",
 });
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,6 +156,26 @@ impl Volume {
     pub fn podman_name(&self) -> String {
         format!("bird-volume-{}", self.id)
     }
+}
+
+// keyed by service name, not id, so backups outlive `bird rm --purge` and can restore a new service
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Backup {
+    pub id: BackupId,
+    pub environment_id: EnvironmentId,
+    pub service: Name,
+    pub trigger: BackupTrigger,
+    pub storage: String,
+    pub volumes: Vec<BackupVolume>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupVolume {
+    pub name: Name,
+    pub lineage: Option<String>,
+    pub key: String,
+    pub size_bytes: u64,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

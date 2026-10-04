@@ -91,6 +91,25 @@ pub enum Error {
     DomainNotFound(bird_core::Hostname),
     #[error("service {0} has no running machines")]
     NoMachines(Name),
+    #[error("{0} has no volumes, there is nothing to back up")]
+    NothingToBackUp(Name),
+    #[error("backup {0} not found")]
+    BackupNotFound(bird_core::BackupId),
+    #[error("backup is kept in {0} storage, which this birdd is not set up to use")]
+    BackupStorageMismatch(String),
+    #[error("backup data {0} is missing from storage")]
+    BackupDataMissing(String),
+    #[error(
+        "the backup has volume {volume}, which {service} does not have; deploy it with -v {volume}:<path> first"
+    )]
+    BackupVolumeMissing { service: Name, volume: Name },
+    #[error("backup failed: {0}")]
+    BackupFailed(String),
+    #[error("restore failed: {reason}; the data from before the restore is in backup {safety}")]
+    RestoreFailed {
+        safety: bird_core::BackupId,
+        reason: String,
+    },
     #[error("another operation on {0} is in progress, try again shortly")]
     Busy(Name),
     #[error("{reason}")]

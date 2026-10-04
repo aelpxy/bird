@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use bird_api::VolumeSpec;
 use bird_core::{
-    CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
-    RegistryHost, Replicas,
+    BackupId, CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name,
+    Port, RegistryHost, Replicas,
 };
 use clap::{Parser, Subcommand};
 
@@ -52,7 +52,7 @@ pub(crate) enum Command {
     #[command(visible_alias = "rm")]
     Remove {
         name: Name,
-        /// Also delete the service's volumes and all data on them
+        /// Also delete the service's volumes and all data on them; backups are kept
         #[arg(long)]
         purge: bool,
     },
@@ -75,6 +75,11 @@ pub(crate) enum Command {
     },
     /// Run a number of machines for a service
     Scale { name: Name, replicas: Replicas },
+    /// Back up and restore the volumes of a service
+    Backup {
+        #[command(subcommand)]
+        command: BackupCommand,
+    },
     /// Show recent logs of a service
     Logs {
         name: Name,
@@ -117,6 +122,26 @@ pub(crate) enum EnvCommand {
         #[arg(long)]
         no_deploy: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum BackupCommand {
+    /// Copy every volume of a service; its machines pause while the copy runs
+    Create { name: Name },
+    /// List backups of a service, also of one that was removed
+    #[command(visible_alias = "ls")]
+    List { name: Name },
+    /// Replace a service's volume data with a backup, saving the current data as a new backup first
+    Restore {
+        name: Name,
+        backup: BackupId,
+        /// Restore data written by a different image than the service runs now
+        #[arg(long)]
+        allow_image_change: bool,
+    },
+    /// Delete a backup and its archives
+    #[command(visible_alias = "rm")]
+    Remove { name: Name, backup: BackupId },
 }
 
 #[derive(Debug, Subcommand)]

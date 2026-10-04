@@ -60,13 +60,13 @@ pub(crate) async fn rollback(
     Ok(())
 }
 
-fn unix_now() -> i64 {
+pub(super) fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
-fn ago(seconds: i64) -> String {
+pub(super) fn ago(seconds: i64) -> String {
     match seconds {
         ..60 => format!("{}s ago", seconds.max(0)),
         60..3600 => format!("{}m ago", seconds / 60),

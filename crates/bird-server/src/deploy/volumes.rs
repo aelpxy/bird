@@ -1,11 +1,9 @@
-use std::collections::BTreeMap;
-
 use bird_api::{DeployRequest, VolumeSpec};
 use bird_core::{ImageLineage, ImageRef, Volume};
 use bird_podman::VolumeMount;
 
 use crate::state::AppState;
-use crate::{Error, Result};
+use crate::{Error, Result, labels};
 
 // checks that run before any config is saved, so a refused deploy changes nothing
 pub(super) async fn preflight(
@@ -40,11 +38,10 @@ pub(super) async fn mounts(state: &AppState, volumes: &[Volume]) -> Result<Vec<V
     for volume in volumes {
         let podman_name = volume.podman_name();
         if volume.lineage.is_none() {
-            let labels = BTreeMap::from([
-                ("bird.managed".to_owned(), "true".to_owned()),
-                ("bird.volume".to_owned(), volume.id.to_string()),
-            ]);
-            state.podman.ensure_volume(&podman_name, &labels).await?;
+            state
+                .podman
+                .ensure_volume(&podman_name, &labels::for_volume(volume))
+                .await?;
         } else if !state.podman.volume_exists(&podman_name).await? {
             // podman would silently create an empty one, which looks exactly like lost data
             return Err(Error::VolumeMissing(volume.name.clone()));

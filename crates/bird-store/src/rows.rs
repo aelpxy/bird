@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use bird_core::{
-    Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname, ImageRef, Machine,
-    MachineId, Port, Project, Registry, Replicas, Service, Variable, Volume,
+    Backup, BackupVolume, Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname,
+    ImageRef, Machine, MachineId, Port, Project, Registry, Replicas, Service, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -181,6 +181,31 @@ pub(crate) fn volume(row: &Row<'_>) -> rusqlite::Result<Volume> {
         mount_path: parse(row, 3)?,
         lineage: row.get(4)?,
         created_at: row.get(5)?,
+    })
+}
+
+// volumes are loaded separately and filled in by the caller
+pub(crate) fn backup(row: &Row<'_>) -> rusqlite::Result<Backup> {
+    Ok(Backup {
+        id: parse(row, 0)?,
+        environment_id: parse(row, 1)?,
+        service: parse(row, 2)?,
+        trigger: parse(row, 3)?,
+        storage: row.get(4)?,
+        volumes: Vec::new(),
+        created_at: row.get(5)?,
+    })
+}
+
+pub(crate) fn backup_volume(row: &Row<'_>) -> rusqlite::Result<BackupVolume> {
+    let size: i64 = row.get(3)?;
+    Ok(BackupVolume {
+        name: parse(row, 0)?,
+        lineage: row.get(1)?,
+        key: row.get(2)?,
+        size_bytes: u64::try_from(size).map_err(|err| {
+            rusqlite::Error::FromSqlConversionFailure(3, Type::Integer, Box::new(err))
+        })?,
     })
 }
 

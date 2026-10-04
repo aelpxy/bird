@@ -34,6 +34,10 @@ pub struct Config {
     #[arg(long, env = "BIRD_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
 
+    /// Directory for volume backups, defaults to `backups` in the data directory
+    #[arg(long, env = "BIRD_BACKUP_DIR")]
+    pub backup_dir: Option<PathBuf>,
+
     #[arg(long, env = "BIRD_PODMAN_SOCKET")]
     pub podman_socket: Option<PathBuf>,
 

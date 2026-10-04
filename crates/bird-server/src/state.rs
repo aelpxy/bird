@@ -5,6 +5,7 @@ use bird_podman::Podman;
 use bird_proxy::Routes;
 use tokio::sync::{Notify, Semaphore};
 
+use crate::backups::BackupStorage;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
@@ -22,6 +23,7 @@ pub(crate) struct AppState {
     pub(crate) reconcile_now: Arc<Notify>,
     pub(crate) shutdown: Shutdown,
     pub(crate) builds: Arc<Semaphore>,
+    pub(crate) backups: Arc<BackupStorage>,
 }
 
 impl AppState {
