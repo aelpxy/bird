@@ -2,6 +2,7 @@ use hyper::body::Incoming;
 
 use crate::error::check;
 use crate::follow::LogFollower;
+use crate::lines::Lines;
 use crate::output::OutputFollower;
 use crate::query::encode;
 use crate::{Error, Podman, Result};
@@ -63,17 +64,18 @@ impl Podman {
 }
 
 fn demux(body: &[u8]) -> Vec<LogLine> {
-    let mut lines = Vec::new();
+    let mut lines = Lines::default();
     if next_frame(body).is_none() {
-        push_lines(&mut lines, LogStream::Stdout, body);
-        return lines;
+        lines.push(LogStream::Stdout, body);
+    } else {
+        let mut rest = body;
+        while let Some((stream, payload, next)) = next_frame(rest) {
+            lines.push(stream, payload);
+            rest = next;
+        }
     }
-    let mut rest = body;
-    while let Some((stream, payload, next)) = next_frame(rest) {
-        push_lines(&mut lines, stream, payload);
-        rest = next;
-    }
-    lines
+    lines.finish();
+    lines.ready.into()
 }
 
 pub(crate) fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
@@ -89,17 +91,6 @@ pub(crate) fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
     let len = usize::try_from(u32::from_be_bytes([a, b, c, d])).ok()?;
     let (payload, next) = body.split_at_checked(len)?;
     Some((stream, payload, next))
-}
-
-pub(crate) fn push_lines(lines: &mut impl Extend<LogLine>, stream: LogStream, payload: &[u8]) {
-    lines.extend(
-        String::from_utf8_lossy(payload)
-            .lines()
-            .map(|text| LogLine {
-                stream,
-                text: text.to_owned(),
-            }),
-    );
 }
 
 #[cfg(test)]
@@ -135,6 +126,17 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn joins_long_lines_the_log_driver_split() {
+        let mut body = frame(1, "aaa");
+        body.extend(frame(1, "bbb\n"));
+        body.extend(frame(1, "tail"));
+        let lines = demux(&body);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, "aaabbb");
+        assert_eq!(lines[1].text, "tail");
     }
 
     #[test]
