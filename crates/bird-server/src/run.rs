@@ -11,6 +11,7 @@ use tokio::sync::{Notify, Semaphore};
 
 use crate::backups::{BackupStorage, DatabaseBackups, LocalDir, S3, S3Settings, Scheduler};
 use crate::commands::tty;
+use crate::cron::{self, CronRuns, CronScheduler};
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::{self, Shutdown};
@@ -66,16 +67,19 @@ pub async fn run_until(
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
         logins: Arc::new(LoginThrottle::default()),
+        crons: Arc::new(CronRuns::default()),
         backups: Arc::new(backup_storage(&config, &data_dir).await?),
     };
     environments::ensure_networks(&state).await?;
     supervisor::recover_interrupted(&state).await?;
+    cron::interrupt_left_over(&state).await?;
     // machines keep running across a restart, so their recorded routes serve until the first sweep
     routing::refresh(&state).await?;
     let supervisor = Supervisor::new(state.clone());
 
     let edge = edge(&config, &state).await?;
     let scheduler = Scheduler::new(state.clone(), database_backups(&config, &data_dir));
+    let cron = CronScheduler::new(state.clone());
 
     let api_listener = listen::bind(config.api_addr)?;
     let proxy_listener = listen::bind(config.proxy_addr)?;
@@ -117,22 +121,25 @@ pub async fn run_until(
         }
     };
     let terminals = Arc::clone(&state.terminals);
+    let crons = Arc::clone(&state.crons);
     // the peer address is kept with sign-ins and sessions
     let app = api::router(state, token).into_make_service_with_connect_info::<SocketAddr>();
     let api = axum::serve(api_listener, app)
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
-    let ((), https_result, api_result, (), (), ()) = tokio::join!(
+    let ((), https_result, api_result, (), (), (), ()) = tokio::join!(
         proxy.serve(proxy_listener, shutdown.wait()),
         https,
         api,
         supervisor.run(shutdown.wait()),
         renewals,
-        scheduler.run(shutdown.wait())
+        scheduler.run(shutdown.wait()),
+        cron.run(shutdown.wait())
     );
     https_result.map_err(|err| Error::Certificate(err.to_string()))?;
     api_result?;
     tty::wait_for_hang_ups(&terminals).await;
+    crons.wait_for_runs().await;
     tracing::info!("birdd stopped");
     Ok(())
 }

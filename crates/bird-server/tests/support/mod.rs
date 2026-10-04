@@ -31,6 +31,7 @@ pub struct Birdd {
     pub prefix: String,
     network: String,
     data_dir: PathBuf,
+    args: Vec<String>,
     stop: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<()>>,
     http: reqwest::Client,
@@ -51,47 +52,26 @@ impl Birdd {
         let data_dir = std::env::temp_dir().join(format!("bird-it-{id}"));
         let network = format!("bird-it-{id}");
         let api = format!("127.0.0.1:{}", free_port());
-        let config = Config::try_parse_from([
-            "birdd",
-            "--data-dir",
-            data_dir.to_str().expect("temp paths are utf-8"),
-            "--api-addr",
-            &api,
-            "--proxy-addr",
-            &format!("127.0.0.1:{}", free_port()),
-            "--network",
-            &network,
-            "--no-db-backup",
-        ])
-        .expect("valid test config");
-        let (stop, stopped) = oneshot::channel();
-        let task = tokio::spawn(async move {
-            let stopped = async move {
-                let _ = stopped.await;
-            };
-            if let Err(err) = Box::pin(run_until(config, stopped)).await {
-                eprintln!("birdd stopped with an error: {err}");
-            }
-        });
+        let args = vec![
+            "birdd".to_owned(),
+            "--data-dir".to_owned(),
+            data_dir.to_str().expect("temp paths are utf-8").to_owned(),
+            "--api-addr".to_owned(),
+            api.clone(),
+            "--proxy-addr".to_owned(),
+            format!("127.0.0.1:{}", free_port()),
+            "--network".to_owned(),
+            network.clone(),
+            "--no-db-backup".to_owned(),
+        ];
         // reqwest is built without a crypto provider of its own; an error means one is installed
         let _ = rustls::crypto::ring::default_provider().install_default();
         let http = reqwest::Client::builder()
             .timeout(REQUEST_TIMEOUT)
             .build()
             .expect("an http client");
-        let deadline = tokio::time::Instant::now() + STARTUP;
-        while http
-            .get(format!("http://{api}/v1/openapi.json"))
-            .send()
-            .await
-            .is_err()
-        {
-            assert!(
-                tokio::time::Instant::now() < deadline,
-                "birdd never started"
-            );
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
+        let (stop, task) = spawn(&args);
+        wait_until_up(&http, &api).await;
         let root = std::fs::read_to_string(data_dir.join("api-token"))
             .expect("birdd wrote its token")
             .trim()
@@ -102,10 +82,20 @@ impl Birdd {
             prefix: id,
             network,
             data_dir,
+            args,
             stop: Some(stop),
             task: Some(task),
             http,
         }
+    }
+
+    // stops birdd and starts it again on the same data, ports and networks
+    pub async fn restart(&mut self) {
+        self.shut_down().await;
+        let (stop, task) = spawn(&self.args);
+        self.stop = Some(stop);
+        self.task = Some(task);
+        wait_until_up(&self.http, &self.api).await;
     }
 
     // a unique name for a project, so its networks are this test's own
@@ -267,6 +257,36 @@ impl Drop for Birdd {
             podman(&["network", "rm", "-f", network]);
         }
         let _ = std::fs::remove_dir_all(&self.data_dir);
+    }
+}
+
+fn spawn(args: &[String]) -> (oneshot::Sender<()>, JoinHandle<()>) {
+    let config = Config::try_parse_from(args).expect("valid test config");
+    let (stop, stopped) = oneshot::channel();
+    let task = tokio::spawn(async move {
+        let stopped = async move {
+            let _ = stopped.await;
+        };
+        if let Err(err) = Box::pin(run_until(config, stopped)).await {
+            eprintln!("birdd stopped with an error: {err}");
+        }
+    });
+    (stop, task)
+}
+
+async fn wait_until_up(http: &reqwest::Client, api: &str) {
+    let deadline = tokio::time::Instant::now() + STARTUP;
+    while http
+        .get(format!("http://{api}/v1/openapi.json"))
+        .send()
+        .await
+        .is_err()
+    {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "birdd never started"
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }
 

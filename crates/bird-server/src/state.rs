@@ -6,6 +6,7 @@ use bird_proxy::Routes;
 use tokio::sync::{Notify, Semaphore};
 
 use crate::backups::BackupStorage;
+use crate::cron::CronRuns;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
@@ -29,6 +30,7 @@ pub(crate) struct AppState {
     pub(crate) terminals: Arc<Semaphore>,
     // failed sign-ins per user and address, kept in memory only
     pub(crate) logins: Arc<LoginThrottle>,
+    pub(crate) crons: Arc<CronRuns>,
 }
 
 impl AppState {

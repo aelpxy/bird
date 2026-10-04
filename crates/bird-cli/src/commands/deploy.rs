@@ -30,7 +30,10 @@ pub(crate) async fn run(
     }
     let allow_image_change = args.allow_image_change;
     let default_command = args.default_command;
-    let (manifest, source) = merge(loaded, args, service)?;
+    let from_file = loaded.is_some();
+    let (mut manifest, source) = merge(loaded, args, service)?;
+    // the file is the whole list, so jobs taken out of it stop; other deploys keep them
+    let cron = from_file.then(|| std::mem::take(&mut manifest.cron));
     let image = match source {
         Source::Image(image) => image,
         Source::Build {
@@ -41,6 +44,7 @@ pub(crate) async fn run(
     };
     let mut request = manifest.into_request(image);
     request.allow_image_change = allow_image_change;
+    request.cron = cron;
     if default_command {
         request.command = None;
         request.default_command = true;

@@ -10,7 +10,9 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 
 pub(crate) use exec::{exec, pick_machine};
-pub(crate) use run::{remove_leftover_runs, run, run_target, start_attached};
+pub(crate) use run::{
+    RunTarget, remove_leftover_runs, run, run_target, run_with_limit, start_attached,
+};
 
 use crate::Result;
 

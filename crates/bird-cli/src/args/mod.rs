@@ -1,3 +1,4 @@
+mod cron;
 mod deploy;
 mod orgs;
 mod projects;
@@ -12,6 +13,7 @@ use bird_core::{
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 
+pub(crate) use cron::CronCommand;
 pub(crate) use deploy::DeployArgs;
 use deploy::{parse_env, parse_port};
 pub(crate) use orgs::OrgCommand;
@@ -185,6 +187,11 @@ pub(crate) enum Command {
     Backup {
         #[command(subcommand)]
         command: Option<BackupCommand>,
+    },
+    /// Show and run the service's cron jobs, lists them by default
+    Cron {
+        #[command(subcommand)]
+        command: Option<CronCommand>,
     },
     /// Create a service from a template, like `bird add postgres`
     Add {

@@ -119,6 +119,31 @@ dockerfile = \"Dockerfile\"
 mod tests {
     use super::*;
 
+    // the full example in the readme, so the docs fail the build when a field changes
+    #[test]
+    fn readme_example_parses() {
+        let readme = include_str!("../../../README.md");
+        let section = &readme[readme.find("### bird.toml").unwrap()..];
+        let start = section.find("```toml\n").unwrap() + "```toml\n".len();
+        let example = &section[start..start + section[start..].find("```").unwrap()];
+        let manifest: Manifest = toml::from_str(example).unwrap();
+        assert_eq!(manifest.name.as_str(), "api");
+        assert!(manifest.image.is_some() && manifest.build.is_none());
+        assert!(manifest.health_timeout.is_some() && manifest.backup.is_some());
+        assert_eq!(manifest.volumes.len(), 1);
+        assert_eq!(manifest.cron.len(), 2);
+
+        // the commented-out [build] is the other way to deploy, and must parse too
+        let built: String = example
+            .lines()
+            .filter(|line| !line.starts_with("image ="))
+            .map(|line| line.strip_prefix("# ").unwrap_or(line))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let built: Manifest = toml::from_str(&built).unwrap();
+        assert!(built.image.is_none() && built.build.is_some());
+    }
+
     #[test]
     fn starter_file_parses() {
         let name: Name = "web".parse().unwrap();
@@ -187,6 +212,38 @@ every = "6h"
     }
 
     #[test]
+    fn reads_cron_jobs() {
+        let manifest: Manifest = toml::from_str(
+            r#"
+name = "web"
+image = "nginx"
+[[cron]]
+name = "report"
+schedule = "0 6 * * MON"
+command = ["bin/report"]
+timeout = "30m"
+[[cron]]
+name = "cleanup"
+schedule = "@hourly"
+command = ["bin/cleanup", "--old"]
+timeout = 90
+[[cron]]
+name = "ping"
+schedule = "*/5 * * * *"
+command = ["true"]
+"#,
+        )
+        .unwrap();
+        let timeouts: Vec<Option<u32>> = manifest
+            .cron
+            .iter()
+            .map(|job| job.timeout.map(bird_core::CronTimeout::secs))
+            .collect();
+        assert_eq!(timeouts, [Some(1800), Some(90), None]);
+        assert_eq!(manifest.cron[1].command.args(), ["bin/cleanup", "--old"]);
+    }
+
+    #[test]
     fn rejects_typos_and_bad_values() {
         let base = "name = \"web\"\nimage = \"nginx\"\n";
         assert!(toml::from_str::<Manifest>(base).is_ok());
@@ -203,6 +260,11 @@ every = "6h"
             "[backup]\nevery = \"1d\"\nevry = 1",
             "replicas = 0",
             "replicas = 99",
+            "[[cron]]\nname = \"a\"\nschedule = \"61 * * * *\"\ncommand = [\"true\"]",
+            "[[cron]]\nname = \"a\"\nschedule = \"@daily\"\ncommand = []",
+            "[[cron]]\nname = \"a\"\nschedule = \"@daily\"\ncommand = [\"true\"]\ntimeout = \"2d\"",
+            "[[cron]]\nname = \"a\"\nschedule = \"@daily\"\ncommand = [\"true\"]\nevery = 1",
+            "[[cron]]\nname = \"A\"\nschedule = \"@daily\"\ncommand = [\"true\"]",
         ] {
             assert!(
                 toml::from_str::<Manifest>(&format!("{base}{bad}\n")).is_err(),

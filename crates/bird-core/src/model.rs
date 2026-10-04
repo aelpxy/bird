@@ -1,6 +1,5 @@
 use std::fmt;
 use std::net::SocketAddr;
-use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,50 +8,6 @@ use crate::{
     Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, OrgId, Port, ProjectId,
     RegistryHost, Replicas, ServiceId, SessionId, TokenId, UserId, VolumeId,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("unknown {kind} {value:?}")]
-pub struct ParseEnumError {
-    kind: &'static str,
-    value: String,
-}
-
-macro_rules! string_enum {
-    ($name:ident, $kind:literal { $($variant:ident => $s:literal),+ $(,)? }) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-        #[serde(rename_all = "lowercase")]
-        pub enum $name {
-            $($variant),+
-        }
-
-        impl $name {
-            #[must_use]
-            pub const fn as_str(self) -> &'static str {
-                match self {
-                    $(Self::$variant => $s),+
-                }
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str(self.as_str())
-            }
-        }
-
-        impl FromStr for $name {
-            type Err = ParseEnumError;
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                match s {
-                    $($s => Ok(Self::$variant),)+
-                    _ => Err(ParseEnumError { kind: $kind, value: s.to_owned() }),
-                }
-            }
-        }
-    };
-}
 
 string_enum!(DeploymentStatus, "deployment status" {
     Pending => "pending",

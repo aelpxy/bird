@@ -2,6 +2,7 @@ mod account;
 mod backup;
 mod build;
 mod completions;
+mod cron;
 mod deploy;
 mod domains;
 mod env;
@@ -32,8 +33,8 @@ use anyhow::Result;
 use bird_core::Name;
 
 use crate::args::{
-    Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, OrgCommand,
-    ProjectCommand, RegistryCommand, SessionCommand, TokenCommand, UserCommand,
+    Args, BackupCommand, Command, CronCommand, DomainsCommand, EnvCommand, EnvironmentCommand,
+    OrgCommand, ProjectCommand, RegistryCommand, SessionCommand, TokenCommand, UserCommand,
 };
 use crate::client::ApiClient;
 use crate::scope::{Scope, Sources};
@@ -118,6 +119,10 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Backup { command } => {
             let command = command.unwrap_or(BackupCommand::List);
             backup::run(&connect(api)?, &target()?, command, out).await
+        }
+        Command::Cron { command } => {
+            let command = command.unwrap_or(CronCommand::List);
+            cron::run(&connect(api)?, &target()?, command, out).await
         }
         Command::Add { template, name } => {
             templates::add(&connect(api)?, &template, name, out).await

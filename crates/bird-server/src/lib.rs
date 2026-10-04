@@ -4,6 +4,7 @@ mod backups;
 mod commands;
 mod config;
 mod credentials;
+mod cron;
 mod data_dir;
 mod db;
 mod deploy;

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use bird_core::{
-    BackupSchedule, Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, HealthTimeout, Hostname,
-    ImageRef, MemoryLimit, Name, Port, Replicas,
+    BackupSchedule, Command, CpuLimit, CronJobSpec, DeploymentId, EnvKey, HealthCheck,
+    HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,9 @@ pub struct DeployRequest {
     /// Forget the saved command and run the image's own again; not together with `command`
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub default_command: bool,
+    /// The service's cron jobs once the deploy succeeds, replacing the ones it had; left out, they stay as they are
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cron: Option<Vec<CronJobSpec>>,
     /// Memory limit in MiB; left out, a new service gets 1024 and an existing one keeps its limit
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory: Option<MemoryLimit>,

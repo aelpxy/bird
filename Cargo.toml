@@ -20,6 +20,9 @@ bird-podman = { path = "crates/bird-podman" }
 bird-proxy = { path = "crates/bird-proxy" }
 bird-store = { path = "crates/bird-store" }
 bytes = "1"
+# cron schedules for jobs, on chrono which object_store already builds
+croner = { version = "4", default-features = false, features = ["chrono"] }
+chrono = { version = "0.4", default-features = false }
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = { version = "4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
