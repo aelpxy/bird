@@ -8,7 +8,7 @@ use std::future::Future;
 use std::time::{Duration, Instant};
 
 use bird_core::{Deployment, DeploymentId, EnvKey, MachineId, MachineState, Service, ServiceState};
-use tokio::time::{MissedTickBehavior, interval_at};
+use tokio::time::{MissedTickBehavior, interval};
 
 use crate::backoff::Backoff;
 use crate::state::AppState;
@@ -45,7 +45,8 @@ impl Supervisor {
     }
 
     pub(crate) async fn run(mut self, shutdown: impl Future<Output = ()>) {
-        let mut ticker = interval_at(tokio::time::Instant::now() + INTERVAL, INTERVAL);
+        // the first tick is immediate: startup serves recorded routes and leaves checking to this
+        let mut ticker = interval(INTERVAL);
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let reconcile_now = std::sync::Arc::clone(&self.state.reconcile_now);
         tokio::pin!(shutdown);
@@ -63,7 +64,7 @@ impl Supervisor {
         tracing::info!("supervisor stopped");
     }
 
-    pub(crate) async fn sweep(&mut self) {
+    async fn sweep(&mut self) {
         if let Err(err) = self.supervise_deployments().await {
             tracing::warn!(error = %err, "supervising deployments failed");
         }
