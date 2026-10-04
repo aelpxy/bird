@@ -44,6 +44,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::OrgExists(_)
         | Error::OrgHasProjects { .. }
         | Error::LastOwner { .. }
+        | Error::NoPendingTwoFactor
         | Error::TokenExists { .. }
         | Error::EnvironmentExists { .. }
         | Error::EnvironmentHasServices { .. }
@@ -55,6 +56,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::UserNotFound(_)
         | Error::OrgNotFound(_)
         | Error::NotMember { .. }
+        | Error::SessionNotFound(_)
         | Error::TokenNotFound { .. }
         | Error::EnvironmentNotFound { .. }
         | Error::DomainNotFound(_)
@@ -77,9 +79,13 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::InvalidTtyRequest(_)
         | Error::InvalidPath(_)
         | Error::PickOrg(_)
+        | Error::WeakPassword { .. }
+        | Error::NotASession
         | Error::CommandConflict
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
-        Error::Forbidden(_) => StatusCode::FORBIDDEN,
+        Error::Forbidden(_) | Error::WrongPassword => StatusCode::FORBIDDEN,
+        Error::InvalidLogin | Error::InvalidCode => StatusCode::UNAUTHORIZED,
+        Error::TooManyAttempts(_) => StatusCode::TOO_MANY_REQUESTS,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
         Error::TooManyTerminals => StatusCode::SERVICE_UNAVAILABLE,

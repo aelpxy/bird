@@ -11,6 +11,8 @@ license = "Apache-2.0"
 [workspace.dependencies]
 anyhow = "1"
 arc-swap = "1"
+# password hashing, argon2id with its default (owasp) parameters
+argon2 = { version = "0.6", default-features = false, features = ["alloc", "getrandom", "password-hash"] }
 axum = { version = "0.8", default-features = false }
 bird-api = { path = "crates/bird-api" }
 bird-core = { path = "crates/bird-core" }

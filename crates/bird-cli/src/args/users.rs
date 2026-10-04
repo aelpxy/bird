@@ -1,6 +1,6 @@
 use std::num::NonZeroU16;
 
-use bird_core::Name;
+use bird_core::{Name, SessionId};
 use clap::Subcommand;
 
 #[derive(Debug, Subcommand)]
@@ -23,6 +23,39 @@ pub(crate) enum UserCommand {
         #[arg(short, long)]
         yes: bool,
     },
+    /// Set a password: yours, asking for the current one, or anyone's for admins
+    Passwd {
+        /// Whose password; admins may reset anyone's, which signs them out everywhere
+        #[arg(long, value_name = "NAME")]
+        user: Option<Name>,
+    },
+    /// Turn two-factor sign-in on or off
+    #[command(name = "2fa")]
+    TwoFactor {
+        #[command(subcommand)]
+        command: TwoFactorCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum TwoFactorCommand {
+    /// Add bird to your authenticator app and get recovery codes
+    Enable,
+    /// Turn it off: yours with your password, or anyone's for admins
+    Disable {
+        #[arg(long, value_name = "NAME")]
+        user: Option<Name>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum SessionCommand {
+    /// List where you are signed in
+    #[command(visible_alias = "ls")]
+    List,
+    /// Sign a session out
+    #[command(visible_alias = "rm")]
+    Remove { id: SessionId },
 }
 
 #[derive(Debug, Subcommand)]

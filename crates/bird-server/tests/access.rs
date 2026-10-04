@@ -160,7 +160,7 @@ async fn tokens_work_until_deleted_or_their_user_is_gone() {
     let first = birdd.user("ada", "member").await;
     assert_eq!(
         birdd.get(&first, "/v1/me").await.body,
-        json!({ "name": "ada", "role": "member" })
+        json!({ "name": "ada", "role": "member", "has_password": false, "two_factor": false })
     );
     let issued = birdd
         .post(

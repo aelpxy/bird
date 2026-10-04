@@ -39,14 +39,20 @@ pub(crate) async fn user(client: &ApiClient, command: UserCommand, out: Output) 
             let rows: Vec<Vec<String>> = users
                 .into_iter()
                 .map(|user| {
+                    let yes_no = |on: bool| if on { "yes" } else { "no" }.to_owned();
                     vec![
                         user.name.to_string(),
                         user.role.to_string(),
+                        yes_no(user.has_password),
+                        yes_no(user.two_factor),
                         ago(now.saturating_sub(user.created_at)),
                     ]
                 })
                 .collect();
-            print!("{}", render(&["USER", "ROLE", "CREATED"], &rows));
+            print!(
+                "{}",
+                render(&["USER", "ROLE", "PASSWORD", "2FA", "CREATED"], &rows)
+            );
         }
         UserCommand::Create { name, admin } => {
             let role = if admin {
@@ -61,11 +67,15 @@ pub(crate) async fn user(client: &ApiClient, command: UserCommand, out: Output) 
                 return Ok(());
             }
             eprintln!(
-                "{} created {} ({role}); their token follows and is not shown again, they log in with `bird login <host:port>` and paste it",
+                "{} created {} ({role}); their token follows and is not shown again; they log in with `bird login <host:port> --token`, then can set a password with `bird user passwd`",
                 style::err(Paint::Green, "✓"),
                 created.user.name
             );
             println!("{}", created.token.token);
+        }
+        UserCommand::Passwd { user } => return super::account::passwd(client, user).await,
+        UserCommand::TwoFactor { command } => {
+            return super::account::two_factor(client, command).await;
         }
         UserCommand::Remove { name, yes } => {
             prompt::confirm(

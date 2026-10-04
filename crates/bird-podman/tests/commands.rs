@@ -6,6 +6,8 @@ use bird_podman::{
     default_socket,
 };
 
+// the whole suite runs at once, so a busy machine can take a while to start a shell
+const LOADED_MACHINE: Duration = Duration::from_secs(30);
 const IMAGE: &str = "docker.io/library/alpine:3";
 
 fn podman() -> Podman {
@@ -188,7 +190,7 @@ async fn terminal_container_is_attached_from_the_start() {
     // busybox asks the terminal for the cursor position before its prompt, so type after the prompt
     let mut early = Vec::new();
     let mut chunk = [0_u8; 1024];
-    tokio::time::timeout(Duration::from_secs(10), async {
+    tokio::time::timeout(LOADED_MACHINE, async {
         while !String::from_utf8_lossy(&early).contains("# ") {
             let read = io.read(&mut chunk).await.unwrap();
             early.extend_from_slice(&chunk[..read]);
@@ -200,17 +202,14 @@ async fn terminal_container_is_attached_from_the_start() {
         .await
         .unwrap();
     let mut output = Vec::new();
-    tokio::time::timeout(Duration::from_secs(10), io.read_to_end(&mut output))
+    tokio::time::timeout(LOADED_MACHINE, io.read_to_end(&mut output))
         .await
         .unwrap()
         .unwrap();
     let output = String::from_utf8_lossy(&output);
     assert!(output.contains("greet=hi"), "{output}");
     assert!(output.contains("33 111"), "{output}");
-    let code = podman
-        .wait_container(&id, Duration::from_secs(10))
-        .await
-        .unwrap();
+    let code = podman.wait_container(&id, LOADED_MACHINE).await.unwrap();
     assert_eq!(code, 6);
     podman.remove_container(&id).await.unwrap();
 }

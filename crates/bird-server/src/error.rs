@@ -62,6 +62,24 @@ pub enum Error {
     NotMember { org: Name, user: Name },
     #[error("{0}")]
     PickOrg(String),
+    #[error("wrong username or password")]
+    InvalidLogin,
+    #[error("wrong two-factor code")]
+    InvalidCode,
+    #[error("too many failed sign-ins, try again in {0} seconds")]
+    TooManyAttempts(u64),
+    #[error("the current password is wrong")]
+    WrongPassword,
+    #[error("passwords need {min} to {max} characters")]
+    WeakPassword { min: usize, max: usize },
+    #[error("start two-factor setup first")]
+    NoPendingTwoFactor,
+    #[error("signing out needs a session; this request used an api token")]
+    NotASession,
+    #[error("session {0} not found, see `bird session list`")]
+    SessionNotFound(bird_core::SessionId),
+    #[error("could not hash the password: {0}")]
+    PasswordHash(String),
     #[error("user {0} not found, see `bird user list`")]
     UserNotFound(Name),
     #[error("user {0} already exists")]

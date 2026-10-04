@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, HealthCheck, HealthTimeout,
     Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, OrgId, Port, ProjectId,
-    RegistryHost, Replicas, ServiceId, TokenId, UserId, VolumeId,
+    RegistryHost, Replicas, ServiceId, SessionId, TokenId, UserId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -113,12 +113,27 @@ string_enum!(BackupTrigger, "backup trigger" {
     Scheduled => "scheduled",
 });
 
+// password hashes and 2fa secrets are not part of it, so loading or logging a user never carries them
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct User {
     pub id: UserId,
     pub name: Name,
     pub role: UserRole,
+    pub has_password: bool,
+    pub two_factor: bool,
     pub created_at: i64,
+}
+
+// a signed-in browser or CLI; its secret is stored only as a hash, like an api token's
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Session {
+    pub id: SessionId,
+    pub user_id: UserId,
+    pub created_at: i64,
+    pub last_used_at: i64,
+    pub expires_at: i64,
+    pub address: Option<String>,
+    pub agent: Option<String>,
 }
 
 // the secret itself is never stored, only its sha-256, which is what requests are looked up by

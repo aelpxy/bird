@@ -4,7 +4,7 @@ use rusqlite::{Row, params};
 use crate::error::{expect_changed, write_error};
 use crate::rows::parse;
 use crate::store::now;
-use crate::users::user;
+use crate::users::{user, user_columns};
 use crate::{Result, Store};
 
 const COLUMNS: &str = "id, user_id, name, prefix, created_at, last_used_at, expires_at";
@@ -66,12 +66,15 @@ impl Store {
     // the user a token belongs to, if it exists and has not expired
     pub fn authenticate(&self, hash: &str) -> Result<Option<(User, ApiToken)>> {
         self.query_one(
-            "SELECT u.id, u.name, u.role, u.created_at,
-                    t.id, t.user_id, t.name, t.prefix, t.created_at, t.last_used_at, t.expires_at
-             FROM api_tokens t JOIN users u ON u.id = t.user_id
-             WHERE t.hash = ?1 AND (t.expires_at IS NULL OR t.expires_at > ?2)",
+            &format!(
+                "SELECT {},
+                        t.id, t.user_id, t.name, t.prefix, t.created_at, t.last_used_at, t.expires_at
+                 FROM api_tokens t JOIN users u ON u.id = t.user_id
+                 WHERE t.hash = ?1 AND (t.expires_at IS NULL OR t.expires_at > ?2)",
+                user_columns("u")
+            ),
             params![hash, now()],
-            |row| Ok((user(row)?, token_at(row, 4)?)),
+            |row| Ok((user(row)?, token_at(row, 6)?)),
         )
     }
 

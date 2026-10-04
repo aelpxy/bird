@@ -6,7 +6,13 @@ use crate::rows::parse;
 use crate::store::now;
 use crate::{Result, Store};
 
-const COLUMNS: &str = "id, name, role, created_at";
+// what `user` reads, from a table aliased as `alias`; secrets stay out, only whether they are set
+pub(crate) fn user_columns(alias: &str) -> String {
+    format!(
+        "{alias}.id, {alias}.name, {alias}.role, {alias}.password_hash IS NOT NULL, \
+         {alias}.totp_secret IS NOT NULL, {alias}.created_at"
+    )
+}
 
 impl Store {
     pub fn create_user(&self, name: &Name, role: UserRole) -> Result<User> {
@@ -14,6 +20,8 @@ impl Store {
             id: UserId::generate(),
             name: name.clone(),
             role,
+            has_password: false,
+            two_factor: false,
             created_at: now(),
         };
         self.execute(
@@ -31,7 +39,10 @@ impl Store {
 
     pub fn user_by_name(&self, name: &Name) -> Result<Option<User>> {
         self.query_one(
-            &format!("SELECT {COLUMNS} FROM users WHERE name = ?1"),
+            &format!(
+                "SELECT {} FROM users u WHERE u.name = ?1",
+                user_columns("u")
+            ),
             [name.as_str()],
             user,
         )
@@ -39,8 +50,16 @@ impl Store {
 
     pub fn list_users(&self) -> Result<Vec<User>> {
         self.query_all(
-            &format!("SELECT {COLUMNS} FROM users ORDER BY name"),
+            &format!("SELECT {} FROM users u ORDER BY u.name", user_columns("u")),
             [],
+            user,
+        )
+    }
+
+    pub fn user(&self, id: UserId) -> Result<Option<User>> {
+        self.query_one(
+            &format!("SELECT {} FROM users u WHERE u.id = ?1", user_columns("u")),
+            [id.to_string()],
             user,
         )
     }
@@ -57,7 +76,9 @@ pub(crate) fn user(row: &Row<'_>) -> rusqlite::Result<User> {
         id: parse(row, 0)?,
         name: parse(row, 1)?,
         role: parse(row, 2)?,
-        created_at: row.get(3)?,
+        has_password: row.get(3)?,
+        two_factor: row.get(4)?,
+        created_at: row.get(5)?,
     })
 }
 

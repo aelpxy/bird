@@ -1,3 +1,4 @@
+mod account;
 mod backup;
 mod build;
 mod completions;
@@ -17,6 +18,7 @@ mod projects;
 mod registry;
 mod remove;
 mod scale;
+mod sessions;
 mod status;
 mod table;
 mod templates;
@@ -31,7 +33,7 @@ use bird_core::Name;
 
 use crate::args::{
     Args, BackupCommand, Command, DomainsCommand, EnvCommand, EnvironmentCommand, OrgCommand,
-    ProjectCommand, RegistryCommand, TokenCommand, UserCommand,
+    ProjectCommand, RegistryCommand, SessionCommand, TokenCommand, UserCommand,
 };
 use crate::client::ApiClient;
 use crate::scope::{Scope, Sources};
@@ -157,7 +159,12 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             )
             .await
         }
-        Command::Login { api } => login::run(api).await,
+        Command::Session { user, command } => {
+            let command = command.unwrap_or(SessionCommand::List);
+            sessions::run(&connect(api)?, user, command, out).await
+        }
+        Command::Login { api, token } => login::run(api, token).await,
+        Command::Logout => login::logout(&connect(api)?).await,
         Command::Completions { shell } => completions::run(shell),
     }
 }

@@ -44,7 +44,8 @@ define_id!(
     BackupId,
     UserId,
     TokenId,
-    OrgId
+    OrgId,
+    SessionId
 );
 
 #[cfg(test)]

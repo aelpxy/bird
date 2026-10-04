@@ -9,6 +9,7 @@ use crate::backups::BackupStorage;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::shutdown::Shutdown;
+use crate::throttle::LoginThrottle;
 use crate::{Error, Result};
 
 #[derive(Clone)]
@@ -26,6 +27,8 @@ pub(crate) struct AppState {
     pub(crate) backups: Arc<BackupStorage>,
     // one permit per open terminal, held until its process is hung up
     pub(crate) terminals: Arc<Semaphore>,
+    // failed sign-ins per user and address, kept in memory only
+    pub(crate) logins: Arc<LoginThrottle>,
 }
 
 impl AppState {

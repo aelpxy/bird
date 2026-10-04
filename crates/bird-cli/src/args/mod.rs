@@ -16,7 +16,7 @@ pub(crate) use deploy::DeployArgs;
 use deploy::{parse_env, parse_port};
 pub(crate) use orgs::OrgCommand;
 pub(crate) use projects::{EnvironmentCommand, ProjectCommand};
-pub(crate) use users::{TokenCommand, UserCommand};
+pub(crate) use users::{SessionCommand, TokenCommand, TwoFactorCommand, UserCommand};
 
 const EXAMPLES: &str = "\
 Examples:
@@ -246,11 +246,24 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: Option<TokenCommand>,
     },
-    /// Save a birdd address and its API token, read from stdin
+    /// Manage where you are signed in, lists your sessions by default
+    Session {
+        /// Whose sessions; admins may manage anyone's
+        #[arg(long, global = true, value_name = "NAME")]
+        user: Option<Name>,
+        #[command(subcommand)]
+        command: Option<SessionCommand>,
+    },
+    /// Sign in to a birdd with your username and password, or a token piped in
     Login {
         #[arg(value_name = "HOST:PORT")]
         api: String,
+        /// Read an api token instead of asking for a username and password
+        #[arg(long)]
+        token: bool,
     },
+    /// Sign out and forget the saved login
+    Logout,
     /// Print a shell completion script for bash, zsh, fish, elvish or powershell
     Completions { shell: Shell },
 }
