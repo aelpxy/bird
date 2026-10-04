@@ -83,12 +83,37 @@ pub(crate) async fn set_member(
     Ok(())
 }
 
+enum Left {
+    Member,
+    // the last owner left an org that owned nothing, so it went with them
+    OrgDeleted,
+    Refused(Vec<Name>),
+}
+
+// the last owner may only leave an org that owns no projects, which is then deleted; checked in
+// the same transaction as the change, so a project created meanwhile cannot slip through
 pub(crate) async fn remove_member(state: &AppState, org: &Org, user: &User) -> Result<()> {
-    keep_an_owner(state, org, user).await?;
     let (org_id, user_id) = (org.id, user.id);
-    state
+    let left = state
         .db
-        .call(move |store| store.remove_member(org_id, user_id))
+        .call(move |store| {
+            store.transaction(|store| {
+                let last_owner = store
+                    .sole_owned_orgs(user_id)?
+                    .iter()
+                    .any(|owned| owned.id == org_id);
+                if !last_owner {
+                    store.remove_member(org_id, user_id)?;
+                    return Ok(Left::Member);
+                }
+                let projects = store.list_org_projects(org_id)?;
+                if !projects.is_empty() {
+                    return Ok(Left::Refused(projects.into_iter().map(|p| p.name).collect()));
+                }
+                store.delete_org(org_id)?;
+                Ok(Left::OrgDeleted)
+            })
+        })
         .await
         .map_err(|err| match err {
             Error::Store(bird_store::Error::NotFound(_)) => Error::NotMember {
@@ -97,7 +122,19 @@ pub(crate) async fn remove_member(state: &AppState, org: &Org, user: &User) -> R
             },
             other => other,
         })?;
-    tracing::info!(org = %org.name, user = %user.name, "org member removed");
+    match left {
+        Left::Member => tracing::info!(org = %org.name, user = %user.name, "org member removed"),
+        Left::OrgDeleted => {
+            tracing::info!(org = %org.name, user = %user.name, "last owner left, empty org deleted");
+        }
+        Left::Refused(projects) => {
+            return Err(Error::OwnsProjects {
+                user: user.name.clone(),
+                org: org.name.clone(),
+                projects,
+            });
+        }
+    }
     Ok(())
 }
 

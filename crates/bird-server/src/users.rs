@@ -79,12 +79,44 @@ pub(crate) async fn create(
     Ok((user, Issued { token, secret }))
 }
 
+// refused while an org only they own still owns projects; empty ones go with them, in the same
+// transaction, so no org is left without an owner
 pub(crate) async fn remove(state: &AppState, name: &Name) -> Result<()> {
     let user = find(state, name).await?;
-    state
+    let user_id = user.id;
+    let outcome = state
         .db
-        .call(move |store| store.delete_user(user.id))
+        .call(move |store| {
+            store.transaction(|store| {
+                let owned = store.sole_owned_orgs(user_id)?;
+                for org in &owned {
+                    let projects = store.list_org_projects(org.id)?;
+                    if !projects.is_empty() {
+                        let projects = projects.into_iter().map(|p| p.name).collect();
+                        return Ok(Err((org.name.clone(), projects)));
+                    }
+                }
+                for org in &owned {
+                    store.delete_org(org.id)?;
+                }
+                store.delete_user(user_id)?;
+                Ok(Ok(owned))
+            })
+        })
         .await?;
+    let deleted_orgs = match outcome {
+        Ok(owned) => owned,
+        Err((org, projects)) => {
+            return Err(Error::OwnsProjects {
+                user: name.clone(),
+                org,
+                projects,
+            });
+        }
+    };
+    for org in &deleted_orgs {
+        tracing::info!(org = %org.name, user = %name, "empty org deleted with its last owner");
+    }
     tracing::info!(user = %name, "user deleted with their tokens");
     Ok(())
 }

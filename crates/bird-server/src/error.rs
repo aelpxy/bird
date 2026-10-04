@@ -56,6 +56,12 @@ pub enum Error {
     OrgExists(Name),
     #[error("org {org} still owns projects {}; delete them first with `bird project rm`", .projects.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
     OrgHasProjects { org: Name, projects: Vec<Name> },
+    #[error("{user} is the last owner of {org}, which still owns projects {}; delete them or make someone else owner first", .projects.iter().map(Name::as_str).collect::<Vec<_>>().join(", "))]
+    OwnsProjects {
+        user: Name,
+        org: Name,
+        projects: Vec<Name>,
+    },
     #[error("{user} is the last owner of {org}; make someone else owner first")]
     LastOwner { org: Name, user: Name },
     #[error("{user} is not a member of {org}")]
