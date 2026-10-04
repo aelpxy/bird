@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bird_core::{Command, EnvKey, EnvironmentId, ImageRef, Name, Service};
@@ -16,6 +16,8 @@ use crate::{Error, Result};
 
 const RUN_TIMEOUT: Duration = Duration::from_hours(1);
 const RUN_LABEL: &str = "bird.run";
+// not the machines' environment label, so the orphan sweep still leaves running commands alone
+const RUN_ENVIRONMENT_LABEL: &str = "bird.run-environment";
 
 pub(crate) struct RunTarget {
     service: Service,
@@ -172,11 +174,16 @@ fn spec(target: &RunTarget, command: &Command, lifecycle: Lifecycle) -> Containe
         labels: BTreeMap::from([
             ("bird.managed".to_owned(), "true".to_owned()),
             (RUN_LABEL.to_owned(), service.name.to_string()),
+            (
+                RUN_ENVIRONMENT_LABEL.to_owned(),
+                service.environment_id.to_string(),
+            ),
         ]),
     }
 }
 
-// a run cannot outlive the birdd that streamed its output, so any found at startup is left over
+// a run cannot outlive the birdd that streamed its output, so any of its environments' runs found
+// at startup are left over; another birdd on the same podman keeps its own
 pub(crate) async fn remove_leftover_runs(state: &AppState) {
     let leftovers = match state.podman.list_containers(RUN_LABEL).await {
         Ok(containers) => containers,
@@ -185,6 +192,22 @@ pub(crate) async fn remove_leftover_runs(state: &AppState) {
             return;
         }
     };
+    let ours: HashSet<String> = match state.db.call(|store| store.list_all_environments()).await {
+        Ok(environments) => environments
+            .into_iter()
+            .map(|env| env.id.to_string())
+            .collect(),
+        Err(err) => {
+            tracing::warn!(error = %err, "could not list environments");
+            return;
+        }
+    };
+    let leftovers = leftovers.into_iter().filter(|container| {
+        container
+            .labels
+            .get(RUN_ENVIRONMENT_LABEL)
+            .is_some_and(|environment| ours.contains(environment))
+    });
     for container in leftovers {
         tracing::info!(container = %container.name, "removing leftover one-off container");
         if let Err(err) = state.podman.remove_container(&container.id).await {
