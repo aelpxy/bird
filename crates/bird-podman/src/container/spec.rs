@@ -27,7 +27,9 @@ pub(super) struct SpecGenerator<'a> {
     terminal: bool,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     stdin: bool,
-    // most apps ignore SIGTERM as pid 1, so stops would wait out the grace period and get killed
+    // most apps ignore SIGTERM as pid 1, so stops would wait out the grace period and get killed;
+    // a replaced entrypoint runs as pid 1 itself, so a missing program fails at start with podman's
+    // own error instead of the init's vague one
     init: bool,
 }
 
@@ -127,7 +129,7 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
             },
             terminal: spec.lifecycle == Lifecycle::Terminal,
             stdin: matches!(spec.lifecycle, Lifecycle::Terminal | Lifecycle::Piped),
-            init: true,
+            init: spec.entrypoint.is_none(),
         }
     }
 }
@@ -170,6 +172,7 @@ mod tests {
         let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
         assert_eq!(json["entrypoint"], serde_json::json!(["echo"]));
         assert_eq!(json["command"], serde_json::json!(["hi"]));
+        assert_eq!(json["init"], false);
     }
 
     #[test]

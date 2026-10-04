@@ -6,20 +6,47 @@ use crate::{Error, Result};
 #[derive(Debug, Default)]
 pub struct Demux {
     header: Vec<u8>,
-    current: Option<(LogStream, usize)>,
+    current: Option<Current>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Current {
+    stream: LogStream,
+    len: usize,
+    remaining: usize,
+}
+
+// part of one frame; a frame arrives as one or more pieces, from `starts` to `ends`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Piece<'a> {
+    pub stream: LogStream,
+    pub data: &'a [u8],
+    // the whole frame's length, known from its header
+    pub frame_len: usize,
+    pub starts: bool,
+    pub ends: bool,
 }
 
 impl Demux {
     // the output in `data`, in order; a frame cut off at its end continues in the next call
-    pub fn push<'a>(&mut self, mut data: &'a [u8]) -> Result<Vec<(LogStream, &'a [u8])>> {
+    pub fn push<'a>(&mut self, mut data: &'a [u8]) -> Result<Vec<Piece<'a>>> {
         let mut pieces = Vec::new();
         while !data.is_empty() {
-            if let Some((stream, remaining)) = self.current {
-                let (piece, rest) = data.split_at(remaining.min(data.len()));
-                pieces.push((stream, piece));
+            if let Some(current) = self.current {
+                let (piece, rest) = data.split_at(current.remaining.min(data.len()));
+                let left = current.remaining - piece.len();
+                pieces.push(Piece {
+                    stream: current.stream,
+                    data: piece,
+                    frame_len: current.len,
+                    starts: current.remaining == current.len,
+                    ends: left == 0,
+                });
                 data = rest;
-                let left = remaining - piece.len();
-                self.current = (left > 0).then_some((stream, left));
+                self.current = (left > 0).then_some(Current {
+                    remaining: left,
+                    ..current
+                });
                 continue;
             }
             let wanted = FRAME_HEADER_LEN - self.header.len();
@@ -35,7 +62,19 @@ impl Demux {
     }
 }
 
-fn start(header: &[u8]) -> Result<Option<(LogStream, usize)>> {
+// what podman itself writes to stderr when a command exits while its input is still being sent,
+// like `Error: write unixpacket @->/proc/self/fd/15/attach: write: connection reset by peer`; it
+// is not the command's output
+#[must_use]
+pub fn is_attach_reset_notice(frame: &[u8]) -> bool {
+    let contains = |needle: &[u8]| frame.windows(needle.len()).any(|window| window == needle);
+    frame.starts_with(b"Error: ")
+        && contains(b" unixpacket ")
+        && contains(b"/attach: ")
+        && frame.ends_with(b": connection reset by peer\n")
+}
+
+fn start(header: &[u8]) -> Result<Option<Current>> {
     let &[kind, 0, 0, 0, a, b, c, d] = header else {
         return Err(unframed());
     };
@@ -46,7 +85,11 @@ fn start(header: &[u8]) -> Result<Option<(LogStream, usize)>> {
     };
     let len = usize::try_from(u32::from_be_bytes([a, b, c, d]))
         .map_err(|_| Error::Body("output frame length does not fit".into()))?;
-    Ok((len > 0).then_some((stream, len)))
+    Ok((len > 0).then_some(Current {
+        stream,
+        len,
+        remaining: len,
+    }))
 }
 
 fn unframed() -> Error {
@@ -66,10 +109,12 @@ mod tests {
     }
 
     fn collect(demux: &mut Demux, data: &[u8], into: &mut Vec<(LogStream, Vec<u8>)>) {
-        for (stream, piece) in demux.push(data).unwrap() {
+        for piece in demux.push(data).unwrap() {
             match into.last_mut() {
-                Some((last, bytes)) if *last == stream => bytes.extend_from_slice(piece),
-                _ => into.push((stream, piece.to_vec())),
+                Some((last, bytes)) if *last == piece.stream && !piece.starts => {
+                    bytes.extend_from_slice(piece.data);
+                }
+                _ => into.push((piece.stream, piece.data.to_vec())),
             }
         }
     }
@@ -96,24 +141,61 @@ mod tests {
     }
 
     #[test]
+    fn marks_where_frames_start_and_end() {
+        let mut data = frame(2, b"abcdef");
+        data.extend(frame(1, b"x"));
+        let mut demux = Demux::default();
+        let first = demux.push(&data[..11]).unwrap();
+        assert_eq!(
+            first,
+            [Piece {
+                stream: LogStream::Stderr,
+                data: b"abc",
+                frame_len: 6,
+                starts: true,
+                ends: false,
+            }]
+        );
+        let rest = demux.push(&data[11..]).unwrap();
+        assert_eq!(
+            (rest[0].data, rest[0].starts, rest[0].ends),
+            (&b"def"[..], false, true)
+        );
+        assert_eq!(
+            (rest[1].stream, rest[1].starts, rest[1].ends),
+            (LogStream::Stdout, true, true)
+        );
+    }
+
+    #[test]
     fn passes_on_parts_of_a_large_frame() {
         let mut demux = Demux::default();
         let mut data = vec![1, 0, 0, 0];
         data.extend_from_slice(&u32::MAX.to_be_bytes());
         data.extend_from_slice(b"partial");
-        assert_eq!(
-            demux.push(&data).unwrap(),
-            vec![(LogStream::Stdout, &b"partial"[..])]
-        );
-        assert_eq!(
-            demux.push(b"more").unwrap(),
-            vec![(LogStream::Stdout, &b"more"[..])]
-        );
+        assert_eq!(demux.push(&data).unwrap()[0].data, b"partial");
+        assert_eq!(demux.push(b"more").unwrap()[0].data, b"more");
     }
 
     #[test]
     fn rejects_unframed_output() {
         assert!(Demux::default().push(b"plain text here").is_err());
         assert!(Demux::default().push(&frame(3, b"x")).is_err());
+    }
+
+    #[test]
+    fn recognizes_podmans_attach_reset_notice() {
+        assert!(is_attach_reset_notice(
+            b"Error: write unixpacket @->/proc/self/fd/15/attach: write: connection reset by peer\n"
+        ));
+        assert!(is_attach_reset_notice(
+            b"Error: read unixpacket @->/proc/self/fd/9/attach: read: connection reset by peer\n"
+        ));
+        assert!(!is_attach_reset_notice(
+            b"Error: connection reset by peer\n"
+        ));
+        assert!(!is_attach_reset_notice(
+            b"psql: error: connection reset by peer\n"
+        ));
     }
 }

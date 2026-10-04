@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use bird_api::Frame;
 use bird_core::Name;
-use bird_podman::{Demux, LogStream};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use rustix::process::{Pid, Signal, kill_process, kill_process_group};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
+use super::piped::PipedOutput;
 use crate::state::AppState;
 
 const CHUNK_BYTES: usize = 32 * 1024;
@@ -164,7 +164,7 @@ async fn bridge(
         }
     };
     let output = async {
-        let mut demux = Demux::default();
+        let mut piped = PipedOutput::default();
         let mut chunk = vec![0_u8; CHUNK_BYTES];
         loop {
             // podman resets the connection when the command exits with input still unread
@@ -173,6 +173,9 @@ async fn bridge(
                 0
             });
             let Some(bytes) = chunk.get(..read).filter(|bytes| !bytes.is_empty()) else {
+                if let Some(rest) = piped.finish() {
+                    client_write.write_all(&rest.encode()).await?;
+                }
                 return Ok::<_, Box<dyn std::error::Error + Send + Sync>>(());
             };
             match stdio {
@@ -182,11 +185,7 @@ async fn bridge(
                         .await?;
                 }
                 Stdio::Piped => {
-                    for (stream, piece) in demux.push(bytes)? {
-                        let frame = match stream {
-                            LogStream::Stdout => Frame::Data(piece.to_vec()),
-                            LogStream::Stderr => Frame::Stderr(piece.to_vec()),
-                        };
+                    for frame in piped.push(bytes)? {
                         client_write.write_all(&frame.encode()).await?;
                     }
                 }
