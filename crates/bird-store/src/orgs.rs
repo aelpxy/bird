@@ -94,6 +94,21 @@ impl Store {
         )
     }
 
+    // orgs nobody but this user owns, which would be left unmanaged without them
+    pub fn sole_owned_orgs(&self, user_id: UserId) -> Result<Vec<Org>> {
+        self.query_all(
+            "SELECT o.id, o.name, o.created_at
+             FROM orgs o JOIN org_members m ON m.org_id = o.id
+             WHERE m.user_id = ?1 AND m.role = 'owner' AND NOT EXISTS (
+                 SELECT 1 FROM org_members other
+                 WHERE other.org_id = o.id AND other.role = 'owner' AND other.user_id != ?1
+             )
+             ORDER BY o.name",
+            [user_id.to_string()],
+            org,
+        )
+    }
+
     pub fn user_orgs(&self, user_id: UserId) -> Result<Vec<(Org, OrgRole)>> {
         self.query_all(
             "SELECT o.id, o.name, o.created_at, m.role
@@ -150,6 +165,11 @@ mod tests {
             [(team.clone(), OrgRole::Owner)]
         );
 
+        assert_eq!(store.sole_owned_orgs(ada.id).unwrap(), [team.clone()]);
+        let bob = store.create_user(&name("bob"), UserRole::Member).unwrap();
+        store.set_member(team.id, bob.id, OrgRole::Owner).unwrap();
+        assert_eq!(store.sole_owned_orgs(ada.id).unwrap(), Vec::new());
+        store.remove_member(team.id, bob.id).unwrap();
         store.remove_member(team.id, ada.id).unwrap();
         assert!(matches!(
             store.remove_member(team.id, ada.id).unwrap_err(),

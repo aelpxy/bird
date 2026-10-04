@@ -44,6 +44,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::OrgExists(_)
         | Error::OrgHasProjects { .. }
         | Error::LastOwner { .. }
+        | Error::OwnsProjects { .. }
         | Error::NoPendingTwoFactor
         | Error::TokenExists { .. }
         | Error::EnvironmentExists { .. }
