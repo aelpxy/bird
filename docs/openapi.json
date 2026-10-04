@@ -2376,6 +2376,7 @@
         "oneOf": [
           {
             "type": "object",
+            "description": "Output exactly as written, so a chunk may end mid-line; invalid UTF-8 becomes U+FFFD",
             "required": [
               "stream",
               "text",

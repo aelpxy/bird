@@ -7,14 +7,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::client::DEFAULT_TIMEOUT;
 use crate::error::check;
-use crate::follow::LogFollower;
+use crate::output::OutputFollower;
 use crate::query::encode;
 use crate::{Error, Podman, Result};
 
 // a command running inside a container: read its output, then ask for its exit code
 pub struct ExecSession {
     id: String,
-    pub output: LogFollower,
+    pub output: OutputFollower,
 }
 
 // a command on a terminal: one raw stream both ways, with no stdout and stderr framing
@@ -101,7 +101,7 @@ impl Podman {
         }
         Ok(ExecSession {
             id,
-            output: LogFollower::new(streamed.body),
+            output: OutputFollower::new(streamed.body),
         })
     }
 

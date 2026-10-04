@@ -57,6 +57,12 @@ pub(crate) async fn run(
     stream(client, &format!("/v1/services/{name}/run"), &request, out).await
 }
 
+// flushed per chunk, so prompts and progress without a newline show up as they are written
+fn write_now(mut to: impl Write, text: &str) -> std::io::Result<()> {
+    to.write_all(text.as_bytes())?;
+    to.flush()
+}
+
 async fn stream(
     client: &ApiClient,
     path: &str,
@@ -78,8 +84,8 @@ async fn stream(
                 }
                 match event {
                     CommandEvent::Output { stream, text } if !out.json => match stream {
-                        LogStream::Stdout => writeln!(std::io::stdout(), "{text}")?,
-                        LogStream::Stderr => writeln!(std::io::stderr(), "{text}")?,
+                        LogStream::Stdout => write_now(std::io::stdout().lock(), &text)?,
+                        LogStream::Stderr => write_now(std::io::stderr().lock(), &text)?,
                     },
                     CommandEvent::Output { .. } => {}
                     finished => last = Some(finished),

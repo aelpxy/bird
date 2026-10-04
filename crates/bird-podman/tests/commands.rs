@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bird_podman::{ContainerSpec, Lifecycle, Limits, LogLine, LogStream, Podman, default_socket};
+use bird_podman::{
+    ContainerSpec, Lifecycle, Limits, LogStream, OutputChunk, OutputFollower, Podman,
+    default_socket,
+};
 
 const IMAGE: &str = "docker.io/library/alpine:3";
 
@@ -28,8 +31,8 @@ fn spec(name: &str, command: &str) -> ContainerSpec {
     }
 }
 
-fn line(stream: LogStream, text: &str) -> LogLine {
-    LogLine {
+fn line(stream: LogStream, text: &str) -> OutputChunk {
+    OutputChunk {
         stream,
         text: text.to_owned(),
     }
@@ -57,9 +60,12 @@ async fn exec_streams_output_and_exit_code() {
     while let Some(next) = session.output.next().await {
         lines.push(next.unwrap());
     }
-    assert!(lines.contains(&line(LogStream::Stdout, "hi")), "{lines:?}");
     assert!(
-        lines.contains(&line(LogStream::Stderr, "oops")),
+        lines.contains(&line(LogStream::Stdout, "hi\n")),
+        "{lines:?}"
+    );
+    assert!(
+        lines.contains(&line(LogStream::Stderr, "oops\n")),
         "{lines:?}"
     );
     assert_eq!(podman.exec_exit_code(&session).await.unwrap(), 3);
@@ -95,8 +101,8 @@ async fn one_off_container_reports_output_and_exit_code() {
     assert_eq!(
         lines,
         vec![
-            line(LogStream::Stdout, "start"),
-            line(LogStream::Stderr, "done")
+            line(LogStream::Stdout, "start\n"),
+            line(LogStream::Stderr, "done\n")
         ]
     );
     let code = podman
@@ -205,5 +211,54 @@ async fn terminal_container_is_attached_from_the_start() {
         .await
         .unwrap();
     assert_eq!(code, 6);
+    podman.remove_container(&id).await.unwrap();
+}
+
+const UNTERMINATED: &str = "head -c 100000 /dev/zero | tr '\\0' x; printf '\\303\\251'";
+
+async fn stdout_of(mut output: OutputFollower) -> String {
+    let mut text = String::new();
+    while let Some(chunk) = output.next().await {
+        let chunk = chunk.expect("the output stream stays readable");
+        assert_eq!(chunk.stream, LogStream::Stdout);
+        text.push_str(&chunk.text);
+    }
+    text
+}
+
+#[tokio::test]
+#[ignore = "requires a running podman socket"]
+async fn output_is_kept_as_written() {
+    let podman = podman();
+    podman
+        .pull_image(&IMAGE.parse().unwrap(), None)
+        .await
+        .unwrap();
+    let expected = format!("{}é", "x".repeat(100_000));
+
+    let name = "bird-test-output-run";
+    let _ = podman.remove_container(name).await;
+    let id = podman
+        .create_container(&spec(name, UNTERMINATED))
+        .await
+        .unwrap();
+    podman.start_container(&id).await.unwrap();
+    let output = podman.follow_output(&id).await.unwrap();
+    assert!(stdout_of(output).await == expected, "run output changed");
+    podman.remove_container(&id).await.unwrap();
+
+    let name = "bird-test-output-exec";
+    let _ = podman.remove_container(name).await;
+    let id = podman
+        .create_container(&spec(name, "sleep 60"))
+        .await
+        .unwrap();
+    podman.start_container(&id).await.unwrap();
+    let command = ["sh", "-c", UNTERMINATED].map(String::from);
+    let session = podman.exec(&id, &command).await.unwrap();
+    assert!(
+        stdout_of(session.output).await == expected,
+        "exec output changed"
+    );
     podman.remove_container(&id).await.unwrap();
 }
