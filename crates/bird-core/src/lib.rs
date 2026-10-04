@@ -14,8 +14,8 @@ pub use id::{BackupId, DeploymentId, EnvironmentId, MachineId, ProjectId, Servic
 pub use image::ImageLineage;
 pub use model::{
     Backup, BackupTrigger, BackupVolume, Certificate, Deployment, DeploymentStatus, Domain,
-    Environment, Machine, MachineState, ParseEnumError, Project, Registry, Service, Variable,
-    Volume,
+    Environment, Machine, MachineState, ParseEnumError, Project, Registry, Service, ServiceState,
+    Variable, Volume,
 };
 pub use replicas::Replicas;
 pub use resources::{CpuLimit, MemoryLimit};

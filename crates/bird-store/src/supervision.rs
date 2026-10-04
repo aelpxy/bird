@@ -1,4 +1,6 @@
-use bird_core::{Deployment, DeploymentStatus, ImageRef, Machine, MachineId, MachineState};
+use bird_core::{
+    Deployment, DeploymentStatus, ImageRef, Machine, MachineId, MachineState, ServiceState,
+};
 use rusqlite::params;
 
 use crate::{Result, Store, rows};
@@ -73,15 +75,21 @@ impl Store {
         )
     }
 
+    // stopped machines of a stopped service are kept on purpose, any other stop was a deploy cut short
     pub fn fail_interrupted(&mut self) -> Result<Interrupted> {
         self.transaction(|store| {
             let machines = store.execute(
-                "UPDATE machines SET state = ?1 WHERE state IN (?2, ?3, ?4)",
+                "UPDATE machines SET state = ?1 WHERE state IN (?2, ?3, ?4)
+                 AND NOT (state = ?4 AND deployment_id IN (
+                     SELECT d.id FROM deployments d JOIN services s ON s.id = d.service_id
+                     WHERE s.state = ?5 AND d.status = ?6))",
                 params![
                     MachineState::Failed.as_str(),
                     MachineState::Created.as_str(),
                     MachineState::Starting.as_str(),
-                    MachineState::Stopped.as_str()
+                    MachineState::Stopped.as_str(),
+                    ServiceState::Stopped.as_str(),
+                    DeploymentStatus::Active.as_str()
                 ],
             )?;
             let deployments = store.execute(
@@ -232,5 +240,25 @@ mod tests {
                 .iter()
                 .all(|m| m.state == MachineState::Failed)
         );
+    }
+
+    #[test]
+    fn keeps_machines_of_stopped_services() {
+        let (mut store, service) = setup();
+        let deployment = store.create_deployment(&service).unwrap();
+        store.activate_deployment(deployment.id).unwrap();
+        let stopped = store.create_machine(deployment.id).unwrap();
+        store
+            .set_machine_state(stopped.id, MachineState::Stopped)
+            .unwrap();
+        store
+            .set_service_state(service.id, ServiceState::Stopped)
+            .unwrap();
+        assert_eq!(store.fail_interrupted().unwrap().machines, 0);
+
+        store
+            .set_service_state(service.id, ServiceState::Running)
+            .unwrap();
+        assert_eq!(store.fail_interrupted().unwrap().machines, 1);
     }
 }

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::{Result, bail};
 use bird_api::{ScaleRequest, ServiceSummary};
-use bird_core::{MachineState, Name, Replicas};
+use bird_core::{MachineState, Name, Replicas, ServiceState};
 
 use crate::client::ApiClient;
 use crate::ui::Spinner;
@@ -21,35 +21,56 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, replicas: Replicas) -> 
         )
         .await?;
     let spinner = Spinner::start(format!("scaling {name} to {replicas} machines"));
+    let reached = converge(client, name, &spinner).await?;
+    drop(spinner);
+    match reached {
+        Converged::Running(running) => println!(
+            "{} {name} runs {running} {}",
+            style::out(Paint::Green, "✓"),
+            if running == 1 { "machine" } else { "machines" }
+        ),
+        Converged::NotDeployed => {
+            println!("{name} is not deployed yet, it will start {replicas} machines on deploy");
+        }
+        Converged::Stopped => {
+            println!("{name} is stopped, it will run {replicas} machines once started");
+        }
+    }
+    Ok(())
+}
 
+pub(super) enum Converged {
+    Running(usize),
+    NotDeployed,
+    Stopped,
+}
+
+// waits until exactly the wanted number of machines run, showing progress on the spinner
+pub(super) async fn converge(
+    client: &ApiClient,
+    name: &Name,
+    spinner: &Spinner,
+) -> Result<Converged> {
     let deadline = tokio::time::Instant::now() + CONVERGE_TIMEOUT;
     while tokio::time::Instant::now() < deadline {
         let service: ServiceSummary = client.get(&format!("/v1/services/{name}"), TIMEOUT).await?;
+        if service.state == ServiceState::Stopped {
+            return Ok(Converged::Stopped);
+        }
         let Some(deployment) = service.deployment else {
-            drop(spinner);
-            println!("{name} is not deployed yet, it will start {replicas} machines on deploy");
-            return Ok(());
+            return Ok(Converged::NotDeployed);
         };
         let running = deployment
             .machines
             .iter()
             .filter(|m| m.state == MachineState::Running)
             .count();
-        if running == usize::from(replicas.get()) && deployment.machines.len() == running {
-            drop(spinner);
-            println!(
-                "{} {name} runs {replicas} {}",
-                style::out(Paint::Green, "✓"),
-                if replicas == Replicas::ONE {
-                    "machine"
-                } else {
-                    "machines"
-                }
-            );
-            return Ok(());
+        let wanted = usize::from(service.replicas.get());
+        if running == wanted && deployment.machines.len() == running {
+            return Ok(Converged::Running(running));
         }
-        spinner.set(format!("scaling {name}: {running}/{replicas} running"));
+        spinner.set(format!("{name}: {running}/{wanted} running"));
         tokio::time::sleep(POLL).await;
     }
-    bail!("{name} did not reach {replicas} machines in time, check `bird logs -s {name}`")
+    bail!("{name} did not reach its machine count in time, check `bird logs -s {name}`")
 }

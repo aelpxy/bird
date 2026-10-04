@@ -10,6 +10,7 @@ mod projects;
 mod registries;
 mod routes;
 mod rows;
+mod service_state;
 mod services;
 mod store;
 mod supervision;

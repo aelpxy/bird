@@ -62,6 +62,12 @@ string_enum!(DeploymentStatus, "deployment status" {
     Failed => "failed",
 });
 
+// what the operator wants: a stopped service keeps its machines stopped and is left alone by the supervisor
+string_enum!(ServiceState, "service state" {
+    Running => "running",
+    Stopped => "stopped",
+});
+
 string_enum!(MachineState, "machine state" {
     Created => "created",
     Starting => "starting",
@@ -102,6 +108,7 @@ pub struct Service {
     pub replicas: Replicas,
     pub health: HealthCheck,
     pub health_timeout: HealthTimeout,
+    pub state: ServiceState,
     pub command: Option<Command>,
     pub memory: MemoryLimit,
     pub cpus: CpuLimit,

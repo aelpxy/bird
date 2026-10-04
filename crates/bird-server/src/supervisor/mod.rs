@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-use bird_core::{Deployment, DeploymentId, EnvKey, MachineId, MachineState, Service};
+use bird_core::{Deployment, DeploymentId, EnvKey, MachineId, MachineState, Service, ServiceState};
 use tokio::time::{MissedTickBehavior, interval_at};
 
 use crate::backoff::Backoff;
@@ -91,6 +91,9 @@ impl Supervisor {
             else {
                 continue;
             };
+            if service.state == ServiceState::Stopped {
+                continue;
+            }
             let Ok(_ticket) = self.state.deploys.begin(&service.name) else {
                 tracing::debug!(service = %service.name, "operation in progress, skipping");
                 continue;

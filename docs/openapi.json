@@ -1097,6 +1097,78 @@
         }
       }
     },
+    "/v1/services/{name}/restart": {
+      "post": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Restart a service's machines one at a time",
+        "operationId": "restart",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every running machine restarted and passed its health check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "A machine did not pass its health check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services/{name}/rollback": {
       "post": {
         "tags": [
@@ -1315,6 +1387,140 @@
           },
           "409": {
             "description": "Services with volumes run a single machine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/start": {
+      "post": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Start a stopped service",
+        "operationId": "start",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Its stopped machines passed their health check; missing replicas follow from the supervisor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "A machine did not pass its health check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/stop": {
+      "post": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Stop a service, keeping its machines and data",
+        "operationId": "stop",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stopped; the supervisor leaves it alone until it is started or deployed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicting state or operation in progress",
             "content": {
               "application/json": {
                 "schema": {
@@ -2330,10 +2536,18 @@
           }
         }
       },
+      "ServiceState": {
+        "type": "string",
+        "enum": [
+          "running",
+          "stopped"
+        ]
+      },
       "ServiceSummary": {
         "type": "object",
         "required": [
           "name",
+          "state",
           "image",
           "port",
           "replicas",
@@ -2384,6 +2598,10 @@
           },
           "replicas": {
             "$ref": "#/components/schemas/Replicas"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ServiceState",
+            "description": "Stopped services keep their machines stopped until started again"
           },
           "volumes": {
             "type": "array",

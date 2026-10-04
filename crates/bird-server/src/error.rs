@@ -89,6 +89,8 @@ pub enum Error {
     EmptyCredentials,
     #[error("domain {0} is not attached to this service")]
     DomainNotFound(bird_core::Hostname),
+    #[error("{0} is stopped, start it with `bird start`")]
+    ServiceStopped(Name),
     #[error("service {0} has no running machines")]
     NoMachines(Name),
     #[error("{service} has no running machine matching {machine:?}, see `bird status`")]

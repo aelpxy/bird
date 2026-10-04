@@ -1,5 +1,6 @@
 mod guard;
 mod machine;
+mod power;
 mod recreate;
 pub(crate) mod references;
 mod remove;
@@ -8,11 +9,15 @@ mod volumes;
 use std::collections::{BTreeMap, BTreeSet};
 
 use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
-use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service, Volume};
+use bird_core::{
+    Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, Service, ServiceState, Volume,
+};
+use bird_store::Store;
 use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
 pub(crate) use machine::{MAX_PROCESSES, destroy_container, ensure_image, launch, set_state};
+pub(crate) use power::{restart, start, stop};
 pub(crate) use remove::remove_service;
 
 use crate::state::AppState;
@@ -186,55 +191,7 @@ async fn save_config(
                         request.port,
                     )?,
                 };
-                let service = match request.health {
-                    Some(health) => {
-                        store.set_health(service.id, &health)?;
-                        Service { health, ..service }
-                    }
-                    None => service,
-                };
-                let service = match request.health_timeout {
-                    Some(health_timeout) => {
-                        store.set_health_timeout(service.id, health_timeout)?;
-                        Service {
-                            health_timeout,
-                            ..service
-                        }
-                    }
-                    None => service,
-                };
-                let service = if request.memory.is_some() || request.cpus.is_some() {
-                    let memory = request.memory.unwrap_or(service.memory);
-                    let cpus = request.cpus.unwrap_or(service.cpus);
-                    store.set_resources(service.id, memory, cpus)?;
-                    Service {
-                        memory,
-                        cpus,
-                        ..service
-                    }
-                } else {
-                    service
-                };
-                let service = match request.replicas {
-                    Some(replicas) => {
-                        store.set_replicas(service.id, replicas)?;
-                        Service {
-                            replicas,
-                            ..service
-                        }
-                    }
-                    None => service,
-                };
-                let service = match &request.command {
-                    Some(command) => {
-                        store.set_command(service.id, command)?;
-                        Service {
-                            command: Some(command.clone()),
-                            ..service
-                        }
-                    }
-                    None => service,
-                };
+                let service = apply_settings(store, service, &request)?;
                 let mut owned: BTreeSet<Hostname> = store
                     .list_domains(service.id)?
                     .into_iter()
@@ -261,4 +218,75 @@ async fn save_config(
             })
         })
         .await
+}
+
+// the settings a deploy may change; anything left out of the request keeps its saved value
+fn apply_settings(
+    store: &Store,
+    service: Service,
+    request: &DeployRequest,
+) -> bird_store::Result<Service> {
+    // deploying means running, also for a service that was stopped
+    let service = if service.state == ServiceState::Stopped {
+        store.set_service_state(service.id, ServiceState::Running)?;
+        Service {
+            state: ServiceState::Running,
+            ..service
+        }
+    } else {
+        service
+    };
+    let service = match &request.health {
+        Some(health) => {
+            store.set_health(service.id, health)?;
+            Service {
+                health: health.clone(),
+                ..service
+            }
+        }
+        None => service,
+    };
+    let service = match request.health_timeout {
+        Some(health_timeout) => {
+            store.set_health_timeout(service.id, health_timeout)?;
+            Service {
+                health_timeout,
+                ..service
+            }
+        }
+        None => service,
+    };
+    let service = if request.memory.is_some() || request.cpus.is_some() {
+        let memory = request.memory.unwrap_or(service.memory);
+        let cpus = request.cpus.unwrap_or(service.cpus);
+        store.set_resources(service.id, memory, cpus)?;
+        Service {
+            memory,
+            cpus,
+            ..service
+        }
+    } else {
+        service
+    };
+    let service = match request.replicas {
+        Some(replicas) => {
+            store.set_replicas(service.id, replicas)?;
+            Service {
+                replicas,
+                ..service
+            }
+        }
+        None => service,
+    };
+    let service = match &request.command {
+        Some(command) => {
+            store.set_command(service.id, command)?;
+            Service {
+                command: Some(command.clone()),
+                ..service
+            }
+        }
+        None => service,
+    };
+    Ok(service)
 }

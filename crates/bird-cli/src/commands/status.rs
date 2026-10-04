@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bird_api::ServiceSummary;
-use bird_core::{MachineState, Name};
+use bird_core::{MachineState, Name, ServiceState};
 
 use super::history::{ago, unix_now};
 use super::logs::label;
@@ -27,6 +27,7 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, out: Output) -> Result<
 fn describe(service: &ServiceSummary, now: i64) -> String {
     let mut text = String::new();
     let headline = match &service.deployment {
+        _ if service.state == ServiceState::Stopped => style::out(Paint::Dim, "stopped"),
         Some(deployment) => style::out(style::deployment(deployment.status), deployment.status),
         None => style::out(Paint::Dim, "not deployed"),
     };
@@ -120,6 +121,7 @@ mod tests {
     fn describes_a_running_service() {
         let service = ServiceSummary {
             name: "web".parse().unwrap(),
+            state: ServiceState::Running,
             image: "nginx:alpine".parse().unwrap(),
             port: bird_core::Port::HTTP,
             replicas: bird_core::Replicas::ONE,
