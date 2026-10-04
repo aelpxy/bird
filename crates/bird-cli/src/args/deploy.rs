@@ -2,13 +2,13 @@ use std::path::PathBuf;
 
 use bird_api::VolumeSpec;
 use bird_core::{
-    CpuLimit, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port,
-    Replicas,
+    CpuLimit, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef, MemoryLimit, Port, Replicas,
 };
 
 const EXAMPLES: &str = "\
 Examples:
   bird deploy                                  deploy the service in ./bird.toml
+  bird deploy app:2                            deploy ./bird.toml with another image
   bird deploy web nginx:alpine --domain web.example.com
   bird deploy api --build --port 3000          build ./Dockerfile on the server
   bird deploy db postgres:18 --port 5432 --health tcp -v data:/var/lib/postgresql";
@@ -16,8 +16,10 @@ Examples:
 #[derive(Debug, clap::Args)]
 #[command(after_help = EXAMPLES)]
 pub(crate) struct DeployArgs {
-    /// Service name, defaults to -s or the name in bird.toml
-    pub(crate) name: Option<Name>,
+    /// Service name, defaults to -s or the name in bird.toml; alone it is the image when -s names
+    /// the service or it looks like one (nginx:alpine)
+    #[arg(value_name = "NAME")]
+    pub(crate) name: Option<String>,
     /// Image to run, overrides bird.toml
     #[arg(conflicts_with = "build")]
     pub(crate) image: Option<ImageRef>,
@@ -145,7 +147,6 @@ mod tests {
 
     #[test]
     fn rejects_invalid_values() {
-        assert!(Args::try_parse_from(["bird", "deploy", "Web", "nginx"]).is_err());
         assert!(Args::try_parse_from(["bird", "deploy", "web", "nginx", "--port", "0"]).is_err());
         assert!(
             Args::try_parse_from(["bird", "deploy", "web", "nginx", "-e", "NOEQUALS"]).is_err()

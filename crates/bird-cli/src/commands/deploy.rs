@@ -62,7 +62,11 @@ fn merge(
     args: DeployArgs,
     service: Option<Name>,
 ) -> Result<(Manifest, Source)> {
-    let (mut manifest, dir) = match (loaded, args.name.clone().or(service)) {
+    let (name, image) = positionals(args.name, args.image, service.as_ref())?;
+    if image.is_some() && args.build.is_some() {
+        bail!("pass an image or --build, not both");
+    }
+    let (mut manifest, dir) = match (loaded, name.or(service)) {
         (Some(Loaded { mut manifest, dir }), name) => {
             manifest.name = name.unwrap_or(manifest.name);
             (manifest, dir)
@@ -80,7 +84,7 @@ fn merge(
         .unwrap_or_default();
     build_args.extend(args.build_args);
     let source = match (
-        args.image,
+        image,
         args.build,
         manifest.image.take(),
         manifest.build.take(),
@@ -124,6 +128,27 @@ fn merge(
     manifest.cpus = args.cpus.or(manifest.cpus);
     manifest.replicas = args.replicas.or(manifest.replicas);
     Ok((manifest, source))
+}
+
+// a lone argument is the image when -s already names the service or it cannot be a name
+fn positionals(
+    name: Option<String>,
+    image: Option<ImageRef>,
+    service: Option<&Name>,
+) -> Result<(Option<Name>, Option<ImageRef>)> {
+    let (Some(only), None) = (&name, &image) else {
+        return Ok((name.map(|n| n.parse()).transpose()?, image));
+    };
+    if service.is_some() {
+        return Ok((None, Some(only.parse()?)));
+    }
+    match only.parse::<Name>() {
+        Ok(name) => Ok((Some(name), None)),
+        Err(err) => only
+            .parse::<ImageRef>()
+            .map(|image| (None, Some(image)))
+            .map_err(|_| err.into()),
+    }
 }
 
 pub(crate) fn print_deployed(
@@ -294,6 +319,24 @@ MODE = "file"
         );
         assert!(Args::try_parse_from(["bird", "deploy", "web", "app:1", "--build"]).is_err());
         assert_eq!(context_dir(Path::new(""), None), PathBuf::from("."));
+    }
+
+    #[test]
+    fn a_lone_argument_can_be_the_image() {
+        let (manifest, source) = merge(Some(loaded(WITH_IMAGE)), args(&["app:2"]), None).unwrap();
+        assert_eq!(manifest.name.as_str(), "web");
+        assert_eq!(source, Source::Image("app:2".parse().unwrap()));
+        let (manifest, _) = merge(Some(loaded(WITH_IMAGE)), args(&["staging"]), None).unwrap();
+        assert_eq!(manifest.name.as_str(), "staging");
+        let service = Some("api".parse().unwrap());
+        let (manifest, source) = merge(None, args(&["nginx"]), service).unwrap();
+        assert_eq!(manifest.name.as_str(), "api");
+        assert_eq!(source, Source::Image("nginx".parse().unwrap()));
+        assert!(merge(Some(loaded(WITH_IMAGE)), args(&["app:2", "--build"]), None).is_err());
+        let err = merge(None, args(&["Web", "nginx"]), None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("invalid name"), "{err}");
     }
 
     #[test]
