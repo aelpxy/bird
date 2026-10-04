@@ -75,7 +75,7 @@ impl From<Entry> for ContainerStats {
 }
 
 impl Podman {
-    // one snapshot per container keyed by full id; fails whole when any of them is gone
+    // one snapshot per container keyed by full id; podman fails it whole when any of them is gone
     pub async fn stats(&self, ids: &[&str]) -> Result<BTreeMap<String, ContainerStats>> {
         if ids.is_empty() {
             return Ok(BTreeMap::new());
