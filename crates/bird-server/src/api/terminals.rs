@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, Request, State};
+use axum::extract::{Query, Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{CONNECTION, UPGRADE};
 use axum::response::{IntoResponse, Response};
 use bird_api::{ErrorBody, TTY_UPGRADE};
-use bird_core::{Command, Name};
+use bird_core::Command;
 use hyper::upgrade::OnUpgrade;
 use serde::Deserialize;
 use tokio::sync::OwnedSemaphorePermit;
 
+use super::scope::ServiceScope;
 use crate::commands::{
     self,
     tty::{Remote, Stdio},
@@ -58,15 +59,16 @@ pub(crate) struct PipedRunQuery {
 }
 
 /// Open an interactive terminal in a running machine
-#[utoipa::path(get, path = "/v1/services/{name}/exec/tty", tag = "commands", params(("name" = String, Path, description = "Service name"), ExecQuery), responses((status = 101, description = "Switched to bird-tty: both sides send frames of a kind byte, a big-endian u32 length and the payload; data (0) both ways, resize (1, cols and rows as u16) from the client, then exit (2, i32 code) or error (3, text) from birdd"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/exec/tty", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ExecQuery), responses((status = 101, description = "Switched to bird-tty: both sides send frames of a kind byte, a big-endian u32 length and the payload; data (0) both ways, resize (1, cols and rows as u16) from the client, then exit (2, i32 code) or error (3, text) from birdd"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
 pub(crate) async fn exec(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<ExecQuery>,
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let container = commands::pick_machine(&state, &name, query.machine.as_deref()).await?;
+    let container =
+        commands::pick_machine(&state, environment, &name, query.machine.as_deref()).await?;
     let session = state.podman.exec_tty(&container, command.args()).await?;
     if let Err(err) = state
         .podman
@@ -89,15 +91,16 @@ pub(crate) async fn exec(
 }
 
 /// Run a command in a running machine with its stdin, stdout and stderr passed through as bytes
-#[utoipa::path(get, path = "/v1/services/{name}/exec/pipe", tag = "commands", params(("name" = String, Path, description = "Service name"), PipedExecQuery), responses((status = 101, description = "Switched to bird-tty without a terminal: the client sends data (0, stdin) and eof (5, empty) once its stdin ends; birdd sends data (0, stdout) and stderr (4) as written, then exit (2) or error (3)"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/exec/pipe", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), PipedExecQuery), responses((status = 101, description = "Switched to bird-tty without a terminal: the client sends data (0, stdin) and eof (5, empty) once its stdin ends; birdd sends data (0, stdout) and stderr (4) as written, then exit (2) or error (3)"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
 pub(crate) async fn exec_pipe(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<PipedExecQuery>,
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let container = commands::pick_machine(&state, &name, query.machine.as_deref()).await?;
+    let container =
+        commands::pick_machine(&state, environment, &name, query.machine.as_deref()).await?;
     let session = state.podman.exec_piped(&container, command.args()).await?;
     tracing::info!(service = %name, "piped command started");
     let remote = Remote::Exec(session.id().to_owned());
@@ -114,15 +117,15 @@ pub(crate) async fn exec_pipe(
 }
 
 /// Open an interactive terminal in a new container from the service's image
-#[utoipa::path(get, path = "/v1/services/{name}/run/tty", tag = "commands", params(("name" = String, Path, description = "Service name"), RunQuery), responses((status = 101, description = "Switched to bird-tty, like the exec terminal; the container is removed when the session ends"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/run/tty", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), RunQuery), responses((status = 101, description = "Switched to bird-tty, like the exec terminal; the container is removed when the session ends"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
 pub(crate) async fn run(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<RunQuery>,
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let target = commands::run_target(&state, &name).await?;
+    let target = commands::run_target(&state, environment, &name).await?;
     let stdio = Stdio::Terminal {
         cols: query.cols,
         rows: query.rows,
@@ -141,15 +144,15 @@ pub(crate) async fn run(
 }
 
 /// Run a command in a new container from the service's image with its stdio passed through as bytes
-#[utoipa::path(get, path = "/v1/services/{name}/run/pipe", tag = "commands", params(("name" = String, Path, description = "Service name"), PipedRunQuery), responses((status = 101, description = "Switched to bird-tty without a terminal, like the piped exec; the container is removed when the session ends"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/run/pipe", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), PipedRunQuery), responses((status = 101, description = "Switched to bird-tty without a terminal, like the piped exec; the container is removed when the session ends"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 426, description = "The request did not ask to upgrade to bird-tty", body = ErrorBody), (status = 503, description = "Too many terminals are open", body = ErrorBody)))]
 pub(crate) async fn run_pipe(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<PipedRunQuery>,
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let target = commands::run_target(&state, &name).await?;
+    let target = commands::run_target(&state, environment, &name).await?;
     let (id, io) = commands::start_attached(&state, &target, &command, Stdio::Piped).await?;
     tokio::spawn(commands::tty::serve(
         state,

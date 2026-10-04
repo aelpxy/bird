@@ -31,6 +31,20 @@ impl Store {
             rows::project,
         )
     }
+
+    pub fn list_projects(&self) -> Result<Vec<Project>> {
+        self.query_all(
+            "SELECT id, name, created_at FROM projects ORDER BY name",
+            [],
+            rows::project,
+        )
+    }
+
+    // takes its environments along, so the caller first makes sure they are empty
+    pub fn delete_project(&self, id: ProjectId) -> Result<()> {
+        self.execute("DELETE FROM projects WHERE id = ?1", [id.to_string()])?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -43,6 +57,25 @@ mod tests {
         let (store, _) = setup();
         assert!(store.project_by_name(&name("default")).unwrap().is_some());
         assert!(store.project_by_name(&name("missing")).unwrap().is_none());
+    }
+
+    #[test]
+    fn lists_and_deletes_with_environments() {
+        let (store, _) = setup();
+        let shop = store.create_project(&name("shop")).unwrap();
+        let env = store
+            .create_environment(shop.id, &name("production"), Some("bird_shop_production"))
+            .unwrap();
+        let names: Vec<_> = store
+            .list_projects()
+            .unwrap()
+            .into_iter()
+            .map(|project| project.name.to_string())
+            .collect();
+        assert_eq!(names, ["default", "shop"]);
+        store.delete_project(shop.id).unwrap();
+        assert!(store.project_by_name(&name("shop")).unwrap().is_none());
+        assert!(store.environment(env.id).unwrap().is_none());
     }
 
     #[test]

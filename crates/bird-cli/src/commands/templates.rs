@@ -41,7 +41,7 @@ pub(crate) async fn add(
     let spinner = Spinner::start(format!("creating {service} from the {template} template"));
     let response: TemplateDeployResponse = client
         .post(
-            &format!("/v1/templates/{template}/deploy"),
+            &client.scoped(&format!("templates/{template}/deploy")),
             &CreateFromTemplate { name },
             DEPLOY_TIMEOUT,
         )

@@ -20,7 +20,7 @@ pub(crate) async fn run(
     match command {
         DomainsCommand::List => {
             let hostnames: Vec<Hostname> = client
-                .get(&format!("/v1/services/{name}/domains"), TIMEOUT)
+                .get(&client.scoped(&format!("services/{name}/domains")), TIMEOUT)
                 .await?;
             if !out.json(&hostnames)? {
                 print_domains(name, &hostnames);
@@ -29,7 +29,7 @@ pub(crate) async fn run(
         DomainsCommand::Add { hostname } => {
             let hostnames: Vec<Hostname> = client
                 .post(
-                    &format!("/v1/services/{name}/domains"),
+                    &client.scoped(&format!("services/{name}/domains")),
                     &AddDomain {
                         hostname: hostname.clone(),
                     },
@@ -45,7 +45,10 @@ pub(crate) async fn run(
         }
         DomainsCommand::Remove { hostname } => {
             client
-                .delete(&format!("/v1/services/{name}/domains/{hostname}"), TIMEOUT)
+                .delete(
+                    &client.scoped(&format!("services/{name}/domains/{hostname}")),
+                    TIMEOUT,
+                )
                 .await?;
             println!(
                 "{} {hostname} no longer routes to {name}",

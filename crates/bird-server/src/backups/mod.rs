@@ -4,7 +4,7 @@ mod restore;
 mod schedule;
 pub(crate) mod storage;
 
-use bird_core::{Backup, BackupId, Name};
+use bird_core::{Backup, BackupId, EnvironmentId, Name};
 
 pub(crate) use create::create;
 pub(crate) use database::DatabaseBackups;
@@ -17,8 +17,11 @@ use crate::state::AppState;
 use crate::{Error, Result};
 use storage::Adapter;
 
-pub(crate) async fn list(state: &AppState, service: &Name) -> Result<Vec<Backup>> {
-    let environment_id = state.environment_id;
+pub(crate) async fn list(
+    state: &AppState,
+    environment_id: EnvironmentId,
+    service: &Name,
+) -> Result<Vec<Backup>> {
     let service = service.clone();
     state
         .db
@@ -26,8 +29,13 @@ pub(crate) async fn list(state: &AppState, service: &Name) -> Result<Vec<Backup>
         .await
 }
 
-pub(crate) async fn remove(state: &AppState, service: &Name, id: BackupId) -> Result<()> {
-    let backup = find(state, service, id).await?;
+pub(crate) async fn remove(
+    state: &AppState,
+    environment: EnvironmentId,
+    service: &Name,
+    id: BackupId,
+) -> Result<()> {
+    let backup = find(state, environment, service, id).await?;
     ensure_reachable(state, &backup)?;
     for volume in &backup.volumes {
         state.backups.delete(&volume.key).await?;
@@ -37,8 +45,12 @@ pub(crate) async fn remove(state: &AppState, service: &Name, id: BackupId) -> Re
     Ok(())
 }
 
-async fn find(state: &AppState, service: &Name, id: BackupId) -> Result<Backup> {
-    let environment_id = state.environment_id;
+async fn find(
+    state: &AppState,
+    environment_id: EnvironmentId,
+    service: &Name,
+    id: BackupId,
+) -> Result<Backup> {
     state
         .db
         .call(move |store| store.backup(id))

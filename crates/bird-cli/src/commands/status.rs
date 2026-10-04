@@ -31,7 +31,10 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, watch: bool, out: Outpu
 
 pub(super) async fn fetch(client: &ApiClient, name: &Name) -> Result<ServiceSummary> {
     client
-        .get(&format!("/v1/services/{name}?stats=true"), TIMEOUT)
+        .get(
+            &client.scoped(&format!("services/{name}?stats=true")),
+            TIMEOUT,
+        )
         .await
 }
 

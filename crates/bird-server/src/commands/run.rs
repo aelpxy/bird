@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use bird_core::{Command, EnvKey, ImageRef, Name, Service};
+use bird_core::{Command, EnvKey, EnvironmentId, ImageRef, Name, Service};
 use bird_podman::{ContainerSpec, Lifecycle, Limits};
 use bytes::Bytes;
 use hyper::upgrade::Upgraded;
@@ -21,11 +21,16 @@ pub(crate) struct RunTarget {
     service: Service,
     image: ImageRef,
     env: BTreeMap<EnvKey, String>,
+    network: String,
 }
 
 // the active deployment, or the newest one when none succeeded yet, like a first deploy that needs setup
-pub(crate) async fn run_target(state: &AppState, name: &Name) -> Result<RunTarget> {
-    let service = state.service(name).await?;
+pub(crate) async fn run_target(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: &Name,
+) -> Result<RunTarget> {
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let found = state
         .db
@@ -43,6 +48,7 @@ pub(crate) async fn run_target(state: &AppState, name: &Name) -> Result<RunTarge
         return Err(Error::NeverDeployed(name.clone()));
     };
     Ok(RunTarget {
+        network: state.network(environment).await?,
         service,
         image,
         env,
@@ -57,7 +63,7 @@ pub(crate) async fn run(
     events: &mpsc::Sender<Bytes>,
 ) -> Result<Option<i32>> {
     ensure_image(state, &target.image).await?;
-    let spec = spec(state, target, command, Lifecycle::OneOff);
+    let spec = spec(target, command, Lifecycle::OneOff);
     let id = state.podman.create_container(&spec).await?;
     tracing::info!(service = %target.service.name, container = %spec.name, "running one-off command");
     let outcome = tokio::select! {
@@ -97,7 +103,7 @@ pub(crate) async fn start_attached(
         Stdio::Terminal { .. } => Lifecycle::Terminal,
         Stdio::Piped => Lifecycle::Piped,
     };
-    let spec = spec(state, target, command, lifecycle);
+    let spec = spec(target, command, lifecycle);
     let id = state.podman.create_container(&spec).await?;
     let attached = async {
         let io = state.podman.attach(&id).await?;
@@ -124,12 +130,7 @@ pub(crate) async fn start_attached(
     }
 }
 
-fn spec(
-    state: &AppState,
-    target: &RunTarget,
-    command: &Command,
-    lifecycle: Lifecycle,
-) -> ContainerSpec {
+fn spec(target: &RunTarget, command: &Command, lifecycle: Lifecycle) -> ContainerSpec {
     let service = &target.service;
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -139,7 +140,7 @@ fn spec(
         image: target.image.clone(),
         command: Some(command.args().to_vec()),
         lifecycle,
-        network: state.network.to_string(),
+        network: target.network.clone(),
         aliases: Vec::new(),
         mounts: Vec::new(),
         limits: Limits {

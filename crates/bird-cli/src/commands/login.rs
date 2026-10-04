@@ -2,10 +2,11 @@ use std::io::{BufRead, IsTerminal, Write};
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bird_api::ServiceSummary;
+use bird_api::ProjectSummary;
 
 use crate::client::ApiClient;
 use crate::profile::{self, Profile};
+use crate::scope::Scope;
 use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -14,9 +15,9 @@ pub(crate) async fn run(api: String) -> Result<()> {
     let path = profile::path().context("cannot find a config directory, set HOME")?;
     let token = read_token()?;
 
-    let client = ApiClient::new(api.clone(), Some(token.clone()));
-    let _: Vec<ServiceSummary> = client
-        .get("/v1/services", TIMEOUT)
+    let client = ApiClient::new(api.clone(), Some(token.clone()), Scope::fallback());
+    let _: Vec<ProjectSummary> = client
+        .get("/v1/projects", TIMEOUT)
         .await
         .context("login failed")?;
 
@@ -25,6 +26,8 @@ pub(crate) async fn run(api: String) -> Result<()> {
         &Profile {
             api: api.clone(),
             token,
+            project: None,
+            environment: None,
         },
     )?;
     println!(

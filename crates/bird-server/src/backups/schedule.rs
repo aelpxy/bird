@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use bird_core::{BackupKeep, BackupSchedule, BackupTrigger, Name, ServiceId};
+use bird_core::{
+    BackupKeep, BackupSchedule, BackupTrigger, EnvironmentId, Name, Service, ServiceId,
+};
 use tokio::time::{MissedTickBehavior, interval_at};
 
 use super::create::snapshot;
@@ -14,8 +16,13 @@ const TICK: Duration = Duration::from_mins(1);
 // a failed backup is tried again this much later instead of pausing the machines every minute
 const RETRY_AFTER: Duration = Duration::from_mins(15);
 
-pub(crate) async fn set(state: &AppState, name: &Name, schedule: BackupSchedule) -> Result<()> {
-    let service = state.service(name).await?;
+pub(crate) async fn set(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: &Name,
+    schedule: BackupSchedule,
+) -> Result<()> {
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let has_volumes = state
         .db
@@ -34,8 +41,8 @@ pub(crate) async fn set(state: &AppState, name: &Name, schedule: BackupSchedule)
     Ok(())
 }
 
-pub(crate) async fn clear(state: &AppState, name: &Name) -> Result<()> {
-    let service = state.service(name).await?;
+pub(crate) async fn clear(state: &AppState, environment: EnvironmentId, name: &Name) -> Result<()> {
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     state
         .db
@@ -133,13 +140,13 @@ impl Scheduler {
             return Ok(());
         }
         // a deploy or another backup holds the ticket, the next tick tries again
-        let Ok(ticket) = state.deploys.begin(&service.name) else {
+        let Ok(ticket) = state.deploys.begin(service.environment_id, &service.name) else {
             return Ok(());
         };
         let backup = snapshot(state, &service, BackupTrigger::Scheduled).await?;
         drop(ticket);
         tracing::info!(service = %service.name, backup = %backup.id, "scheduled backup done");
-        prune(state, &service.name, schedule.keep).await;
+        prune(state, &service, schedule.keep).await;
         Ok(())
     }
 }
@@ -150,8 +157,9 @@ fn is_due(last: Option<i64>, schedule: BackupSchedule, now: i64) -> bool {
 }
 
 // only scheduled backups count toward keep; manual and restore backups are the operator's to delete
-async fn prune(state: &AppState, name: &Name, keep: BackupKeep) {
-    let backups = match super::list(state, name).await {
+async fn prune(state: &AppState, service: &Service, keep: BackupKeep) {
+    let (environment, name) = (service.environment_id, &service.name);
+    let backups = match super::list(state, environment, name).await {
         Ok(backups) => backups,
         Err(err) => {
             tracing::warn!(service = %name, error = %err, "could not list backups to prune");
@@ -163,7 +171,7 @@ async fn prune(state: &AppState, name: &Name, keep: BackupKeep) {
         .filter(|backup| backup.trigger == BackupTrigger::Scheduled)
         .skip(keep.count());
     for backup in expired {
-        if let Err(err) = super::remove(state, name, backup.id).await {
+        if let Err(err) = super::remove(state, environment, name, backup.id).await {
             tracing::warn!(service = %name, backup = %backup.id, error = %err, "could not delete an expired backup");
         }
     }

@@ -10,8 +10,10 @@ mod error;
 mod logs;
 mod openapi;
 mod power;
+mod projects;
 mod registries;
 mod scale;
+mod scope;
 mod services;
 mod stream;
 mod templates;
@@ -51,6 +53,10 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
 
 fn documented_routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::with_openapi(openapi::document())
+        .routes(routes!(projects::list, projects::create))
+        .routes(routes!(projects::remove))
+        .routes(routes!(projects::create_environment))
+        .routes(routes!(projects::remove_environment))
         .routes(routes!(deploy::create))
         .routes(routes!(builds::create))
         .routes(routes!(services::list))

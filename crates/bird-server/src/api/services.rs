@@ -1,19 +1,22 @@
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use bird_api::ErrorBody;
 use bird_api::{DeploymentSummary, FailedDeploy, MachineSummary, ServiceSummary, VolumeSpec};
-use bird_core::{DeploymentStatus, MachineId, MachineState, Name};
+use bird_core::{DeploymentStatus, EnvironmentId, MachineId, MachineState, Name};
 use bird_store::Store;
 use serde::Deserialize;
 
+use super::scope::{Scope, ServiceScope};
 use crate::state::AppState;
 use crate::{Result, deploy, stats};
 
 /// List services
-#[utoipa::path(get, path = "/v1/services", tag = "services", responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
-pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<ServiceSummary>>> {
-    let environment_id = state.environment_id;
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name")), responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+pub(crate) async fn list(
+    State(state): State<AppState>,
+    Scope(environment_id): Scope,
+) -> Result<Json<Vec<ServiceSummary>>> {
     let summaries = state
         .db
         .call(move |store| {
@@ -36,13 +39,13 @@ pub(crate) struct GetQuery {
 }
 
 /// Show one service
-#[utoipa::path(get, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name"), GetQuery), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), GetQuery), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn get(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<GetQuery>,
 ) -> Result<Json<ServiceSummary>> {
-    let mut summary = summary(&state, &name).await?;
+    let mut summary = summary(&state, environment, &name).await?;
     if query.stats {
         add_stats(&state, &mut summary).await?;
     }
@@ -69,8 +72,12 @@ async fn add_stats(state: &AppState, summary: &mut ServiceSummary) -> Result<()>
     Ok(())
 }
 
-pub(super) async fn summary(state: &AppState, name: &Name) -> Result<ServiceSummary> {
-    let service = state.service(name).await?;
+pub(super) async fn summary(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: &Name,
+) -> Result<ServiceSummary> {
+    let service = state.service(environment, name).await?;
     state.db.call(move |store| summarize(store, service)).await
 }
 
@@ -83,13 +90,15 @@ pub(crate) struct RemoveQuery {
 }
 
 /// Remove a service and its machines
-#[utoipa::path(delete, path = "/v1/services/{name}", tag = "services", params(("name" = String, Path, description = "Service name"), RemoveQuery), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(delete, path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), RemoveQuery), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<RemoveQuery>,
 ) -> Result<StatusCode> {
-    let task = tokio::spawn(async move { deploy::remove_service(&state, name, query.purge).await });
+    let task = tokio::spawn(async move {
+        deploy::remove_service(&state, environment, name, query.purge).await
+    });
     match task.await {
         Ok(result) => result.map(|()| StatusCode::NO_CONTENT),
         Err(err) => Err(std::io::Error::other(err).into()),

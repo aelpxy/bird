@@ -35,14 +35,25 @@ pub(super) async fn remove_orphans(state: &AppState) {
             return;
         }
     };
-    let filter = labels::environment_filter(state.environment_id);
-    let containers = match state.podman.list_containers(&filter).await {
-        Ok(containers) => containers,
+    let environments = match state.db.call(|store| store.list_all_environments()).await {
+        Ok(environments) => environments,
         Err(err) => {
-            tracing::warn!(error = %err, "could not list containers");
+            tracing::warn!(error = %err, "could not list environments");
             return;
         }
     };
+    // only this birdd's environments, so another birdd on the same podman keeps its machines
+    let mut containers = Vec::new();
+    for environment in environments {
+        let filter = labels::environment_filter(environment.id);
+        match state.podman.list_containers(&filter).await {
+            Ok(found) => containers.extend(found),
+            Err(err) => {
+                tracing::warn!(error = %err, "could not list containers");
+                return;
+            }
+        }
+    }
     for container in containers {
         if is_orphan(&container.labels, &tracked) {
             tracing::warn!(container = %container.name, "removing orphaned container");

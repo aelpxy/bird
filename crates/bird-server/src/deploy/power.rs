@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bird_core::{Deployment, Machine, MachineState, Name, Service, ServiceState};
+use bird_core::{Deployment, EnvironmentId, Machine, MachineState, Name, Service, ServiceState};
 
 use super::machine::boot;
 use super::{OPERATION_PATIENCE, set_state};
@@ -11,9 +11,12 @@ use crate::{Error, Result, routing};
 const STOP_GRACE: Duration = Duration::from_secs(30);
 
 // containers are kept, so logs survive and starting again needs no pull or new container
-pub(crate) async fn stop(state: &AppState, name: &Name) -> Result<()> {
-    let _ticket = state.deploys.wait_for(name, OPERATION_PATIENCE).await?;
-    let service = state.service(name).await?;
+pub(crate) async fn stop(state: &AppState, environment: EnvironmentId, name: &Name) -> Result<()> {
+    let _ticket = state
+        .deploys
+        .wait_for(environment, name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let machines = state
         .db
@@ -52,9 +55,12 @@ pub(crate) async fn stop(state: &AppState, name: &Name) -> Result<()> {
 }
 
 // machines the supervisor would add, like extra replicas, follow once the service runs again
-pub(crate) async fn start(state: &AppState, name: &Name) -> Result<()> {
-    let _ticket = state.deploys.wait_for(name, OPERATION_PATIENCE).await?;
-    let service = state.service(name).await?;
+pub(crate) async fn start(state: &AppState, environment: EnvironmentId, name: &Name) -> Result<()> {
+    let _ticket = state
+        .deploys
+        .wait_for(environment, name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let found = state
         .db
@@ -89,9 +95,16 @@ pub(crate) async fn start(state: &AppState, name: &Name) -> Result<()> {
 }
 
 // one machine at a time, so a service with replicas keeps serving throughout
-pub(crate) async fn restart(state: &AppState, name: &Name) -> Result<()> {
-    let _ticket = state.deploys.wait_for(name, OPERATION_PATIENCE).await?;
-    let service = state.service(name).await?;
+pub(crate) async fn restart(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: &Name,
+) -> Result<()> {
+    let _ticket = state
+        .deploys
+        .wait_for(environment, name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, name).await?;
     if service.state == ServiceState::Stopped {
         return Err(Error::ServiceStopped(name.clone()));
     }

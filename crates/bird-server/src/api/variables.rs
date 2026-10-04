@@ -4,28 +4,31 @@ use axum::Json;
 use axum::extract::{Path, State};
 use bird_api::ErrorBody;
 use bird_api::{UpdateVariables, VariableValue, VariablesResponse};
-use bird_core::{EnvKey, Name, ServiceId};
+use bird_core::{EnvKey, EnvironmentId, Name, ServiceId};
+use serde::Deserialize;
 
+use super::scope::ServiceScope;
 use crate::state::AppState;
 use crate::{Error, Result, deploy, secrets};
 
 /// List variable names
-#[utoipa::path(get, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
 ) -> Result<Json<Vec<EnvKey>>> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     Ok(Json(keys(&state, service.id).await?))
 }
 
 /// Reveal one variable
-#[utoipa::path(get, path = "/v1/services/{name}/variables/{key}", tag = "variables", params(("name" = String, Path, description = "Service name"), ("key" = String, Path, description = "Variable name")), responses((status = 200, description = "The stored value and what the running deployment received", body = VariableValue), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or variable not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables/{key}", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("key" = String, Path, description = "Variable name")), responses((status = 200, description = "The stored value and what the running deployment received", body = VariableValue), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or variable not found", body = ErrorBody)))]
 pub(crate) async fn get(
     State(state): State<AppState>,
-    Path((name, key)): Path<(Name, EnvKey)>,
+    ServiceScope { environment, name }: ServiceScope,
+    Path(KeyPath { key }): Path<KeyPath>,
 ) -> Result<Json<VariableValue>> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     let service_id = service.id;
     let (stored, deployed) = state
         .db
@@ -52,14 +55,14 @@ pub(crate) async fn get(
 }
 
 /// Set or unset variables
-#[utoipa::path(patch, path = "/v1/services/{name}/variables", tag = "variables", params(("name" = String, Path, description = "Service name")), request_body = UpdateVariables, responses((status = 200, description = "Variables updated, redeployed unless deploy is false", body = VariablesResponse), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
+#[utoipa::path(patch, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = UpdateVariables, responses((status = 200, description = "Variables updated, redeployed unless deploy is false", body = VariablesResponse), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
 pub(crate) async fn update(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Json(update): Json<UpdateVariables>,
 ) -> Result<Json<VariablesResponse>> {
     // run detached so a disconnecting client cannot abort the redeploy halfway through
-    let task = tokio::spawn(async move { apply(&state, &name, update).await });
+    let task = tokio::spawn(async move { apply(&state, environment, &name, update).await });
     match task.await {
         Ok(result) => result.map(Json),
         Err(err) => Err(std::io::Error::other(err).into()),
@@ -68,14 +71,15 @@ pub(crate) async fn update(
 
 async fn apply(
     state: &AppState,
+    environment: EnvironmentId,
     name: &Name,
     update: UpdateVariables,
 ) -> Result<VariablesResponse> {
-    let service = state.service(name).await?;
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let UpdateVariables { set, unset, deploy } = update;
     let set = secrets::expand_all(set)?;
-    deploy::references::check_change(state, name, &set, &unset).await?;
+    deploy::references::check_change(state, environment, name, &set, &unset).await?;
     state
         .db
         .call(move |store| {
@@ -103,6 +107,11 @@ async fn apply(
         keys: keys(state, service_id).await?,
         deployment,
     })
+}
+
+#[derive(Deserialize)]
+pub(crate) struct KeyPath {
+    key: EnvKey,
 }
 
 async fn keys(state: &AppState, service_id: ServiceId) -> Result<Vec<EnvKey>> {

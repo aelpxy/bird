@@ -51,6 +51,7 @@ pub(crate) async fn launch(
         .call(move |store| store.list_volumes(service_id))
         .await?;
     let mounts = super::volumes::mounts(state, &attached).await?;
+    let network = state.network(service.environment_id).await?;
 
     let deployment_id = deployment.id;
     let machine = state
@@ -64,7 +65,7 @@ pub(crate) async fn launch(
         lifecycle: Lifecycle::Service {
             port: deployment.port,
         },
-        network: state.network.to_string(),
+        network,
         aliases: labels::aliases(service),
         mounts,
         limits: Limits {

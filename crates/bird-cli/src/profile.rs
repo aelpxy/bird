@@ -4,6 +4,7 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use bird_core::Name;
 use serde::{Deserialize, Serialize};
 
 pub(crate) const DEFAULT_API: &str = "127.0.0.1:7070";
@@ -13,6 +14,11 @@ pub(crate) const TOKEN_ENV: &str = "BIRD_TOKEN";
 pub(crate) struct Profile {
     pub(crate) api: String,
     pub(crate) token: String,
+    // what `bird switch` chose, used where neither flags nor bird.toml say
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) project: Option<Name>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) environment: Option<Name>,
 }
 
 pub(crate) struct Target {
@@ -77,6 +83,8 @@ mod tests {
         Profile {
             api: api.to_owned(),
             token: "saved".to_owned(),
+            project: None,
+            environment: None,
         }
     }
 

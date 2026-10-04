@@ -4,17 +4,18 @@ use std::time::{Duration, SystemTime};
 
 use axum::Json;
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::response::{IntoResponse, Response};
 use bird_api::{LogEntry, LogStream};
-use bird_core::{MachineId, MachineState, Name};
+use bird_core::{EnvironmentId, MachineId, MachineState, Name};
 use bird_podman::{LogLine, LogStart, Podman};
 use bytes::Bytes;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
+use super::scope::ServiceScope;
 use super::stream::ChannelBody;
 use crate::state::AppState;
 use crate::{Error, Result};
@@ -36,19 +37,19 @@ pub(crate) struct LogsQuery {
 }
 
 /// Read or follow logs
-#[utoipa::path(get, path = "/v1/services/{name}/logs", tag = "logs", params(("name" = String, Path, description = "Service name"), LogsQuery), responses((status = 200, description = "Recent log lines; with follow=true a newline-delimited JSON stream of LogEntry", body = Vec<LogEntry>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/logs", tag = "logs", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), LogsQuery), responses((status = 200, description = "Recent log lines; with follow=true a newline-delimited JSON stream of LogEntry", body = Vec<LogEntry>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn logs(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Query(query): Query<LogsQuery>,
 ) -> Result<Response> {
-    let machines = logged_machines(&state, &name, |m| {
+    let machines = logged_machines(&state, environment, &name, |m| {
         matches!(m, MachineState::Running | MachineState::Stopped)
     })
     .await?;
     let tail = query.tail.unwrap_or(DEFAULT_TAIL).min(MAX_TAIL);
     if query.follow {
-        return Ok(follow(&state, name, machines, tail));
+        return Ok(follow(&state, environment, name, machines, tail));
     }
     if machines.is_empty() {
         return Err(Error::NoMachines(name));
@@ -64,10 +65,11 @@ pub(crate) async fn logs(
 // stopped machines keep their containers, so a stopped service still shows its last logs
 async fn logged_machines(
     state: &AppState,
+    environment: EnvironmentId,
     name: &Name,
     wanted: impl Fn(MachineState) -> bool + Send + 'static,
 ) -> Result<Vec<(MachineId, String)>> {
-    let service = state.service(name).await?;
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let machines = state
         .db
@@ -85,9 +87,22 @@ async fn logged_machines(
         .collect())
 }
 
-fn follow(state: &AppState, name: Name, machines: Vec<(MachineId, String)>, tail: u32) -> Response {
+fn follow(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: Name,
+    machines: Vec<(MachineId, String)>,
+    tail: u32,
+) -> Response {
     let (lines, receiver) = mpsc::channel(STREAM_BUFFER);
-    tokio::spawn(watch(state.clone(), name, machines, tail, lines));
+    tokio::spawn(watch(
+        state.clone(),
+        environment,
+        name,
+        machines,
+        tail,
+        lines,
+    ));
     (
         [(CONTENT_TYPE, "application/x-ndjson")],
         Body::new(ChannelBody(receiver)),
@@ -98,6 +113,7 @@ fn follow(state: &AppState, name: Name, machines: Vec<(MachineId, String)>, tail
 // follows the service, not the machines it had: replacements from a deploy, restart or start join in
 async fn watch(
     state: AppState,
+    environment: EnvironmentId,
     name: Name,
     machines: Vec<(MachineId, String)>,
     tail: u32,
@@ -131,7 +147,7 @@ async fn watch(
                 }
             }
             _ = poll.tick() => {
-                let running = match logged_machines(&state, &name, |m| m == MachineState::Running).await {
+                let running = match logged_machines(&state, environment, &name, |m| m == MachineState::Running).await {
                     Ok(running) => running,
                     Err(Error::ServiceNotFound(_)) => break,
                     Err(err) => {

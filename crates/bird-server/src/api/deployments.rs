@@ -1,19 +1,20 @@
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use bird_api::ErrorBody;
 use bird_api::{DeployResponse, DeploymentInfo, RollbackRequest};
 use bird_core::{Deployment, DeploymentStatus, Name, Service, ServiceId};
 
+use super::scope::ServiceScope;
 use crate::state::AppState;
 use crate::{Error, Result, deploy};
 
 /// List deployments
-#[utoipa::path(get, path = "/v1/services/{name}/deployments", tag = "deployments", params(("name" = String, Path, description = "Service name")), responses((status = 200, description = "Deployments, newest first", body = Vec<DeploymentInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/deployments", tag = "deployments", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Deployments, newest first", body = Vec<DeploymentInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
 ) -> Result<Json<Vec<DeploymentInfo>>> {
-    let service = state.service(&name).await?;
+    let service = state.service(environment, &name).await?;
     let deployments = history(&state, service.id).await?;
     let ids: Vec<_> = deployments.iter().map(|d| d.id).collect();
     let counts = state
@@ -30,15 +31,15 @@ pub(crate) async fn list(
 }
 
 /// Roll back to an earlier deployment
-#[utoipa::path(post, path = "/v1/services/{name}/rollback", tag = "deployments", params(("name" = String, Path, description = "Service name")), request_body = RollbackRequest, responses((status = 200, description = "Earlier image, port and variables deployed again", body = DeployResponse), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
+#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/rollback", tag = "deployments", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = RollbackRequest, responses((status = 200, description = "Earlier image, port and variables deployed again", body = DeployResponse), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
 pub(crate) async fn rollback(
     State(state): State<AppState>,
-    Path(name): Path<Name>,
+    ServiceScope { environment, name }: ServiceScope,
     Json(request): Json<RollbackRequest>,
 ) -> Result<Json<DeployResponse>> {
     // run detached so a disconnecting client cannot abort the redeploy halfway through
     let task = tokio::spawn(async move {
-        let service = state.service(&name).await?;
+        let service = state.service(environment, &name).await?;
         let deployments = history(&state, service.id).await?;
         let target = pick_target(&deployments, request.deployment_id, &name)?;
         tracing::info!(service = %name, target = %target.id, image = %target.image, "rolling back");

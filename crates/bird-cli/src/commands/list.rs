@@ -13,7 +13,7 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 const HEADER: [&str; 5] = ["NAME", "STATUS", "MACHINES", "IMAGE", "DOMAINS"];
 
 pub(crate) async fn run(client: &ApiClient, out: Output) -> Result<()> {
-    let services: Vec<ServiceSummary> = client.get("/v1/services", TIMEOUT).await?;
+    let services: Vec<ServiceSummary> = client.get(&client.scoped("services"), TIMEOUT).await?;
     if out.json(&services)? {
         return Ok(());
     }

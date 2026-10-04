@@ -36,7 +36,12 @@ pub(crate) async fn exec(
         command: Command::try_from(command)?,
         machine,
     };
-    stream(client, &format!("/v1/services/{name}/exec"), &request).await
+    stream(
+        client,
+        &client.scoped(&format!("services/{name}/exec")),
+        &request,
+    )
+    .await
 }
 
 pub(crate) async fn run(client: &ApiClient, name: &Name, command: Vec<String>) -> Result<()> {
@@ -46,7 +51,12 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, command: Vec<String>) -
     let request = RunRequest {
         command: Command::try_from(command)?,
     };
-    stream(client, &format!("/v1/services/{name}/run"), &request).await
+    stream(
+        client,
+        &client.scoped(&format!("services/{name}/run")),
+        &request,
+    )
+    .await
 }
 
 // `--json`: each event is printed as birdd sent it

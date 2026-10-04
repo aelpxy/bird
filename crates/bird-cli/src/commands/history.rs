@@ -14,7 +14,10 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) async fn history(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let deployments: Vec<DeploymentInfo> = client
-        .get(&format!("/v1/services/{name}/deployments"), TIMEOUT)
+        .get(
+            &client.scoped(&format!("services/{name}/deployments")),
+            TIMEOUT,
+        )
         .await?;
     if out.json(&deployments)? {
         return Ok(());
@@ -59,7 +62,7 @@ pub(crate) async fn rollback(
     let request = RollbackRequest { deployment_id };
     let response: DeployResponse = client
         .post(
-            &format!("/v1/services/{name}/rollback"),
+            &client.scoped(&format!("services/{name}/rollback")),
             &request,
             DEPLOY_TIMEOUT,
         )

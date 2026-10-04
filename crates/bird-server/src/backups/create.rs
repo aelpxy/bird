@@ -1,7 +1,8 @@
 use std::time::Duration;
 
 use bird_core::{
-    Backup, BackupId, BackupTrigger, BackupVolume, MachineState, Name, Service, Volume,
+    Backup, BackupId, BackupTrigger, BackupVolume, EnvironmentId, MachineState, Name, Service,
+    Volume,
 };
 
 use super::storage::Adapter;
@@ -11,9 +12,16 @@ use crate::{Error, Result};
 
 const COPY_TIMEOUT: Duration = Duration::from_hours(1);
 
-pub(crate) async fn create(state: &AppState, name: &Name) -> Result<Backup> {
-    let _ticket = state.deploys.wait_for(name, OPERATION_PATIENCE).await?;
-    let service = state.service(name).await?;
+pub(crate) async fn create(
+    state: &AppState,
+    environment: EnvironmentId,
+    name: &Name,
+) -> Result<Backup> {
+    let _ticket = state
+        .deploys
+        .wait_for(environment, name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, name).await?;
     snapshot(state, &service, BackupTrigger::Manual).await
 }
 

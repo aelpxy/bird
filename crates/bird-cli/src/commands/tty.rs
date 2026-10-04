@@ -45,7 +45,7 @@ pub(crate) async fn session(
     let (cols, rows) = terminal::size();
     let path = format!(
         "{}&cols={cols}&rows={rows}",
-        path(name, &place, "tty", &command)?
+        path(client, name, &place, "tty", &command)?
     );
     let io = client.upgrade(&path, TTY_UPGRADE, TIMEOUT).await?;
     let raw = RawMode::enable()?;
@@ -59,6 +59,7 @@ pub(crate) async fn session(
 
 // `mode` is `tty` or `pipe`
 pub(super) fn path(
+    client: &ApiClient,
     name: &Name,
     place: &Place<'_>,
     mode: &str,
@@ -68,10 +69,10 @@ pub(super) fn path(
         Place::Machine(_) => "exec",
         Place::NewContainer => "run",
     };
-    let mut path = format!(
-        "/v1/services/{name}/{endpoint}/{mode}?command={}",
+    let mut path = client.scoped(&format!(
+        "services/{name}/{endpoint}/{mode}?command={}",
         encode(&serde_json::to_string(command)?)
-    );
+    ));
     if let Place::Machine(Some(machine)) = place {
         path.push_str("&machine=");
         path.push_str(&encode(machine));

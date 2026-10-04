@@ -1,6 +1,6 @@
 use bird_core::{
-    Backup, BackupId, BackupTrigger, BackupVolume, Deployment, ImageLineage, ImageRef, Machine,
-    MachineState, Name, Service, ServiceState, Volume,
+    Backup, BackupId, BackupTrigger, BackupVolume, Deployment, EnvironmentId, ImageLineage,
+    ImageRef, Machine, MachineState, Name, Service, ServiceState, Volume,
 };
 
 use super::create::snapshot;
@@ -17,13 +17,17 @@ pub(crate) struct Restored {
 
 pub(crate) async fn restore(
     state: &AppState,
+    environment: EnvironmentId,
     name: &Name,
     id: BackupId,
     allow_image_change: bool,
 ) -> Result<Restored> {
-    let _ticket = state.deploys.wait_for(name, OPERATION_PATIENCE).await?;
-    let service = state.service(name).await?;
-    let backup = find(state, name, id).await?;
+    let _ticket = state
+        .deploys
+        .wait_for(environment, name, OPERATION_PATIENCE)
+        .await?;
+    let service = state.service(environment, name).await?;
+    let backup = find(state, environment, name, id).await?;
     ensure_reachable(state, &backup)?;
     let service_id = service.id;
     let (volumes, machines, active) = state

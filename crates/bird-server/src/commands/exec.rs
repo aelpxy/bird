@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bird_core::{Command, Machine, MachineState, Name};
+use bird_core::{Command, EnvironmentId, Machine, MachineState, Name};
 use bytes::Bytes;
 use tokio::sync::mpsc;
 
@@ -13,10 +13,11 @@ const EXEC_TIMEOUT: Duration = Duration::from_hours(1);
 // a full machine id, or its end as `bird status` and `bird logs` show it
 pub(crate) async fn pick_machine(
     state: &AppState,
+    environment: EnvironmentId,
     name: &Name,
     wanted: Option<&str>,
 ) -> Result<String> {
-    let service = state.service(name).await?;
+    let service = state.service(environment, name).await?;
     let service_id = service.id;
     let machines = state
         .db

@@ -96,6 +96,8 @@ pub struct Environment {
     pub id: EnvironmentId,
     pub project_id: ProjectId,
     pub name: Name,
+    // the podman network its machines share; `None` is the network birdd was started with
+    pub network: Option<String>,
     pub created_at: i64,
 }
 

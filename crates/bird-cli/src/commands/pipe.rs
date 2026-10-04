@@ -25,7 +25,7 @@ pub(crate) async fn session(
     if command.is_empty() {
         bail!("give a command to run; an interactive shell needs a terminal on stdin and stdout");
     }
-    let path = path(name, &place, "pipe", &command)?;
+    let path = path(client, name, &place, "pipe", &command)?;
     let io = client.upgrade(&path, TTY_UPGRADE, TIMEOUT).await?;
     match relay(io).await? {
         0 => Ok(()),

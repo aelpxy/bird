@@ -41,7 +41,9 @@ pub(crate) async fn run(
     let mut request = manifest.into_request(image);
     request.allow_image_change = allow_image_change;
     let spinner = Spinner::start(format!("deploying {} ({})", request.name, request.image));
-    let response: DeployResponse = client.post("/v1/deploy", &request, DEPLOY_TIMEOUT).await?;
+    let response: DeployResponse = client
+        .post(&client.scoped("deploy"), &request, DEPLOY_TIMEOUT)
+        .await?;
     drop(spinner);
     print_deployed(&response, started.elapsed(), out)
 }
