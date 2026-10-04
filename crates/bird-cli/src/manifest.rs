@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use bird_api::{MANIFEST_FILE, Manifest};
-use bird_core::EnvKey;
+use bird_core::{EnvKey, ImageRef, Name, Port};
+
+use crate::ui::style::{self, Paint};
 
 const SECRET_HINTS: [&str; 5] = ["PASSWORD", "SECRET", "TOKEN", "API_KEY", "PRIVATE_KEY"];
 
@@ -30,24 +32,24 @@ pub(crate) fn load(explicit: Option<&Path>) -> Result<Option<Loaded>> {
             path.display()
         );
     }
-    warn_about_secrets(&manifest, path);
     let dir = path.parent().map_or_else(PathBuf::new, Path::to_path_buf);
     Ok(Some(Loaded { manifest, dir }))
 }
 
 // bird.toml is usually committed, so literal secrets in it end up in git history
-fn warn_about_secrets(manifest: &Manifest, path: &Path) {
+pub(crate) fn warn_about_secrets(manifest: &Manifest, path: &Path) {
+    let warning = style::err(Paint::Yellow, "warning:");
     let build_args = manifest.build.iter().flat_map(|build| &build.args);
     for (key, _) in build_args.filter(|(key, _)| looks_secret(key)) {
         eprintln!(
-            "warning: build arg {key} in {} looks like a secret, build args stay readable in the image",
+            "{warning} build arg {key} in {} looks like a secret, build args stay readable in the image",
             path.display()
         );
     }
     for (key, value) in &manifest.env {
         if looks_secret(key) && !value.is_empty() && !value.contains("${{") {
             eprintln!(
-                "warning: {key} in {} looks like a secret, set it with `bird env set {} {key}=...` instead",
+                "{warning} {key} in {} looks like a secret, set it with `bird env set -s {} {key}=...` instead",
                 path.display(),
                 manifest.name
             );
@@ -59,11 +61,34 @@ fn looks_secret(key: &EnvKey) -> bool {
     SECRET_HINTS.iter().any(|hint| key.as_str().contains(hint))
 }
 
-pub(crate) fn starter(name: &str, image: &str, port: u16) -> String {
+// where a new service's image comes from: a published image or the Dockerfile next to bird.toml
+pub(crate) enum Starter<'a> {
+    Image(&'a ImageRef),
+    Build,
+}
+
+pub(crate) fn starter(name: &Name, source: &Starter<'_>, port: Port) -> String {
+    let (image, build) = match source {
+        Starter::Image(image) => (
+            format!("image = \"{image}\"\n"),
+            "# build from source on the server instead of pulling image; remove image above to use it
+# [build]
+# context = \".\"
+# dockerfile = \"Dockerfile\"
+# args = { NODE_ENV = \"production\" }",
+        ),
+        Starter::Build => (
+            String::new(),
+            "# built on the server from the Dockerfile; set image = \"...\" instead to pull one
+[build]
+context = \".\"
+dockerfile = \"Dockerfile\"
+# args = { NODE_ENV = \"production\" }",
+        ),
+    };
     format!(
         r#"name = "{name}"
-image = "{image}"
-port = {port}
+{image}port = {port}
 # domains = ["{name}.example.com"]
 # health = "/healthz"
 # health_timeout = "2m"
@@ -72,11 +97,7 @@ port = {port}
 # replicas = 2
 # command = ["./server", "--listen", "0.0.0.0:{port}"]
 
-# build from source on the server instead of pulling image; remove image above to use it
-# [build]
-# context = "."
-# dockerfile = "Dockerfile"
-# args = {{ NODE_ENV = "production" }}
+{build}
 
 # plain settings and references like ${{{{postgres.DATABASE_URL}}}}; set secrets with `bird env set`
 [env]
@@ -95,9 +116,24 @@ mod tests {
 
     #[test]
     fn starter_file_parses() {
-        let manifest: Manifest = toml::from_str(&starter("web", "nginx:alpine", 8080)).unwrap();
+        let name: Name = "web".parse().unwrap();
+        let port = Port::try_from(8080).unwrap();
+        let image: ImageRef = "nginx:alpine".parse().unwrap();
+        let manifest: Manifest =
+            toml::from_str(&starter(&name, &Starter::Image(&image), port)).unwrap();
         assert_eq!(manifest.name.as_str(), "web");
-        assert_eq!(manifest.port.map(bird_core::Port::get), Some(8080));
+        assert_eq!(manifest.port, Some(port));
+        assert_eq!(manifest.image, Some(image));
+        assert_eq!(manifest.build, None);
+        let manifest: Manifest = toml::from_str(&starter(&name, &Starter::Build, port)).unwrap();
+        assert_eq!(manifest.image, None);
+        assert_eq!(
+            manifest
+                .build
+                .and_then(|b| b.dockerfile)
+                .map(|d| d.to_string()),
+            Some("Dockerfile".to_owned())
+        );
     }
 
     #[test]

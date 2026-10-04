@@ -59,21 +59,26 @@ To run it as a service, use the rootless systemd unit in [contrib/systemd/birdd.
 ## Usage
 
 ```sh
-bird deploy app ghcr.io/owner/app:1 --port 3000 --domain app.example.com -e NODE_ENV=production
-bird deploy app --build                # build ./Dockerfile on the server
-bird list
-bird logs app -f
-bird scale app 3
-bird history app
-bird rollback app                      # previous deployment, or pass an id
-bird rm app                            # --purge also deletes its volumes
+cd my-app
+bird init                              # bird.toml named after the directory, builds ./Dockerfile
+bird deploy
+bird status                            # deployment, machines, domains, health
+bird logs -f
+bird scale 3
+bird history
+bird rollback                          # previous deployment, or pass an id
+bird rm                                # asks first; --purge also deletes its volumes
+
+bird ls                                # every service
+bird deploy api ghcr.io/owner/api:1 --port 3000 --domain api.example.com
+bird logs -s api                       # any service by name
 ```
 
-Run `bird --help` or `bird <command> --help` for every option.
+Commands act on the service named in `./bird.toml`, or the one given with `-s <name>`. Read commands take `--json` for scripts, destructive ones ask for confirmation unless you pass `-y`, and `bird completions <shell>` prints shell completions. Run `bird --help` or `bird <command> --help` for every option.
 
 ### bird.toml
 
-`bird init web nginx:alpine --port 80` writes a starter file. With a `bird.toml` in the directory, `bird deploy` needs no arguments:
+`bird init` writes a starter file that builds the directory's Dockerfile on the port it `EXPOSE`s; `bird init web nginx:alpine` runs an image instead. With a `bird.toml` in the directory, `bird deploy` needs no arguments:
 
 ```toml
 name = "web"
@@ -99,10 +104,10 @@ One file describes one service. Use `image = "..."` instead of `[build]` to depl
 ### Variables
 
 ```sh
-bird env set app API_KEY='${{secret}}' DATABASE_URL='${{postgres.DATABASE_URL}}'
-bird env ls app                        # names only
-bird env get app DATABASE_URL --deployed
-bird env unset app OLD_KEY
+bird env set API_KEY='${{secret}}' DATABASE_URL='${{postgres.DATABASE_URL}}'
+bird env                               # names only
+bird env get DATABASE_URL --deployed
+bird env unset OLD_KEY
 ```
 
 Values can reference another service's variable (`${{service.KEY}}`), the same service's (`${{KEY}}`), or generate a random secret once (`${{secret}}`, `${{secret(N)}}`). References resolve when a deploy starts. Changing variables redeploys the service unless you pass `--no-deploy`.
@@ -111,8 +116,8 @@ Values can reference another service's variable (`${{service.KEY}}`), the same s
 
 ```sh
 bird templates                         # postgres, valkey
-bird add postgres                      # --name to pick the service name
-bird env set app DATABASE_URL='${{postgres.DATABASE_URL}}'
+bird add postgres                      # or `bird add postgres db` to pick the name
+bird env set -s app DATABASE_URL='${{postgres.DATABASE_URL}}'
 ```
 
 Templates create ready-made services with a volume, a generated password and a connection variable.
@@ -128,10 +133,10 @@ A service with volumes runs one machine and stops the old one before starting th
 ### Backups
 
 ```sh
-bird backup create db                  # copies every volume of the service
-bird backup ls db
-bird backup restore db <backup-id>
-bird backup rm db <backup-id>
+bird backup create -s db               # copies every volume of the service
+bird backup -s db                      # lists them
+bird backup restore -s db <backup-id>
+bird backup rm -s db <backup-id>
 ```
 
 A backup pauses the service's machines for the few seconds the copy takes, so the data is consistent the way it would be after a crash, which databases recover from. Restoring first saves the current data as a new backup, so you can undo it, then restarts the service on the restored data. Backups are kept in `~/.local/share/bird/backups` (`--backup-dir` to change it) and survive `bird rm --purge`. A recreated service generates new secrets, but restored database data keeps its old passwords: note them with `bird env get` before removing a service, and set them on the new one.

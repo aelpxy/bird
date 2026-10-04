@@ -19,6 +19,7 @@ bird-proxy = { path = "crates/bird-proxy" }
 bird-store = { path = "crates/bird-store" }
 bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
+clap_complete = { version = "4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 http-body = "1"
 http-body-util = "0.1"

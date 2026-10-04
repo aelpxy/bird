@@ -8,19 +8,21 @@ use bird_core::{EnvKey, Name};
 use super::deploy::{DEPLOY_TIMEOUT, print_deployed};
 use crate::args::EnvCommand;
 use crate::client::ApiClient;
+use crate::ui::style::{self, Paint};
+use crate::ui::{Output, Spinner};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(crate) async fn run(client: &ApiClient, command: EnvCommand) -> Result<()> {
+pub(crate) async fn run(
+    client: &ApiClient,
+    name: &Name,
+    command: EnvCommand,
+    out: Output,
+) -> Result<()> {
     match command {
-        EnvCommand::List { name } => list(client, &name).await,
-        EnvCommand::Get {
-            name,
-            key,
-            deployed,
-        } => get(client, &name, &key, deployed).await,
+        EnvCommand::List => list(client, name, out).await,
+        EnvCommand::Get { key, deployed } => get(client, name, &key, deployed, out).await,
         EnvCommand::Set {
-            name,
             variables,
             no_deploy,
         } => {
@@ -29,29 +31,31 @@ pub(crate) async fn run(client: &ApiClient, command: EnvCommand) -> Result<()> {
                 unset: Vec::new(),
                 deploy: !no_deploy,
             };
-            apply(client, &name, &update).await
+            apply(client, name, &update, out).await
         }
-        EnvCommand::Unset {
-            name,
-            keys,
-            no_deploy,
-        } => {
+        EnvCommand::Unset { keys, no_deploy } => {
             let update = UpdateVariables {
                 set: BTreeMap::new(),
                 unset: keys,
                 deploy: !no_deploy,
             };
-            apply(client, &name, &update).await
+            apply(client, name, &update, out).await
         }
     }
 }
 
-async fn list(client: &ApiClient, name: &Name) -> Result<()> {
+async fn list(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let keys: Vec<EnvKey> = client
         .get(&format!("/v1/services/{name}/variables"), TIMEOUT)
         .await?;
+    if out.json(&keys)? {
+        return Ok(());
+    }
     if keys.is_empty() {
-        println!("{name} has no variables");
+        println!(
+            "{name} has no variables, add some with {}",
+            style::out(Paint::Bold, "bird env set KEY=value")
+        );
     }
     for key in keys {
         println!("{key}");
@@ -59,10 +63,19 @@ async fn list(client: &ApiClient, name: &Name) -> Result<()> {
     Ok(())
 }
 
-async fn get(client: &ApiClient, name: &Name, key: &EnvKey, deployed: bool) -> Result<()> {
+async fn get(
+    client: &ApiClient,
+    name: &Name,
+    key: &EnvKey,
+    deployed: bool,
+    out: Output,
+) -> Result<()> {
     let variable: VariableValue = client
         .get(&format!("/v1/services/{name}/variables/{key}"), TIMEOUT)
         .await?;
+    if out.json(&variable)? {
+        return Ok(());
+    }
     if !deployed {
         println!("{}", variable.value);
         return Ok(());
@@ -76,10 +89,17 @@ async fn get(client: &ApiClient, name: &Name, key: &EnvKey, deployed: bool) -> R
     Ok(())
 }
 
-async fn apply(client: &ApiClient, name: &Name, update: &UpdateVariables) -> Result<()> {
-    if update.deploy {
-        println!("updating variables and redeploying {name}...");
-    }
+async fn apply(
+    client: &ApiClient,
+    name: &Name,
+    update: &UpdateVariables,
+    out: Output,
+) -> Result<()> {
+    let spinner = Spinner::start(if update.deploy {
+        format!("updating variables and redeploying {name}")
+    } else {
+        format!("updating variables of {name}")
+    });
     let response: VariablesResponse = client
         .patch(
             &format!("/v1/services/{name}/variables"),
@@ -87,18 +107,27 @@ async fn apply(client: &ApiClient, name: &Name, update: &UpdateVariables) -> Res
             DEPLOY_TIMEOUT,
         )
         .await?;
+    let elapsed = spinner.elapsed();
+    drop(spinner);
+    if out.json(&response)? {
+        return Ok(());
+    }
     let keys: Vec<String> = response.keys.iter().map(ToString::to_string).collect();
     println!(
-        "{name} variables: {}",
+        "{} {name} variables: {}",
+        style::out(Paint::Green, "✓"),
         if keys.is_empty() {
             "none".to_owned()
         } else {
             keys.join(", ")
         }
     );
-    match &response.deployment {
-        Some(deployment) => print_deployed(deployment),
-        None => println!("saved, the changes apply on the next deploy"),
+    if let Some(deployment) = &response.deployment {
+        return print_deployed(deployment, elapsed, out);
     }
+    println!(
+        "  {}",
+        style::out(Paint::Dim, "saved, the changes apply on the next deploy")
+    );
     Ok(())
 }

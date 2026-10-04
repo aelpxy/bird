@@ -8,15 +8,24 @@ use super::history::{ago, unix_now};
 use super::table::render;
 use crate::args::BackupCommand;
 use crate::client::ApiClient;
+use crate::ui::style::{self, Paint};
+use crate::ui::{Output, Spinner, duration, prompt};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 // copying large volumes takes a while, and a restore copies twice and starts the app again
 const TRANSFER_TIMEOUT: Duration = Duration::from_hours(3);
 
-pub(crate) async fn run(client: &ApiClient, command: BackupCommand) -> Result<()> {
+pub(crate) async fn run(
+    client: &ApiClient,
+    name: &Name,
+    command: BackupCommand,
+    out: Output,
+) -> Result<()> {
     match command {
-        BackupCommand::Create { name } => {
-            println!("backing up {name}, its machines pause until the copy is done...");
+        BackupCommand::Create => {
+            let spinner = Spinner::start(format!(
+                "backing up {name}, its machines pause until the copy is done"
+            ));
             let backup: BackupInfo = client
                 .post(
                     &format!("/v1/services/{name}/backups"),
@@ -24,19 +33,31 @@ pub(crate) async fn run(client: &ApiClient, command: BackupCommand) -> Result<()
                     TRANSFER_TIMEOUT,
                 )
                 .await?;
-            println!(
-                "backup {} of {name}: {}",
-                backup.id,
-                size(backup.volumes.iter().map(|v| v.size_bytes).sum())
-            );
+            let elapsed = spinner.elapsed();
+            drop(spinner);
+            if !out.json(&backup)? {
+                println!(
+                    "{} backed up {name} in {}: {} {}",
+                    style::out(Paint::Green, "✓"),
+                    duration(elapsed),
+                    size(backup.volumes.iter().map(|v| v.size_bytes).sum()),
+                    style::out(Paint::Dim, format!("(backup {})", backup.id))
+                );
+            }
         }
-        BackupCommand::List { name } => list(client, &name).await?,
+        BackupCommand::List => list(client, name, out).await?,
         BackupCommand::Restore {
-            name,
             backup,
             allow_image_change,
+            yes,
         } => {
-            println!("restoring {name} from backup {backup}, its machines restart...");
+            prompt::confirm(
+                &format!(
+                    "replace {name}'s data with backup {backup}? the current data is saved as a new backup first, and its machines restart"
+                ),
+                yes,
+            )?;
+            let spinner = Spinner::start(format!("restoring {name} from backup {backup}"));
             let response: RestoreResponse = client
                 .post(
                     &format!("/v1/services/{name}/backups/{backup}/restore"),
@@ -44,27 +65,50 @@ pub(crate) async fn run(client: &ApiClient, command: BackupCommand) -> Result<()
                     TRANSFER_TIMEOUT,
                 )
                 .await?;
-            println!(
-                "restored {name} from {}; the data it replaced is backup {}",
-                response.restored, response.safety_backup
-            );
+            let elapsed = spinner.elapsed();
+            drop(spinner);
+            if !out.json(&response)? {
+                println!(
+                    "{} restored {name} from {} in {}",
+                    style::out(Paint::Green, "✓"),
+                    response.restored,
+                    duration(elapsed)
+                );
+                println!(
+                    "  {}",
+                    style::out(
+                        Paint::Dim,
+                        format!(
+                            "the data it replaced is backup {}, restore that to undo",
+                            response.safety_backup
+                        )
+                    )
+                );
+            }
         }
-        BackupCommand::Remove { name, backup } => {
+        BackupCommand::Remove { backup, yes } => {
+            prompt::confirm(&format!("delete backup {backup} of {name}?"), yes)?;
             client
                 .delete(&format!("/v1/services/{name}/backups/{backup}"), TIMEOUT)
                 .await?;
-            println!("deleted backup {backup}");
+            println!("{} deleted backup {backup}", style::out(Paint::Green, "✓"));
         }
     }
     Ok(())
 }
 
-async fn list(client: &ApiClient, name: &Name) -> Result<()> {
+async fn list(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
     let backups: Vec<BackupInfo> = client
         .get(&format!("/v1/services/{name}/backups"), TIMEOUT)
         .await?;
+    if out.json(&backups)? {
+        return Ok(());
+    }
     if backups.is_empty() {
-        println!("{name} has no backups yet, make one with `bird backup create {name}`");
+        println!(
+            "{name} has no backups yet, make one with {}",
+            style::out(Paint::Bold, "bird backup create")
+        );
         return Ok(());
     }
     let now = unix_now();

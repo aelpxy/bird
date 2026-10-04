@@ -9,6 +9,7 @@ use bird_core::{BuildFile, EnvKey, ImageRef, Name};
 
 use crate::client::ApiClient;
 use crate::context;
+use crate::ui::style::{self, Paint};
 
 // covers uploading the context; birdd bounds the build itself
 const UPLOAD_TIMEOUT: Duration = Duration::from_mins(10);
@@ -26,7 +27,7 @@ pub(crate) async fn run(
         None => DEFAULT_DOCKERFILE.parse()?,
     };
     let packed = context::pack(dir, &dockerfile)?;
-    println!(
+    eprintln!(
         "uploading {} ({} files, {:.1} MiB)...",
         dir.display(),
         packed.files,
@@ -51,7 +52,7 @@ pub(crate) async fn run(
                 let event: BuildEvent =
                     serde_json::from_str(line).context("birdd sent an unexpected build event")?;
                 match event {
-                    BuildEvent::Log { line } => println!("  {line}"),
+                    BuildEvent::Log { line } => eprintln!("  {}", style::err(Paint::Dim, line)),
                     BuildEvent::Built { image } => outcome = Some(Ok(image)),
                     BuildEvent::Failed { error } => outcome = Some(Err(anyhow!(error))),
                 }
@@ -61,7 +62,7 @@ pub(crate) async fn run(
         .await?;
     match outcome {
         Some(Ok(image)) => {
-            println!("built {image}");
+            eprintln!("{} built {image}", style::err(Paint::Green, "✓"));
             Ok(image)
         }
         Some(Err(err)) => Err(err),
