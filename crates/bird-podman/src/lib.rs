@@ -6,6 +6,7 @@ mod error;
 mod exec;
 mod follow;
 mod image;
+mod lines;
 mod logs;
 mod network;
 mod output;
