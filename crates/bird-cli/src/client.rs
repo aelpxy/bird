@@ -35,7 +35,7 @@ impl fmt::Display for ApiError {
         } else {
             f.write_str(&self.body.error)?;
         }
-        if self.status == StatusCode::NOT_FOUND && self.body.error.starts_with("service ") {
+        if self.status == StatusCode::NOT_FOUND && is_missing_service(&self.body.error) {
             write!(
                 f,
                 "\nsee your services with `bird ls`, or create this one with `bird deploy`"
@@ -58,6 +58,14 @@ impl fmt::Display for ApiError {
 }
 
 impl std::error::Error for ApiError {}
+
+// birdd answers "service <name> not found"; other 404s about a service need a different hint
+fn is_missing_service(error: &str) -> bool {
+    error
+        .strip_prefix("service ")
+        .and_then(|rest| rest.strip_suffix(" not found"))
+        .is_some_and(|name| !name.contains(' '))
+}
 
 impl ApiClient {
     pub(crate) fn new(addr: String, token: Option<String>) -> Self {
@@ -295,4 +303,21 @@ fn api_error(status: StatusCode, body: &[u8]) -> anyhow::Error {
         logs: Vec::new(),
     });
     ApiError { status, body }.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hints_at_deploy_only_for_a_missing_service() {
+        assert!(is_missing_service("service web not found"));
+        assert!(!is_missing_service(
+            "service web has no earlier deployment to roll back to"
+        ));
+        assert!(!is_missing_service(
+            "web has no running machines, see `bird status`"
+        ));
+        assert!(!is_missing_service("service web volume data not found"));
+    }
 }
