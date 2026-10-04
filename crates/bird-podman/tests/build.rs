@@ -74,3 +74,27 @@ async fn reports_a_failing_step() {
     assert!(matches!(lines.last(), Some(BuildLine::Failed(e)) if e.contains("exit status 7")));
     assert!(!podman.image_exists(&tag).await.unwrap());
 }
+
+#[tokio::test]
+#[ignore = "requires a running podman socket"]
+async fn rebuilding_reuses_cached_layers() {
+    let podman = podman();
+    let marker = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dockerfile = format!("FROM docker.io/library/alpine:3\nRUN echo {marker} > /marker\n");
+    let first: ImageRef = "localhost/bird-test/build:cache-1".parse().unwrap();
+    let second: ImageRef = "localhost/bird-test/build:cache-2".parse().unwrap();
+    let cached = |lines: &[BuildLine]| {
+        lines
+            .iter()
+            .any(|l| matches!(l, BuildLine::Log(line) if line.contains("Using cache")))
+    };
+    let first_lines = lines(&podman, &dockerfile, &first).await;
+    assert!(!cached(&first_lines), "{first_lines:?}");
+    let second_lines = lines(&podman, &dockerfile, &second).await;
+    assert!(cached(&second_lines), "{second_lines:?}");
+    podman.remove_image(&second).await.unwrap();
+    podman.remove_image(&first).await.unwrap();
+}

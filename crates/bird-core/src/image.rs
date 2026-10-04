@@ -55,12 +55,15 @@ pub struct ImageLineage {
     repository: String,
     major: Option<String>,
     variant: Option<String>,
+    // images bird builds are tagged with a timestamp, not a version, so every build is one lineage
+    built_here: bool,
 }
 
 impl ImageLineage {
     #[must_use]
     pub fn of(image: &ImageRef) -> Self {
         let qualified = image.qualified();
+        let built_here = image.is_local();
         let without_digest = qualified
             .split_once('@')
             .map_or(qualified.as_str(), |(r, _)| r);
@@ -71,7 +74,9 @@ impl ImageLineage {
         };
         let tag = tag.trim_start_matches(':');
         let digits: String = tag.chars().take_while(char::is_ascii_digit).collect();
-        let (major, variant) = if digits.is_empty() {
+        let (major, variant) = if built_here {
+            (None, None)
+        } else if digits.is_empty() {
             (None, Some(tag).filter(|t| *t != "latest"))
         } else {
             (
@@ -83,7 +88,18 @@ impl ImageLineage {
             repository: repository.to_owned(),
             major,
             variant: variant.map(str::to_owned),
+            built_here,
         }
+    }
+
+    // a lineage stored for a volume; older ones of built images still carry the build timestamp
+    #[must_use]
+    pub fn matches(&self, recorded: &str) -> bool {
+        recorded == self.to_string()
+            || (self.built_here
+                && recorded
+                    .rsplit_once(':')
+                    .is_some_and(|(repository, _)| repository == self.repository))
     }
 }
 
@@ -165,6 +181,22 @@ mod tests {
             lineage("postgres:18-alpine"),
             "docker.io/library/postgres:18-alpine"
         );
+    }
+
+    #[test]
+    fn builds_of_one_service_share_a_lineage() {
+        let first = ImageLineage::of(&"localhost/bird/notes:1791077958876".parse().unwrap());
+        let next = ImageLineage::of(&"localhost/bird/notes:1791082579769".parse().unwrap());
+        assert_eq!(first, next);
+        assert_eq!(next.to_string(), "localhost/bird/notes:*");
+        assert!(next.matches("localhost/bird/notes:*"));
+        assert!(next.matches("localhost/bird/notes:1791077958876"));
+        assert!(!next.matches("localhost/bird/other:1791077958876"));
+        assert!(!next.matches("docker.io/library/postgres:18"));
+        let pulled = ImageLineage::of(&"postgres:18".parse().unwrap());
+        assert!(pulled.matches("docker.io/library/postgres:18"));
+        assert!(!pulled.matches("docker.io/library/postgres:19"));
+        assert!(!pulled.matches("docker.io/library/postgres:1791077958876"));
     }
 
     #[test]
