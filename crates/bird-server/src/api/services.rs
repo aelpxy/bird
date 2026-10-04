@@ -72,6 +72,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             memory: service.memory,
             cpus: service.cpus,
             health: service.health,
+            health_timeout: service.health_timeout,
             domains,
             volumes,
             deployment: None,
@@ -94,6 +95,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         memory: service.memory,
         cpus: service.cpus,
         health: service.health,
+        health_timeout: service.health_timeout,
         domains,
         volumes,
         deployment: Some(DeploymentSummary {

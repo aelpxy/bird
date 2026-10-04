@@ -34,7 +34,7 @@ pub(super) async fn check_machine(
         .map(|host_port| SocketAddr::from((Ipv4Addr::LOCALHOST, host_port)));
     let responded = match (info.state, address) {
         (ContainerState::Running, Some(address)) => {
-            Some(health::probe(service.health, address).await)
+            Some(health::probe(&service.health, address).await)
         }
         _ => None,
     };

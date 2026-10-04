@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use bird_api::VolumeSpec;
 use bird_core::{
-    BackupId, CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name,
-    Port, RegistryHost, Replicas,
+    BackupId, CpuLimit, DeploymentId, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef,
+    MemoryLimit, Name, Port, RegistryHost, Replicas,
 };
 use clap::{Parser, Subcommand};
 
@@ -23,7 +23,7 @@ pub(crate) enum Command {
     /// Save a birdd address and API token, read from stdin
     Login { api: String },
     /// Deploy an image as a service, creating it if needed; reads ./bird.toml when present
-    Deploy(DeployArgs),
+    Deploy(Box<DeployArgs>),
     /// Write a starter bird.toml in the current directory
     Init {
         name: Name,
@@ -196,10 +196,14 @@ pub(crate) struct DeployArgs {
     /// Domain to route to this service, repeatable; leave out for internal-only services
     #[arg(long = "domain")]
     pub(crate) domains: Vec<Hostname>,
-    /// How to tell the app is ready: http (default for new services) or tcp for databases;
-    /// left out, an existing service keeps its current check
+    /// How to tell the app is ready: http (any response, default for new services), tcp for
+    /// databases, or a path like /healthz that must answer 2xx; left out, an existing service
+    /// keeps its current check
     #[arg(long)]
     pub(crate) health: Option<HealthCheck>,
+    /// How long a new machine has to pass its health check, like 90s or 5m (new services default to 60s)
+    #[arg(long)]
+    pub(crate) health_timeout: Option<HealthTimeout>,
     /// Environment variable as KEY=VALUE, repeatable
     #[arg(long = "env", short = 'e', value_parser = parse_env)]
     pub(crate) env: Vec<(EnvKey, String)>,

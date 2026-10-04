@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use bird_core::{
-    Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name,
-    Port, Replicas,
+    Command, CpuLimit, DeploymentId, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef,
+    MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,9 @@ pub struct DeployRequest {
     pub env: BTreeMap<EnvKey, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health: Option<HealthCheck>,
+    /// Seconds a new machine has to pass its health check; left out, a new service gets 60 and an existing one keeps its timeout
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health_timeout: Option<HealthTimeout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Command>,
     /// Memory limit in MiB; left out, a new service gets 1024 and an existing one keeps its limit
@@ -67,5 +70,22 @@ mod tests {
         assert_eq!(request.domains, Vec::new());
         assert!(request.env.is_empty());
         assert_eq!(request.health, None);
+    }
+
+    #[test]
+    fn health_checks_travel_as_strings() {
+        let with_path =
+            r#"{"name":"web","image":"nginx","port":80,"health":"/up","health_timeout":90}"#;
+        let request: DeployRequest = serde_json::from_str(with_path).unwrap();
+        assert_eq!(request.health.unwrap().to_string(), "/up");
+        assert_eq!(request.health_timeout.unwrap().secs(), 90);
+        let json = serde_json::to_string(&DeployRequest {
+            health: Some(HealthCheck::Tcp),
+            ..request
+        })
+        .unwrap();
+        assert!(json.contains(r#""health":"tcp""#), "{json}");
+        let bad = r#"{"name":"web","image":"nginx","port":80,"health":"up"}"#;
+        assert!(serde_json::from_str::<DeployRequest>(bad).is_err());
     }
 }

@@ -38,6 +38,12 @@ pub enum ValidationError {
         "invalid dockerfile path {0:?}: use a path inside the build context like Dockerfile or docker/web.Dockerfile"
     )]
     BuildFile(String),
+    #[error("invalid health check {0:?}: use http, tcp or a path like /healthz")]
+    Health(String),
+    #[error("invalid health check path {0:?}: use a path like /healthz, without spaces or #")]
+    HealthPath(String),
+    #[error("invalid health timeout {0:?}: use 1s to 60m, like 90s or 5m")]
+    HealthTimeout(String),
 }
 
 macro_rules! validated_string {

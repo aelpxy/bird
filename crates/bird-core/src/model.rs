@@ -5,9 +5,9 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, Hostname, ImageRef,
-    MachineId, MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost, Replicas, ServiceId,
-    VolumeId,
+    BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, HealthCheck, HealthTimeout,
+    Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost,
+    Replicas, ServiceId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -62,11 +62,6 @@ string_enum!(DeploymentStatus, "deployment status" {
     Failed => "failed",
 });
 
-string_enum!(HealthCheck, "health check" {
-    Http => "http",
-    Tcp => "tcp",
-});
-
 string_enum!(MachineState, "machine state" {
     Created => "created",
     Starting => "starting",
@@ -106,6 +101,7 @@ pub struct Service {
     pub port: Port,
     pub replicas: Replicas,
     pub health: HealthCheck,
+    pub health_timeout: HealthTimeout,
     pub command: Option<Command>,
     pub memory: MemoryLimit,
     pub cpus: CpuLimit,

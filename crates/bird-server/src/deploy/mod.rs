@@ -34,6 +34,7 @@ pub(crate) async fn redeploy(
         domains: Vec::new(),
         env: BTreeMap::new(),
         health: None,
+        health_timeout: None,
         command: None,
         memory: None,
         cpus: None,
@@ -187,8 +188,18 @@ async fn save_config(
                 };
                 let service = match request.health {
                     Some(health) => {
-                        store.set_health(service.id, health)?;
+                        store.set_health(service.id, &health)?;
                         Service { health, ..service }
+                    }
+                    None => service,
+                };
+                let service = match request.health_timeout {
+                    Some(health_timeout) => {
+                        store.set_health_timeout(service.id, health_timeout)?;
+                        Service {
+                            health_timeout,
+                            ..service
+                        }
                     }
                     None => service,
                 };

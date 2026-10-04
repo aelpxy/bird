@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use bird_core::{
-    BuildFile, Command, CpuLimit, EnvKey, HealthCheck, Hostname, ImageRef, MemoryLimit, Name, Port,
-    Replicas,
+    BuildFile, Command, CpuLimit, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef,
+    MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -28,6 +28,8 @@ pub struct Manifest {
     pub domains: Vec<Hostname>,
     #[serde(default)]
     pub health: Option<HealthCheck>,
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub health_timeout: Option<HealthTimeout>,
     #[serde(default)]
     pub command: Option<Command>,
     #[serde(default, deserialize_with = "text_or_number")]
@@ -67,6 +69,7 @@ impl Manifest {
             port: None,
             domains: Vec::new(),
             health: None,
+            health_timeout: None,
             command: None,
             memory: None,
             cpus: None,
@@ -86,6 +89,7 @@ impl Manifest {
             domains: self.domains,
             env: self.env,
             health: self.health,
+            health_timeout: self.health_timeout,
             command: self.command,
             memory: self.memory,
             cpus: self.cpus,

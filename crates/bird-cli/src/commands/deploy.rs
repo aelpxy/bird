@@ -104,6 +104,7 @@ fn merge(loaded: Option<Loaded>, args: DeployArgs) -> Result<(Manifest, Source)>
         manifest.command = Some(Command::try_from(args.command)?);
     }
     manifest.health = args.health.or(manifest.health);
+    manifest.health_timeout = args.health_timeout.or(manifest.health_timeout);
     manifest.memory = args.memory.or(manifest.memory);
     manifest.cpus = args.cpus.or(manifest.cpus);
     manifest.replicas = args.replicas.or(manifest.replicas);
@@ -141,7 +142,7 @@ mod tests {
         let CliCommand::Deploy(deploy) = Args::try_parse_from(argv).unwrap().command else {
             panic!("expected deploy");
         };
-        deploy
+        *deploy
     }
 
     fn loaded(source: &str) -> Loaded {

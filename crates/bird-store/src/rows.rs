@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
 use bird_core::{
-    Backup, BackupVolume, Certificate, Command, Deployment, Domain, EnvKey, Environment, Hostname,
-    ImageRef, Machine, MachineId, Port, Project, Registry, Replicas, Service, Variable, Volume,
+    Backup, BackupVolume, Certificate, Command, Deployment, Domain, EnvKey, Environment,
+    HealthCheck, Hostname, ImageRef, Machine, MachineId, Port, Project, Registry, Replicas,
+    Service, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -62,6 +63,15 @@ where
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(idx, Type::Integer, Box::new(err)))
 }
 
+// the check's kind and its path live in two columns, the path only ever set for http
+fn health(row: &Row<'_>, kind: usize, path: usize) -> rusqlite::Result<HealthCheck> {
+    let check: HealthCheck = parse(row, kind)?;
+    match (check, parse_optional(row, path)?) {
+        (HealthCheck::Http, Some(path)) => Ok(HealthCheck::Path(path)),
+        (check, _) => Ok(check),
+    }
+}
+
 fn replicas(row: &Row<'_>, idx: usize) -> rusqlite::Result<Replicas> {
     let raw: u8 = row.get(idx)?;
     Replicas::try_from(raw)
@@ -94,7 +104,8 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         port: port(row, 4)?,
         created_at: row.get(5)?,
         replicas: replicas(row, 6)?,
-        health: parse(row, 7)?,
+        health: health(row, 7, 11)?,
+        health_timeout: limit(row, 12)?,
         command: command(row, 8)?,
         memory: limit(row, 9)?,
         cpus: limit(row, 10)?,
