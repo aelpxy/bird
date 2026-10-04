@@ -47,12 +47,29 @@ pub(crate) async fn restore(
         }
     }
 
+    let restored = match download(state, &targets).await {
+        Ok(()) => swap(state, &service, id, &machines, &targets, active).await,
+        Err(err) => Err(err),
+    };
+    unstage(state, &targets).await;
+    restored
+}
+
+async fn swap(
+    state: &AppState,
+    service: &Service,
+    id: BackupId,
+    machines: &[Machine],
+    targets: &[(&BackupVolume, &Volume)],
+    active: Option<Deployment>,
+) -> Result<Restored> {
+    let name = &service.name;
     // nothing is touched until the current data is saved, so a bad restore can be undone
-    let safety = snapshot(state, &service, BackupTrigger::Restore).await?;
+    let safety = snapshot(state, service, BackupTrigger::Restore).await?;
     tracing::info!(service = %name, backup = %id, safety_backup = %safety.id, "restoring");
     let restored = async {
-        replace_data(state, &machines, &targets).await?;
-        relaunch(state, &service, active).await
+        replace_data(state, machines, targets).await?;
+        relaunch(state, service, active).await
     }
     .await;
     if let Err(err) = restored {
@@ -136,7 +153,10 @@ async fn replace_data(
             .podman
             .ensure_volume(&podman_name, &labels::for_volume(volume))
             .await?;
-        let archive = state.backups.get(&saved.key).await?;
+        let archive = match state.backups.staging() {
+            Some(staging) => staging.get(&saved.key).await?,
+            None => state.backups.get(&saved.key).await?,
+        };
         state.podman.import_volume(&podman_name, archive).await?;
         if let Some(lineage) = saved.lineage.clone() {
             let volume_id = volume.id;
@@ -148,6 +168,29 @@ async fn replace_data(
         tracing::info!(volume = %volume.name, bytes = saved.size_bytes, "volume restored");
     }
     Ok(())
+}
+
+// fetched before the machines go, so the outage does not wait on a slow download
+async fn download(state: &AppState, targets: &[(&BackupVolume, &Volume)]) -> Result<()> {
+    let Some(staging) = state.backups.staging() else {
+        return Ok(());
+    };
+    for (saved, _) in targets {
+        let archive = state.backups.get(&saved.key).await?;
+        staging.put(&saved.key, archive).await?;
+    }
+    Ok(())
+}
+
+async fn unstage(state: &AppState, targets: &[(&BackupVolume, &Volume)]) {
+    let Some(staging) = state.backups.staging() else {
+        return;
+    };
+    for (saved, _) in targets {
+        if let Err(err) = staging.delete(&saved.key).await {
+            tracing::warn!(key = %saved.key, error = %err, "could not delete a staged backup archive");
+        }
+    }
 }
 
 // a stopped service gets its data back and stays stopped until `bird start`

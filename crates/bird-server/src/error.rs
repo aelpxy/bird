@@ -123,6 +123,8 @@ pub enum Error {
         "the backup has volume {volume}, which {service} does not have; deploy it with -v {volume}:<path> first"
     )]
     BackupVolumeMissing { service: Name, volume: Name },
+    #[error("backup storage: {0}")]
+    Storage(#[from] object_store::Error),
     #[error("backup failed: {0}")]
     BackupFailed(String),
     #[error("restore failed: {reason}; the data from before the restore is in backup {safety}")]

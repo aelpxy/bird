@@ -9,6 +9,10 @@
 #
 # birdd listens on ports 80 and 443; let unprivileged users bind them (once, as root):
 #   echo net.ipv4.ip_unprivileged_port_start=80 > /etc/sysctl.d/90-bird.conf && sysctl --system
+#
+# Backups to S3: put BIRD_S3_BUCKET, BIRD_S3_ENDPOINT, BIRD_S3_ACCESS_KEY_ID and
+# BIRD_S3_SECRET_ACCESS_KEY in ~/.config/bird/s3.env (mode 600) and add under [Service]:
+#   EnvironmentFile=%h/.config/bird/s3.env
 
 [Unit]
 Description=bird daemon (API, proxy and machine supervisor)

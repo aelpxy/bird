@@ -39,6 +39,38 @@ pub struct Config {
     #[arg(long, env = "BIRD_BACKUP_DIR")]
     pub backup_dir: Option<PathBuf>,
 
+    /// Keep backups in this S3-compatible bucket instead of a directory
+    #[arg(
+        long,
+        env = "BIRD_S3_BUCKET",
+        conflicts_with = "backup_dir",
+        requires_all = ["s3_access_key_id", "s3_secret_access_key"]
+    )]
+    pub s3_bucket: Option<String>,
+
+    /// S3 endpoint for services other than AWS, like https://<account>.r2.cloudflarestorage.com
+    #[arg(long, env = "BIRD_S3_ENDPOINT", requires = "s3_bucket")]
+    pub s3_endpoint: Option<String>,
+
+    #[arg(long, env = "BIRD_S3_REGION", default_value = "us-east-1")]
+    pub s3_region: String,
+
+    /// Folder inside the bucket to keep backups under
+    #[arg(long, env = "BIRD_S3_PREFIX", requires = "s3_bucket")]
+    pub s3_prefix: Option<String>,
+
+    #[arg(long, env = "BIRD_S3_ACCESS_KEY_ID", requires = "s3_bucket")]
+    pub s3_access_key_id: Option<String>,
+
+    /// Set it through the environment, other users on the server can read command lines
+    #[arg(
+        long,
+        env = "BIRD_S3_SECRET_ACCESS_KEY",
+        hide_env_values = true,
+        requires = "s3_bucket"
+    )]
+    pub s3_secret_access_key: Option<Secret>,
+
     /// How often to copy bird.db into backup storage, like 6h or 1d
     #[arg(long, env = "BIRD_DB_BACKUP_EVERY", default_value = "1d")]
     pub db_backup_every: BackupInterval,
@@ -62,6 +94,31 @@ impl Config {
     #[must_use]
     pub fn data_dir(&self) -> PathBuf {
         self.data_dir.clone().unwrap_or_else(default_data_dir)
+    }
+}
+
+// kept out of debug output, so printing the config cannot leak it
+#[derive(Clone)]
+pub struct Secret(String);
+
+impl Secret {
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::str::FromStr for Secret {
+    type Err = std::convert::Infallible;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Ok(Self(value.to_owned()))
+    }
+}
+
+impl std::fmt::Debug for Secret {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Secret(..)")
     }
 }
 

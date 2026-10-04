@@ -21,12 +21,17 @@ bytes = "1"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = { version = "4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+futures-util = { version = "0.3", default-features = false }
 http-body = "1"
 http-body-util = "0.1"
 hyper = { version = "1", default-features = false }
 hyper-util = { version = "0.1", default-features = false }
 # terminal modes and process signals through a safe api, since unsafe code is forbidden
 rustix = { version = "1", default-features = false, features = ["std"] }
+# s3-compatible backup storage, signed with ring like the rest of bird
+object_store = { version = "0.14", default-features = false, features = ["aws-base", "ring", "reqwest", "tokio"] }
+# object_store's client, using rustls with ring
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
 instant-acme = { version = "0.8", default-features = false, features = ["ring", "hyper-rustls", "rcgen"] }
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
