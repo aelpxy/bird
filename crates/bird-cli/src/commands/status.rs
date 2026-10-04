@@ -1,5 +1,4 @@
 use std::fmt::Write;
-use std::io::{IsTerminal, Write as _};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -10,17 +9,17 @@ use super::backup::size;
 use super::history::{ago, unix_now};
 use super::logs::label;
 use super::table::render;
+use super::watch;
 use crate::client::ApiClient;
 use crate::ui::Output;
 use crate::ui::style::{self, Paint};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 const LABEL_WIDTH: usize = 11;
-const WATCH_INTERVAL: Duration = Duration::from_secs(2);
 
 pub(crate) async fn run(client: &ApiClient, name: &Name, watch: bool, out: Output) -> Result<()> {
     if watch {
-        return run_watch(client, name, out).await;
+        return watch::run(client, name, out).await;
     }
     let service = fetch(client, name).await?;
     if out.json(&service)? {
@@ -30,49 +29,13 @@ pub(crate) async fn run(client: &ApiClient, name: &Name, watch: bool, out: Outpu
     Ok(())
 }
 
-// redrawn in place on a terminal; piped, each refresh is appended (one JSON line each with --json)
-async fn run_watch(client: &ApiClient, name: &Name, out: Output) -> Result<()> {
-    let redraw = !out.json && std::io::stdout().is_terminal();
-    loop {
-        let service = fetch(client, name).await?;
-        let frame = if out.json {
-            format!("{}\n", serde_json::to_string(&service)?)
-        } else if redraw {
-            let hint = format!("every {}s, ctrl-c to stop", WATCH_INTERVAL.as_secs());
-            repaint(&format!(
-                "{}\n\n{}",
-                style::out(Paint::Dim, hint),
-                describe(&service, unix_now())
-            ))
-        } else {
-            format!("{}\n", describe(&service, unix_now()))
-        };
-        let mut stdout = std::io::stdout().lock();
-        stdout.write_all(frame.as_bytes())?;
-        stdout.flush()?;
-        drop(stdout);
-        tokio::time::sleep(WATCH_INTERVAL).await;
-    }
-}
-
-async fn fetch(client: &ApiClient, name: &Name) -> Result<ServiceSummary> {
+pub(super) async fn fetch(client: &ApiClient, name: &Name) -> Result<ServiceSummary> {
     client
         .get(&format!("/v1/services/{name}?stats=true"), TIMEOUT)
         .await
 }
 
-// overwrites the previous frame line by line instead of clearing first, so it does not flicker
-fn repaint(frame: &str) -> String {
-    let mut text = String::from("\x1b[H");
-    for line in frame.lines() {
-        text.push_str(line);
-        text.push_str("\x1b[K\n");
-    }
-    text.push_str("\x1b[J");
-    text
-}
-
-fn describe(service: &ServiceSummary, now: i64) -> String {
+pub(super) fn describe(service: &ServiceSummary, now: i64) -> String {
     let mut text = String::new();
     let headline = match &service.deployment {
         _ if service.state == ServiceState::Stopped => style::out(Paint::Dim, "stopped"),
@@ -279,10 +242,5 @@ mod tests {
             "{text}"
         );
         assert!(text.contains("stopped  1m ago  -    -"), "{text}");
-    }
-
-    #[test]
-    fn repaints_over_the_previous_frame() {
-        assert_eq!(repaint("a\nb\n"), "\x1b[Ha\x1b[K\nb\x1b[K\n\x1b[J");
     }
 }

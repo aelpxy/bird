@@ -18,6 +18,7 @@ mod status;
 mod table;
 mod templates;
 mod tty;
+mod watch;
 
 use std::path::Path;
 
