@@ -68,7 +68,7 @@ pub(crate) async fn start(state: &AppState, name: &Name) -> Result<()> {
         })
         .await?;
     let Some((deployment, machines)) = found else {
-        return Err(Error::NeverDeployed(name.clone()));
+        return Err(Error::NothingToStart(name.clone()));
     };
     let service = Service {
         state: ServiceState::Running,
