@@ -22,14 +22,15 @@ pub(crate) async fn run(
 ) -> Result<()> {
     let path = format!("/v1/services/{name}/logs?tail={tail}");
     if follow {
-        let labeled = running_machines(client, name).await? > 1;
+        let mut labels = Labels::new(running_machines(client, name).await? > 1);
         return client
             .stream_lines(&format!("{path}&follow=true"), TIMEOUT, |line| {
                 if out.json {
                     println!("{line}");
                     return Ok(());
                 }
-                print(&serde_json::from_str(line)?, labeled)
+                let entry: LogEntry = serde_json::from_str(line)?;
+                print(&entry, labels.needed(entry.machine))
             })
             .await;
     }
@@ -62,6 +63,24 @@ async fn running_machines(client: &ApiClient, name: &Name) -> Result<usize> {
         .count())
 }
 
+// lines are labeled once a second machine shows up, such as a replacement during a deploy
+struct Labels {
+    first: Option<MachineId>,
+    on: bool,
+}
+
+impl Labels {
+    const fn new(on: bool) -> Self {
+        Self { first: None, on }
+    }
+
+    fn needed(&mut self, machine: MachineId) -> bool {
+        let first = *self.first.get_or_insert(machine);
+        self.on |= first != machine;
+        self.on
+    }
+}
+
 fn print(entry: &LogEntry, labeled: bool) -> Result<()> {
     let prefix = if labeled {
         format!("{} ", style::out(Paint::Cyan, label(entry.machine)))
@@ -86,6 +105,18 @@ pub(super) fn label(machine: MachineId) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn labels_start_with_a_second_machine() {
+        let one: MachineId = "01a103aa-d2e9-70f0-b516-f428629a3236".parse().unwrap();
+        let two: MachineId = "01a103aa-d2e9-70f0-b516-f428629a3237".parse().unwrap();
+        let mut labels = Labels::new(false);
+        assert!(!labels.needed(one));
+        assert!(!labels.needed(one));
+        assert!(labels.needed(two));
+        assert!(labels.needed(one));
+        assert!(Labels::new(true).needed(one));
+    }
 
     #[test]
     fn labels_use_random_tail() {

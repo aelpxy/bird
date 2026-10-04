@@ -24,7 +24,7 @@ pub use container::{
 pub use error::{Error, Result};
 pub use exec::{ExecInfo, ExecSession, TtySession};
 pub use follow::LogFollower;
-pub use logs::{LogLine, LogStream};
+pub use logs::{LogLine, LogStart, LogStream};
 pub use output::{OutputChunk, OutputFollower};
 pub use stats::ContainerStats;
 pub use volume::VolumeMount;
