@@ -2,10 +2,7 @@ use std::collections::BTreeMap;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
-use bird_core::{
-    Deployment, DeploymentId, EnvKey, HealthCheck, ImageRef, MachineId, MachineState, MemoryLimit,
-    Port, Service,
-};
+use bird_core::{Deployment, DeploymentId, EnvKey, ImageRef, MachineId, MachineState, Service};
 use bird_podman::{ContainerSpec, ContainerState, Limits, RegistryAuth};
 use tokio::time::Instant;
 
@@ -14,7 +11,6 @@ use crate::{Error, Result, health, labels};
 
 // enough for any real app, low enough that a fork bomb cannot exhaust the host
 const MAX_PROCESSES: u32 = 4096;
-const READY_TIMEOUT: Duration = Duration::from_secs(60);
 const READY_POLL: Duration = Duration::from_millis(250);
 const STOP_GRACE: Duration = Duration::from_secs(10);
 const FAILURE_LOG_LINES: u32 = 30;
@@ -94,15 +90,7 @@ pub(crate) async fn launch(
         })
         .await?;
 
-    match boot(
-        state,
-        &container_id,
-        deployment.port,
-        service.health,
-        service.memory,
-    )
-    .await
-    {
+    match boot(state, &container_id, deployment, service).await {
         Ok(address) => {
             state
                 .db
@@ -125,10 +113,10 @@ pub(crate) async fn launch(
 async fn boot(
     state: &AppState,
     container_id: &str,
-    port: Port,
-    check: HealthCheck,
-    memory: MemoryLimit,
+    deployment: &Deployment,
+    service: &Service,
 ) -> Result<SocketAddr> {
+    let port = deployment.port;
     state.podman.start_container(container_id).await?;
     let info = state.podman.inspect_container(container_id).await?;
     let Some(host_port) = info.host_port(port) else {
@@ -141,24 +129,31 @@ async fn boot(
     };
     let address = SocketAddr::from((Ipv4Addr::LOCALHOST, host_port));
 
-    let deadline = Instant::now() + READY_TIMEOUT;
+    let deadline = Instant::now() + service.health_timeout.duration();
     loop {
-        if health::probe(check, address).await {
+        if health::probe(&service.health, address).await {
             return Ok(address);
         }
         let info = state.podman.inspect_container(container_id).await?;
         if info.state != ContainerState::Running {
             let reason = if info.oom_killed {
-                format!("app ran out of memory, raise the limit with --memory (now {memory})")
+                format!(
+                    "app ran out of memory, raise the limit with --memory (now {})",
+                    service.memory
+                )
             } else {
-                format!("app exited before it started accepting {check} connections")
+                format!(
+                    "app exited before it could {}",
+                    health::expectation(&service.health)
+                )
             };
             return Err(unhealthy(state, container_id, reason).await);
         }
         if Instant::now() >= deadline {
             let reason = format!(
-                "app did not accept {check} connections on port {port} within {}s",
-                READY_TIMEOUT.as_secs()
+                "app did not {} on port {port} within {}, raise --health-timeout if it needs longer",
+                health::expectation(&service.health),
+                service.health_timeout
             );
             return Err(unhealthy(state, container_id, reason).await);
         }

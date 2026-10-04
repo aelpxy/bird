@@ -1,6 +1,6 @@
 use bird_core::{
-    Command, CpuLimit, EnvironmentId, HealthCheck, ImageRef, MemoryLimit, Name, Port, Replicas,
-    Service, ServiceId,
+    Command, CpuLimit, EnvironmentId, HealthCheck, HealthTimeout, ImageRef, MemoryLimit, Name,
+    Port, Replicas, Service, ServiceId,
 };
 use rusqlite::params;
 
@@ -24,6 +24,7 @@ impl Store {
             port,
             replicas: Replicas::ONE,
             health: HealthCheck::Http,
+            health_timeout: HealthTimeout::DEFAULT,
             command: None,
             memory: MemoryLimit::DEFAULT,
             cpus: CpuLimit::DEFAULT,
@@ -61,10 +62,19 @@ impl Store {
         expect_changed(changed, "service")
     }
 
-    pub fn set_health(&self, id: ServiceId, health: HealthCheck) -> Result<()> {
+    pub fn set_health(&self, id: ServiceId, health: &HealthCheck) -> Result<()> {
+        let (kind, path) = health_columns(health);
         let changed = self.execute(
-            "UPDATE services SET health = ?2 WHERE id = ?1",
-            params![id.to_string(), health.as_str()],
+            "UPDATE services SET health = ?2, health_path = ?3 WHERE id = ?1",
+            params![id.to_string(), kind, path],
+        )?;
+        expect_changed(changed, "service")
+    }
+
+    pub fn set_health_timeout(&self, id: ServiceId, timeout: HealthTimeout) -> Result<()> {
+        let changed = self.execute(
+            "UPDATE services SET health_timeout_secs = ?2 WHERE id = ?1",
+            params![id.to_string(), timeout.secs()],
         )?;
         expect_changed(changed, "service")
     }
@@ -94,14 +104,18 @@ impl Store {
             .map(|command| serde_json::to_string(command.args()))
             .transpose()
             .map_err(Error::Encode)?;
+        let (health, health_path) = health_columns(&service.health);
         let changed = self.execute(
-            "UPDATE services SET image = ?2, port = ?3, health = ?4, command = ?5,
-             memory_mb = ?6, cpu_millicores = ?7 WHERE id = ?1",
+            "UPDATE services SET image = ?2, port = ?3, health = ?4, health_path = ?5,
+             health_timeout_secs = ?6, command = ?7, memory_mb = ?8, cpu_millicores = ?9
+             WHERE id = ?1",
             params![
                 service.id.to_string(),
                 service.image.as_str(),
                 service.port.get(),
-                service.health.as_str(),
+                health,
+                health_path,
+                service.health_timeout.secs(),
                 command,
                 service.memory.mebibytes(),
                 service.cpus.millicores()
@@ -113,7 +127,7 @@ impl Store {
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs
              FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
@@ -127,7 +141,7 @@ impl Store {
     ) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs
              FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
@@ -138,7 +152,7 @@ impl Store {
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs
              FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],
@@ -149,6 +163,15 @@ impl Store {
     pub fn delete_service(&self, id: ServiceId) -> Result<()> {
         let changed = self.execute("DELETE FROM services WHERE id = ?1", [id.to_string()])?;
         expect_changed(changed, "service")
+    }
+}
+
+// the column's CHECK predates paths, so a path check is stored as http plus its path
+fn health_columns(health: &HealthCheck) -> (&'static str, Option<&str>) {
+    match health {
+        HealthCheck::Http => ("http", None),
+        HealthCheck::Path(path) => ("http", Some(path.as_str())),
+        HealthCheck::Tcp => ("tcp", None),
     }
 }
 
@@ -241,10 +264,15 @@ mod tests {
     fn stores_health_check() {
         let (store, service) = setup();
         assert_eq!(service.health, HealthCheck::Http);
-        store.set_health(service.id, HealthCheck::Tcp).unwrap();
+        for check in [HealthCheck::Tcp, "/up".parse().unwrap(), HealthCheck::Http] {
+            store.set_health(service.id, &check).unwrap();
+            assert_eq!(store.service(service.id).unwrap().unwrap().health, check);
+        }
+        let timeout = "5m".parse().unwrap();
+        store.set_health_timeout(service.id, timeout).unwrap();
         assert_eq!(
-            store.service(service.id).unwrap().unwrap().health,
-            HealthCheck::Tcp
+            store.service(service.id).unwrap().unwrap().health_timeout,
+            timeout
         );
     }
 
@@ -253,7 +281,12 @@ mod tests {
         let (store, service) = setup();
         let command = bird_core::Command::try_from(vec!["sh".to_owned()]).unwrap();
         store.set_command(service.id, &command).unwrap();
-        store.set_health(service.id, HealthCheck::Tcp).unwrap();
+        store
+            .set_health(service.id, &"/up".parse().unwrap())
+            .unwrap();
+        store
+            .set_health_timeout(service.id, "90s".parse().unwrap())
+            .unwrap();
         store
             .update_service(service.id, &"x:1".parse().unwrap(), service.port)
             .unwrap();

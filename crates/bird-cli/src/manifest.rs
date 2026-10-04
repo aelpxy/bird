@@ -65,7 +65,8 @@ pub(crate) fn starter(name: &str, image: &str, port: u16) -> String {
 image = "{image}"
 port = {port}
 # domains = ["{name}.example.com"]
-# health = "http"
+# health = "/healthz"
+# health_timeout = "2m"
 # memory = "512m"
 # cpus = 0.5
 # replicas = 2
@@ -107,7 +108,8 @@ name = "web"
 image = "ghcr.io/me/web:1"
 port = 3000
 domains = ["app.example.com", "www.example.com"]
-health = "tcp"
+health = "/up"
+health_timeout = 90
 command = ["node", "server.js"]
 memory = "512m"
 cpus = 0.5
@@ -129,6 +131,14 @@ path = "/data"
         assert_eq!(request.cpus.map(bird_core::CpuLimit::millicores), Some(500));
         assert_eq!(request.volumes.len(), 1);
         assert_eq!(request.replicas.map(bird_core::Replicas::get), Some(3));
+        assert_eq!(
+            request.health.map(|h| h.to_string()).as_deref(),
+            Some("/up")
+        );
+        assert_eq!(
+            request.health_timeout.map(bird_core::HealthTimeout::secs),
+            Some(90)
+        );
     }
 
     #[test]
@@ -141,6 +151,8 @@ path = "/data"
             "cpus = 0.01",
             "port = 0",
             "health = \"grpc\"",
+            "health = \"healthz\"",
+            "health_timeout = \"1h\"",
             "replicas = 0",
             "replicas = 99",
         ] {

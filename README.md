@@ -82,6 +82,8 @@ domains = ["web.example.com"]
 memory = "512m"
 cpus = 0.5
 replicas = 2
+health = "/healthz"
+health_timeout = "2m"
 
 [build]
 context = "."
@@ -156,7 +158,7 @@ When you run `bird deploy`, the daemon:
 
 1. Saves the service settings in SQLite.
 2. Pulls the image (or uses the one it just built) and starts the new machines on the `bird` network, with Podman's init as PID 1.
-3. Waits up to 60 seconds for each machine to answer HTTP on `/` (any status) or, with `--health tcp`, accept a connection.
+3. Waits up to 60 seconds (`--health-timeout`) for each machine to pass its health check: by default any HTTP response on `/`; with `--health /healthz`, a 2xx on that path; with `--health tcp`, an accepted connection. Probes send `Host: localhost`.
 4. Switches the proxy routes to the new machines and removes the old ones.
 
 If startup fails, traffic stays on the previous deployment and its settings are restored. The app must listen on `0.0.0.0` on the port given by `--port` (default `80`).
@@ -188,7 +190,7 @@ Registering a domain does not create DNS records; point them at the server. Befo
 
 ### Supervision
 
-Every 10 seconds the supervisor checks each machine. It restarts stopped containers and replaces missing or repeatedly unhealthy ones, retrying failures with increasing delays. It also removes orphaned containers and refreshes the routes. After each deploy, bird deletes old images, keeping the last few per service for rollbacks. The CLI currently uses the `default` project and `production` environment.
+Every 10 seconds the supervisor checks each machine with the same health check. It restarts stopped containers and replaces missing ones or ones that fail three checks in a row, retrying failures with increasing delays. It also removes orphaned containers and refreshes the routes. After each deploy, bird deletes old images, keeping the last few per service for rollbacks. The CLI currently uses the `default` project and `production` environment.
 
 ## Development
 
