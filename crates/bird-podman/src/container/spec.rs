@@ -21,6 +21,10 @@ pub(super) struct SpecGenerator<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     portmappings: Vec<PortMapping>,
     restart_policy: &'static str,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    terminal: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    stdin: bool,
     // most apps ignore SIGTERM as pid 1, so stops would wait out the grace period and get killed
     init: bool,
 }
@@ -112,12 +116,14 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                     host_ip: "127.0.0.1",
                     protocol: "tcp",
                 }],
-                Lifecycle::OneOff => Vec::new(),
+                Lifecycle::OneOff | Lifecycle::Terminal => Vec::new(),
             },
             restart_policy: match spec.lifecycle {
                 Lifecycle::Service { .. } => "unless-stopped",
-                Lifecycle::OneOff => "no",
+                Lifecycle::OneOff | Lifecycle::Terminal => "no",
             },
+            terminal: spec.lifecycle == Lifecycle::Terminal,
+            stdin: spec.lifecycle == Lifecycle::Terminal,
             init: true,
         }
     }
@@ -197,6 +203,14 @@ mod tests {
         let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
         assert!(json.get("portmappings").is_none());
         assert_eq!(json["restart_policy"], "no");
+        assert!(json.get("terminal").is_none());
+        spec.lifecycle = Lifecycle::Terminal;
+        let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
+        assert_eq!(
+            (json["terminal"].clone(), json["stdin"].clone()),
+            (true.into(), true.into())
+        );
+        assert!(json.get("portmappings").is_none());
     }
 
     #[test]

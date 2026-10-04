@@ -34,6 +34,14 @@ Examples:
 
 Ctrl-C and Ctrl-D go to the remote program; exit the shell or program to leave.";
 
+const RUN_EXAMPLES: &str = "\
+Examples:
+  bird run                             a shell in a fresh container, removed when you leave
+  bird run rails console               an interactive console with the service's variables
+  bird run -T rake db:migrate          plain output, for scripts and deploy hooks
+
+The container joins the private network but gets no volumes.";
+
 #[derive(Debug, Parser)]
 #[command(
     name = "bird",
@@ -105,10 +113,15 @@ pub(crate) enum Command {
         )]
         command: Vec<String>,
     },
-    /// Run a command in a new container from the service's image, with its variables and network
+    /// Run a command or open a shell in a new container from the service's image, with its
+    /// variables and network but not its volumes; interactive when used from a terminal
+    #[command(after_help = RUN_EXAMPLES)]
     Run {
+        /// Stream output without a terminal, keeping stderr apart, even when run from one
+        #[arg(short = 'T', long)]
+        no_tty: bool,
+        /// Command and its arguments; left out, a shell
         #[arg(
-            required = true,
             trailing_var_arg = true,
             allow_hyphen_values = true,
             value_name = "COMMAND"
@@ -341,8 +354,13 @@ mod tests {
             Args::try_parse_from(["bird", "exec", "-m", "a516d4", "--", "ls", "-la"]).unwrap();
         assert!(matches!(args.command, Command::Exec { machine: Some(m), .. } if m == "a516d4"));
         let args = Args::try_parse_from(["bird", "run", "rake", "db:migrate", "--trace"]).unwrap();
-        assert!(matches!(args.command, Command::Run { command } if command.len() == 3));
-        assert!(Args::try_parse_from(["bird", "run"]).is_err());
+        assert!(
+            matches!(args.command, Command::Run { command, no_tty: false } if command.len() == 3)
+        );
+        let args = Args::try_parse_from(["bird", "run"]).unwrap();
+        assert!(matches!(args.command, Command::Run { command, .. } if command.is_empty()));
+        let args = Args::try_parse_from(["bird", "run", "-T", "env"]).unwrap();
+        assert!(matches!(args.command, Command::Run { no_tty: true, .. }));
     }
 
     #[test]

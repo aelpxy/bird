@@ -2,8 +2,7 @@ use std::time::Duration;
 
 use bird_api::Frame;
 use bird_core::Name;
-use bird_podman::TtySession;
-use hyper::upgrade::OnUpgrade;
+use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
 use rustix::process::{Pid, Signal, kill_process};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -19,6 +18,54 @@ const HANG_UP_GRACE: Duration = Duration::from_secs(2);
 pub(crate) const MAX_TERMINALS: usize = 64;
 const SHUTDOWN_WAIT: Duration = Duration::from_secs(10);
 
+// what the terminal is connected to, which decides how it is resized, read and ended
+pub(crate) enum Remote {
+    // a command in a running machine; podman keeps it running when its client leaves
+    Exec(String),
+    // a one-off container whose main process is the command; removing it ends everything
+    Container(String),
+}
+
+impl Remote {
+    async fn resize(&self, state: &AppState, cols: u16, rows: u16) {
+        let resized = match self {
+            Self::Exec(id) => state.podman.resize_exec(id, cols, rows).await,
+            Self::Container(id) => state.podman.resize_container(id, cols, rows).await,
+        };
+        if let Err(err) = resized {
+            tracing::debug!(error = %err, "could not resize terminal");
+        }
+    }
+
+    // the output ends a moment before podman records the exit
+    async fn exit_code(&self, state: &AppState) -> i32 {
+        match self {
+            Self::Exec(id) => exec_exit_code(state, id).await,
+            Self::Container(id) => state
+                .podman
+                .wait_container(id, EXIT_WAIT)
+                .await
+                .unwrap_or_else(|err| {
+                    tracing::debug!(error = %err, "could not read terminal exit code");
+                    -1
+                }),
+        }
+    }
+
+    // runs however the session ended, so nothing is left behind in the machine or on the host
+    async fn end(&self, state: &AppState, exited: bool) {
+        match self {
+            Self::Exec(id) if !exited => hang_up(state, id).await,
+            Self::Exec(_) => {}
+            Self::Container(id) => {
+                if let Err(err) = state.podman.remove_container(id).await {
+                    tracing::warn!(container = id, error = %err, "could not remove one-off container");
+                }
+            }
+        }
+    }
+}
+
 enum Ended {
     Exited(i32),
     Left,
@@ -29,27 +76,29 @@ pub(crate) async fn serve(
     state: AppState,
     name: Name,
     upgrade: OnUpgrade,
-    session: TtySession,
+    io: TokioIo<Upgraded>,
+    remote: Remote,
     permit: OwnedSemaphorePermit,
 ) {
-    let id = session.id().to_owned();
     let client = match upgrade.await {
         Ok(upgraded) => TokioIo::new(upgraded),
         Err(err) => {
             tracing::debug!(service = %name, error = %err, "terminal client never connected");
-            hang_up(&state, &id).await;
+            remote.end(&state, false).await;
             return;
         }
     };
-    match bridge(&state, client, session).await {
+    let exited = match bridge(&state, client, io, &remote).await {
         Ended::Exited(code) => {
             tracing::info!(service = %name, code, "terminal closed");
+            true
         }
         Ended::Left => {
             tracing::info!(service = %name, "terminal client left, hanging up");
-            hang_up(&state, &id).await;
+            false
         }
-    }
+    };
+    remote.end(&state, exited).await;
     drop(permit);
 }
 
@@ -67,11 +116,11 @@ pub(crate) async fn wait_for_hang_ups(terminals: &Semaphore) {
 async fn bridge(
     state: &AppState,
     client: impl AsyncRead + AsyncWrite,
-    session: TtySession,
+    process: TokioIo<Upgraded>,
+    remote: &Remote,
 ) -> Ended {
-    let id = session.id().to_owned();
     let (mut client_read, mut client_write) = tokio::io::split(client);
-    let (mut process_read, mut process_write) = tokio::io::split(session.io);
+    let (mut process_read, mut process_write) = tokio::io::split(process);
     let input = async {
         let mut buffer = Vec::new();
         let mut chunk = vec![0_u8; CHUNK_BYTES];
@@ -84,11 +133,7 @@ async fn bridge(
             while let Some(frame) = Frame::decode(&mut buffer)? {
                 match frame {
                     Frame::Data(bytes) => process_write.write_all(&bytes).await?,
-                    Frame::Resize { cols, rows } => {
-                        if let Err(err) = state.podman.resize_exec(&id, cols, rows).await {
-                            tracing::debug!(error = %err, "could not resize terminal");
-                        }
-                    }
+                    Frame::Resize { cols, rows } => remote.resize(state, cols, rows).await,
                     Frame::Exit(_) | Frame::Error(_) => {}
                 }
             }
@@ -124,14 +169,13 @@ async fn bridge(
         tracing::debug!(error = %err, "terminal output ended");
         return Ended::Left;
     }
-    let code = exit_code(state, &id).await;
+    let code = remote.exit_code(state).await;
     let _ = client_write.write_all(&Frame::Exit(code).encode()).await;
     let _ = client_write.shutdown().await;
     Ended::Exited(code)
 }
 
-// the output ends a moment before podman records the exit
-async fn exit_code(state: &AppState, id: &str) -> i32 {
+async fn exec_exit_code(state: &AppState, id: &str) -> i32 {
     let deadline = tokio::time::Instant::now() + EXIT_WAIT;
     loop {
         match state.podman.inspect_exec(id).await {

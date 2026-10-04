@@ -86,6 +86,16 @@ impl Podman {
         self.transport.upgrade(path, body, DEFAULT_TIMEOUT).await
     }
 
+    // with stdin attached podman passes the request body to the process, so attach sends none
+    pub(crate) async fn upgrade_without_body(
+        &self,
+        path: &str,
+    ) -> Result<hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>> {
+        self.transport
+            .upgrade(path, Vec::new(), DEFAULT_TIMEOUT)
+            .await
+    }
+
     pub(crate) async fn stream(&self, path: &str) -> Result<Streamed> {
         self.transport.stream(path, DEFAULT_TIMEOUT).await
     }

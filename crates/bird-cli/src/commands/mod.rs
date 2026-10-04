@@ -59,12 +59,21 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             let client = connect(api)?;
             let name = target()?;
             if !no_tty && !out.json && crate::ui::terminal::interactive() {
-                tty::session(&client, &name, machine.as_deref(), command).await
+                let place = tty::Place::Machine(machine.as_deref());
+                tty::session(&client, &name, place, command).await
             } else {
                 exec::exec(&client, &name, machine, command, out).await
             }
         }
-        Command::Run { command } => exec::run(&connect(api)?, &target()?, command, out).await,
+        Command::Run { no_tty, command } => {
+            let client = connect(api)?;
+            let name = target()?;
+            if !no_tty && !out.json && crate::ui::terminal::interactive() {
+                tty::session(&client, &name, tty::Place::NewContainer, command).await
+            } else {
+                exec::run(&client, &name, command, out).await
+            }
+        }
         Command::Env { command } => {
             let command = command.unwrap_or(EnvCommand::List);
             env::run(&connect(api)?, &target()?, command, out).await

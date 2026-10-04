@@ -6,6 +6,8 @@ use std::time::Duration;
 
 use bird_core::{EnvKey, ImageRef, Port};
 use hyper::Method;
+use hyper::upgrade::Upgraded;
+use hyper_util::rt::TokioIo;
 use serde::Deserialize;
 
 use crate::client::DEFAULT_TIMEOUT;
@@ -35,6 +37,8 @@ pub enum Lifecycle {
     Service { port: Port },
     // runs a command once, unpublished, and stays exited
     OneOff,
+    // a one-off on a terminal with stdin open; attach before starting it so no output is missed
+    Terminal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,6 +149,23 @@ impl Podman {
 
     pub async fn unpause_container(&self, id: &str) -> Result<()> {
         let path = format!("/containers/{}/unpause", encode(id));
+        let response = self.send(Method::POST, &path, DEFAULT_TIMEOUT).await?;
+        check(response, || format!("container {id}"))?;
+        Ok(())
+    }
+
+    // the container's terminal from the start: raw output out, keystrokes in, until it exits
+    pub async fn attach(&self, id: &str) -> Result<TokioIo<Upgraded>> {
+        let path = format!(
+            "/containers/{}/attach?stream=true&stdin=true&stdout=true&stderr=true",
+            encode(id)
+        );
+        self.upgrade_without_body(&path).await
+    }
+
+    // only works while the container runs
+    pub async fn resize_container(&self, id: &str, cols: u16, rows: u16) -> Result<()> {
+        let path = format!("/containers/{}/resize?h={rows}&w={cols}", encode(id));
         let response = self.send(Method::POST, &path, DEFAULT_TIMEOUT).await?;
         check(response, || format!("container {id}"))?;
         Ok(())

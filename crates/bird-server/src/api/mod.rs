@@ -15,6 +15,7 @@ mod scale;
 mod services;
 mod stream;
 mod templates;
+mod terminals;
 mod variables;
 
 use std::sync::Arc;
@@ -72,7 +73,8 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(backups::set_schedule, backups::clear_schedule))
         .routes(routes!(commands::exec))
         .routes(routes!(commands::run))
-        .routes(routes!(commands::tty))
+        .routes(routes!(terminals::exec))
+        .routes(routes!(terminals::run))
         .routes(routes!(power::stop))
         .routes(routes!(power::start))
         .routes(routes!(power::restart))

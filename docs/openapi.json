@@ -1143,7 +1143,7 @@
           "commands"
         ],
         "summary": "Open an interactive terminal in a running machine",
-        "operationId": "tty",
+        "operationId": "exec",
         "parameters": [
           {
             "name": "name",
@@ -1542,6 +1542,112 @@
           },
           "404": {
             "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/run/tty": {
+      "get": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "Open an interactive terminal in a new container from the service's image",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "command",
+            "in": "query",
+            "description": "The command as a JSON array of strings, like `[\"rails\",\"console\"]`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cols",
+            "in": "query",
+            "description": "Terminal width in columns",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "rows",
+            "in": "query",
+            "description": "Terminal height in rows",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switched to bird-tty, like the exec terminal; the container is removed when the session ends"
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "The request did not ask to upgrade to bird-tty",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Too many terminals are open",
             "content": {
               "application/json": {
                 "schema": {
