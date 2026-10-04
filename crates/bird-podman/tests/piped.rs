@@ -51,10 +51,10 @@ async fn round_trip(io: TokioIo<Upgraded>, input: Vec<u8>) -> (Vec<u8>, Vec<u8>)
         .expect("the output stays readable");
     writer.await.expect("the writer finishes");
     let (mut stdout, mut stderr) = (Vec::new(), Vec::new());
-    for (stream, piece) in Demux::default().push(&raw).expect("framed output") {
-        match stream {
-            LogStream::Stdout => stdout.extend_from_slice(piece),
-            LogStream::Stderr => stderr.extend_from_slice(piece),
+    for piece in Demux::default().push(&raw).expect("framed output") {
+        match piece.stream {
+            LogStream::Stdout => stdout.extend_from_slice(piece.data),
+            LogStream::Stderr => stderr.extend_from_slice(piece.data),
         }
     }
     (stdout, stderr)

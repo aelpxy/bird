@@ -262,3 +262,25 @@ async fn output_is_kept_as_written() {
     );
     podman.remove_container(&id).await.unwrap();
 }
+
+// a replaced entrypoint runs without podman's init, so a missing program fails at start with
+// podman's own message rather than as a plain exit code 1 from the init
+#[tokio::test]
+#[ignore = "requires a running podman socket"]
+async fn a_missing_program_fails_at_start() {
+    let podman = podman();
+    let name = "bird-test-missing-program";
+    let _ = podman.remove_container(name).await;
+    let missing = ContainerSpec {
+        entrypoint: Some(vec!["no-such-program".to_owned()]),
+        command: Some(Vec::new()),
+        ..spec(name, "")
+    };
+    let id = podman.create_container(&missing).await.unwrap();
+    let error = podman.start_container(&id).await.unwrap_err().to_string();
+    podman.remove_container(&id).await.unwrap();
+    assert!(
+        error.contains("no-such-program") && error.contains("not found"),
+        "{error}"
+    );
+}
