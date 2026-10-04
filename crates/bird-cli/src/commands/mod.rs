@@ -4,6 +4,7 @@ mod completions;
 mod deploy;
 mod domains;
 mod env;
+mod exec;
 mod history;
 mod init;
 mod list;
@@ -26,6 +27,8 @@ use crate::client::ApiClient;
 use crate::ui::Output;
 use crate::{manifest, profile};
 
+pub(crate) use exec::RemoteExit;
+
 pub(crate) async fn run(args: Args) -> Result<()> {
     let Args {
         service,
@@ -46,6 +49,10 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         Command::Logs { tail, follow } => {
             logs::run(&connect(api)?, &target()?, tail, follow, out).await
         }
+        Command::Exec { machine, command } => {
+            exec::exec(&connect(api)?, &target()?, machine, command, out).await
+        }
+        Command::Run { command } => exec::run(&connect(api)?, &target()?, command, out).await,
         Command::Env { command } => {
             let command = command.unwrap_or(EnvCommand::List);
             env::run(&connect(api)?, &target()?, command, out).await

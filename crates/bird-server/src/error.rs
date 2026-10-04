@@ -91,6 +91,14 @@ pub enum Error {
     DomainNotFound(bird_core::Hostname),
     #[error("service {0} has no running machines")]
     NoMachines(Name),
+    #[error("{service} has no running machine matching {machine:?}, see `bird status`")]
+    MachineNotFound { service: Name, machine: String },
+    #[error("{0:?} matches more than one machine, give more of its id")]
+    AmbiguousMachine(String),
+    #[error("{0} has never been deployed, so there is no image to run")]
+    NeverDeployed(Name),
+    #[error("command failed: {0}")]
+    CommandFailed(String),
     #[error("{0} has no volumes, there is nothing to back up")]
     NothingToBackUp(Name),
     #[error("backup {0} not found")]

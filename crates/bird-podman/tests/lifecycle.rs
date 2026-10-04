@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use bird_core::{ImageRef, Port};
 use bird_podman::{
-    ContainerSpec, ContainerState, Error, Limits, LogStream, Podman, VolumeMount, default_socket,
+    ContainerSpec, ContainerState, Error, Lifecycle, Limits, LogStream, Podman, VolumeMount,
+    default_socket,
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -57,7 +58,7 @@ async fn container_lifecycle() {
         name: name.clone(),
         image,
         command: None,
-        port,
+        lifecycle: Lifecycle::Service { port },
         network: name.clone(),
         aliases: vec!["lifecycle-alias".to_owned()],
         limits: Limits {

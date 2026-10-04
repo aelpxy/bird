@@ -69,12 +69,15 @@ bird history
 bird rollback                          # previous deployment, or pass an id
 bird rm                                # asks first; --purge also deletes its volumes
 
+bird exec psql -U postgres             # a command in a running machine
+bird run rake db:migrate               # a command in a fresh container from the service's image
+
 bird ls                                # every service
 bird deploy api ghcr.io/owner/api:1 --port 3000 --domain api.example.com
 bird logs -s api                       # any service by name
 ```
 
-Commands act on the service named in `./bird.toml`, or the one given with `-s <name>`. Read commands take `--json` for scripts, destructive ones ask for confirmation unless you pass `-y`, and `bird completions <shell>` prints shell completions. Run `bird --help` or `bird <command> --help` for every option.
+Commands act on the service named in `./bird.toml`, or the one given with `-s <name>` (put it before the command for `exec` and `run`, everything after belongs to the command). `bird exec` and `bird run` stream the command's output and exit with its exit code; `run` gets the service's variables and private network but no volumes, and its container is removed when the command ends or you disconnect. Neither is interactive yet. Read commands take `--json` for scripts, destructive ones ask for confirmation unless you pass `-y`, and `bird completions <shell>` prints shell completions. Run `bird --help` or `bird <command> --help` for every option.
 
 ### bird.toml
 

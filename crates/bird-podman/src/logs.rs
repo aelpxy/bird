@@ -33,7 +33,20 @@ impl Podman {
             "/containers/{}/logs?follow=true&stdout=true&stderr=true&tail={tail}",
             encode(id)
         );
-        let streamed = self.stream(&path).await?;
+        self.follow(id, &path).await
+    }
+
+    // everything since the container started, ending when it exits
+    pub async fn follow_output(&self, id: &str) -> Result<LogFollower> {
+        let path = format!(
+            "/containers/{}/logs?follow=true&stdout=true&stderr=true",
+            encode(id)
+        );
+        self.follow(id, &path).await
+    }
+
+    async fn follow(&self, id: &str, path: &str) -> Result<LogFollower> {
+        let streamed = self.stream(path).await?;
         let status = streamed.status;
         if !status.is_success() {
             check(streamed.collect().await?, || format!("container {id}"))?;

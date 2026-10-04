@@ -950,6 +950,78 @@
         }
       }
     },
+    "/v1/services/{name}/exec": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "Run a command in a running machine",
+        "operationId": "exec",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newline-delimited JSON stream of CommandEvent, ending with exited or failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/services/{name}/logs": {
       "get": {
         "tags": [
@@ -1096,6 +1168,78 @@
           },
           "502": {
             "description": "The app did not become healthy; includes its last log lines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/services/{name}/run": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "Run a command in a new container from the service's image",
+        "operationId": "run",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Newline-delimited JSON stream of CommandEvent, ending with exited or failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1648,6 +1792,69 @@
           "type": "string"
         }
       },
+      "CommandEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "stream",
+              "text",
+              "type"
+            ],
+            "properties": {
+              "stream": {
+                "$ref": "#/components/schemas/LogStream"
+              },
+              "text": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "output"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "code",
+              "type"
+            ],
+            "properties": {
+              "code": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "exited"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "error",
+              "type"
+            ],
+            "properties": {
+              "error": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "failed"
+                ]
+              }
+            }
+          }
+        ]
+      },
       "CpuLimit": {
         "type": "integer",
         "format": "int32",
@@ -1897,6 +2104,24 @@
           }
         }
       },
+      "ExecRequest": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Command"
+          },
+          "machine": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Machine id, or the end of one as `bird status` shows it; left out, the first running machine"
+          }
+        }
+      },
       "HealthCheck": {
         "type": "string",
         "description": "http (any HTTP response on /), tcp (accepts connections) or a path like /healthz that must answer 2xx",
@@ -2080,6 +2305,17 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "RunRequest": {
+        "type": "object",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Command"
           }
         }
       },
@@ -2332,6 +2568,10 @@
     {
       "name": "backups",
       "description": "Copies of service volumes, and restoring them"
+    },
+    {
+      "name": "commands",
+      "description": "One-off commands in a running machine or a fresh container"
     }
   ]
 }

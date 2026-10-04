@@ -1,5 +1,6 @@
 mod backups;
 mod builds;
+mod commands;
 mod deploy;
 mod deployments;
 mod domains;
@@ -15,6 +16,7 @@ mod volumes;
 
 pub use backups::{BackupInfo, BackupVolumeInfo, RestoreRequest, RestoreResponse};
 pub use builds::BuildEvent;
+pub use commands::{CommandEvent, ExecRequest, RunRequest};
 pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};
 pub use domains::AddDomain;

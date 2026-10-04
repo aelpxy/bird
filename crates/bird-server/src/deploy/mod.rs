@@ -12,7 +12,7 @@ use bird_core::{Deployment, DeploymentStatus, EnvKey, Hostname, ImageRef, Port, 
 use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
-pub(crate) use machine::{destroy_container, launch, set_state};
+pub(crate) use machine::{MAX_PROCESSES, destroy_container, ensure_image, launch, set_state};
 pub(crate) use remove::remove_service;
 
 use crate::state::AppState;

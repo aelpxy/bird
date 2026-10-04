@@ -1,6 +1,7 @@
 mod auth;
 mod backups;
 mod builds;
+mod commands;
 mod deploy;
 mod deployments;
 mod docs;
@@ -67,4 +68,6 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(backups::create, backups::list))
         .routes(routes!(backups::restore))
         .routes(routes!(backups::remove))
+        .routes(routes!(commands::exec))
+        .routes(routes!(commands::run))
 }

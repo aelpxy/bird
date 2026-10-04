@@ -3,20 +3,20 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use bird_core::{Deployment, DeploymentId, EnvKey, ImageRef, MachineId, MachineState, Service};
-use bird_podman::{ContainerSpec, ContainerState, Limits, RegistryAuth};
+use bird_podman::{ContainerSpec, ContainerState, Lifecycle, Limits, RegistryAuth};
 use tokio::time::Instant;
 
 use crate::state::AppState;
 use crate::{Error, Result, health, labels};
 
 // enough for any real app, low enough that a fork bomb cannot exhaust the host
-const MAX_PROCESSES: u32 = 4096;
+pub(crate) const MAX_PROCESSES: u32 = 4096;
 const READY_POLL: Duration = Duration::from_millis(250);
 const STOP_GRACE: Duration = Duration::from_secs(10);
 const FAILURE_LOG_LINES: u32 = 30;
 
 // built images live only in local podman storage, there is nothing to pull them from
-async fn ensure_image(state: &AppState, image: &ImageRef) -> Result<()> {
+pub(crate) async fn ensure_image(state: &AppState, image: &ImageRef) -> Result<()> {
     if image.is_local() {
         if state.podman.image_exists(image).await? {
             return Ok(());
@@ -61,7 +61,9 @@ pub(crate) async fn launch(
         name: format!("bird-{}-{}", service.name, machine.id),
         image: deployment.image.clone(),
         command: deployment.command.clone().map(Into::into),
-        port: deployment.port,
+        lifecycle: Lifecycle::Service {
+            port: deployment.port,
+        },
         network: state.network.to_string(),
         aliases: labels::aliases(service),
         mounts,
