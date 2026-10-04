@@ -79,12 +79,19 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             let place = tty::Place::Machine(machine.as_deref());
             attach(&client, &name, place, no_tty, command).await
         }
-        Command::Run { no_tty, command } => {
+        Command::Run {
+            no_tty,
+            no_entrypoint,
+            command,
+        } => {
             let (client, name) = (connect(api)?, target()?);
             if out.json {
-                return exec::run(&client, &name, command).await;
+                return exec::run(&client, &name, command, no_entrypoint).await;
             }
-            attach(&client, &name, tty::Place::NewContainer, no_tty, command).await
+            let place = tty::Place::NewContainer {
+                skip_entrypoint: no_entrypoint,
+            };
+            attach(&client, &name, place, no_tty, command).await
         }
         Command::Env { command } => {
             let command = command.unwrap_or(EnvCommand::List);

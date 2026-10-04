@@ -29,6 +29,7 @@ pub(crate) async fn run(
         manifest::warn_about_secrets(&loaded.manifest, config.unwrap_or(Path::new(MANIFEST_FILE)));
     }
     let allow_image_change = args.allow_image_change;
+    let default_command = args.default_command;
     let (manifest, source) = merge(loaded, args, service)?;
     let image = match source {
         Source::Image(image) => image,
@@ -40,6 +41,10 @@ pub(crate) async fn run(
     };
     let mut request = manifest.into_request(image);
     request.allow_image_change = allow_image_change;
+    if default_command {
+        request.command = None;
+        request.default_command = true;
+    }
     let spinner = Spinner::start(format!("deploying {} ({})", request.name, request.image));
     let response: DeployResponse = client
         .post(&client.scoped("deploy"), &request, DEPLOY_TIMEOUT)

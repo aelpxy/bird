@@ -47,6 +47,7 @@ pub(crate) async fn redeploy(
         volumes: Vec::new(),
         replicas: None,
         backup: None,
+        default_command: false,
         allow_image_change: false,
     };
     deploy(state, service.environment_id, request).await
@@ -59,6 +60,9 @@ pub(crate) async fn deploy(
 ) -> Result<DeployResponse> {
     if !request.image.has_lowercase_repository() {
         return Err(bird_core::ValidationError::Image(request.image.to_string()).into());
+    }
+    if request.default_command && request.command.is_some() {
+        return Err(crate::Error::CommandConflict);
     }
     request.env = secrets::expand_all(request.env)?;
     references::check_change(state, environment, &request.name, &request.env, &[]).await?;
@@ -295,9 +299,16 @@ fn apply_settings(
     };
     let service = match &request.command {
         Some(command) => {
-            store.set_command(service.id, command)?;
+            store.set_command(service.id, Some(command))?;
             Service {
                 command: Some(command.clone()),
+                ..service
+            }
+        }
+        None if request.default_command => {
+            store.set_command(service.id, None)?;
+            Service {
+                command: None,
                 ..service
             }
         }

@@ -40,6 +40,9 @@ pub(crate) struct RunQuery {
     cols: u16,
     /// Terminal height in rows
     rows: u16,
+    /// Run the command itself instead of passing it to the image's entrypoint
+    #[serde(default)]
+    skip_entrypoint: bool,
 }
 
 #[derive(Deserialize, utoipa::IntoParams)]
@@ -56,6 +59,9 @@ pub(crate) struct PipedExecQuery {
 pub(crate) struct PipedRunQuery {
     /// The command as a JSON array of strings, like `["rake","db:migrate"]`
     command: String,
+    /// Run the command itself instead of passing it to the image's entrypoint
+    #[serde(default)]
+    skip_entrypoint: bool,
 }
 
 /// Open an interactive terminal in a running machine
@@ -125,7 +131,9 @@ pub(crate) async fn run(
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let target = commands::run_target(&state, environment, &name).await?;
+    let target = commands::run_target(&state, environment, &name)
+        .await?
+        .skipping_entrypoint(query.skip_entrypoint);
     let stdio = Stdio::Terminal {
         cols: query.cols,
         rows: query.rows,
@@ -152,7 +160,9 @@ pub(crate) async fn run_pipe(
     request: Request,
 ) -> Result<Response> {
     let (upgrade, command, permit) = accept(&state, request, &query.command)?;
-    let target = commands::run_target(&state, environment, &name).await?;
+    let target = commands::run_target(&state, environment, &name)
+        .await?
+        .skipping_entrypoint(query.skip_entrypoint);
     let (id, io) = commands::start_attached(&state, &target, &command, Stdio::Piped).await?;
     tokio::spawn(commands::tty::serve(
         state,

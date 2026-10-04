@@ -58,6 +58,7 @@ async fn container_lifecycle() {
         name: name.clone(),
         image,
         command: None,
+        entrypoint: None,
         lifecycle: Lifecycle::Service { port },
         network: name.clone(),
         aliases: vec!["lifecycle-alias".to_owned()],

@@ -28,7 +28,8 @@ const DEFAULT_SHELL: [&str; 3] = [
 // where the terminal runs: in a running machine, or in a fresh container from the service's image
 pub(crate) enum Place<'a> {
     Machine(Option<&'a str>),
-    NewContainer,
+    // the command goes to the image's entrypoint unless it skips it
+    NewContainer { skip_entrypoint: bool },
 }
 
 pub(crate) async fn session(
@@ -67,15 +68,24 @@ pub(super) fn path(
 ) -> Result<String> {
     let endpoint = match place {
         Place::Machine(_) => "exec",
-        Place::NewContainer => "run",
+        Place::NewContainer { .. } => "run",
     };
     let mut path = client.scoped(&format!(
         "services/{name}/{endpoint}/{mode}?command={}",
         encode(&serde_json::to_string(command)?)
     ));
-    if let Place::Machine(Some(machine)) = place {
-        path.push_str("&machine=");
-        path.push_str(&encode(machine));
+    match place {
+        Place::Machine(Some(machine)) => {
+            path.push_str("&machine=");
+            path.push_str(&encode(machine));
+        }
+        Place::NewContainer {
+            skip_entrypoint: true,
+        } => path.push_str("&skip_entrypoint=true"),
+        Place::Machine(None)
+        | Place::NewContainer {
+            skip_entrypoint: false,
+        } => {}
     }
     Ok(path)
 }

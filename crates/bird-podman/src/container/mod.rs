@@ -22,6 +22,8 @@ pub struct ContainerSpec {
     pub name: String,
     pub image: ImageRef,
     pub command: Option<Vec<String>>,
+    // replaces the image's entrypoint; the image's command is then dropped too
+    pub entrypoint: Option<Vec<String>>,
     pub lifecycle: Lifecycle,
     pub network: String,
     pub aliases: Vec<String>,

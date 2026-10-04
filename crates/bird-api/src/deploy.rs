@@ -23,8 +23,12 @@ pub struct DeployRequest {
     /// Seconds a new machine has to pass its health check; left out, a new service gets 60 and an existing one keeps its timeout
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub health_timeout: Option<HealthTimeout>,
+    /// Command to run instead of the image's; left out, an existing service keeps its saved one
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<Command>,
+    /// Forget the saved command and run the image's own again; not together with `command`
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub default_command: bool,
     /// Memory limit in MiB; left out, a new service gets 1024 and an existing one keeps its limit
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory: Option<MemoryLimit>,

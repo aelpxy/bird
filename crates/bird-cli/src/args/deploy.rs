@@ -61,7 +61,10 @@ pub(crate) struct DeployArgs {
     /// Run an image whose version or base differs from the one that wrote the volume data
     #[arg(long)]
     pub(crate) allow_image_change: bool,
-    /// Command to run instead of the image default, after `--`
+    /// Forget a command given before, here or in bird.toml, and run the image's own again
+    #[arg(long, conflicts_with = "command")]
+    pub(crate) default_command: bool,
+    /// Command to run instead of the image default, after `--`; it is kept for later deploys
     #[arg(last = true)]
     pub(crate) command: Vec<String>,
 }

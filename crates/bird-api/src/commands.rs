@@ -16,6 +16,9 @@ pub struct ExecRequest {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RunRequest {
     pub command: Command,
+    /// Run the command itself instead of passing it to the image's entrypoint
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skip_entrypoint: bool,
 }
 
 // one line of the newline-delimited json stream exec and run answer with; it ends with exited or failed

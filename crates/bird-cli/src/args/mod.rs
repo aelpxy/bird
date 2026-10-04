@@ -44,7 +44,8 @@ Examples:
   bird run rails console               an interactive console with the service's variables
   bird run -T rake db:migrate          plain output, for scripts and deploy hooks
 
-The container joins the private network but gets no volumes.";
+The container joins the private network but gets no volumes. The command goes to the image's
+entrypoint as arguments, like `docker run`; pass --no-entrypoint to run it directly.";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -142,6 +143,10 @@ pub(crate) enum Command {
         /// with stderr kept apart
         #[arg(short = 'T', long)]
         no_tty: bool,
+        /// Run the command itself; by default it goes to the image's entrypoint as arguments,
+        /// like `docker run`
+        #[arg(long)]
+        no_entrypoint: bool,
         /// Command and its arguments; left out, a shell
         #[arg(
             trailing_var_arg = true,
@@ -396,7 +401,7 @@ mod tests {
         assert!(matches!(args.command, Command::Exec { machine: Some(m), .. } if m == "a516d4"));
         let args = Args::try_parse_from(["bird", "run", "rake", "db:migrate", "--trace"]).unwrap();
         assert!(
-            matches!(args.command, Command::Run { command, no_tty: false } if command.len() == 3)
+            matches!(args.command, Command::Run { command, no_tty: false, .. } if command.len() == 3)
         );
         let args = Args::try_parse_from(["bird", "run"]).unwrap();
         assert!(matches!(args.command, Command::Run { command, .. } if command.is_empty()));

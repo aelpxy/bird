@@ -14,6 +14,7 @@ fn spec(name: &str, command: &[&str]) -> ContainerSpec {
         name: name.to_owned(),
         image: IMAGE.parse().expect("a valid image"),
         command: Some(command.iter().map(|arg| (*arg).to_owned()).collect()),
+        entrypoint: None,
         lifecycle: Lifecycle::OneOff,
         network: "podman".to_owned(),
         aliases: Vec::new(),
