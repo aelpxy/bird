@@ -75,6 +75,8 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(commands::run))
         .routes(routes!(terminals::exec))
         .routes(routes!(terminals::run))
+        .routes(routes!(terminals::exec_pipe))
+        .routes(routes!(terminals::run_pipe))
         .routes(routes!(power::stop))
         .routes(routes!(power::start))
         .routes(routes!(power::restart))

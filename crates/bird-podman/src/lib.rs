@@ -2,6 +2,7 @@ mod auth;
 mod build;
 mod client;
 mod container;
+mod demux;
 mod error;
 mod exec;
 mod follow;
@@ -21,8 +22,9 @@ pub use client::{Podman, default_socket};
 pub use container::{
     ContainerInfo, ContainerSpec, ContainerState, Lifecycle, Limits, PublishedPort,
 };
+pub use demux::Demux;
 pub use error::{Error, Result};
-pub use exec::{ExecInfo, ExecSession, TtySession};
+pub use exec::{AttachedExec, ExecInfo, ExecSession};
 pub use follow::LogFollower;
 pub use logs::{LogLine, LogStart, LogStream};
 pub use output::{OutputChunk, OutputFollower};

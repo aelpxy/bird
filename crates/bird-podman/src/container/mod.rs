@@ -39,6 +39,8 @@ pub enum Lifecycle {
     OneOff,
     // a one-off on a terminal with stdin open; attach before starting it so no output is missed
     Terminal,
+    // a one-off with stdin open but no terminal, attached like `Terminal`; output comes framed
+    Piped,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -154,7 +156,7 @@ impl Podman {
         Ok(())
     }
 
-    // the container's terminal from the start: raw output out, keystrokes in, until it exits
+    // the container's stdio from the start, until it exits: raw on a terminal, framed when piped
     pub async fn attach(&self, id: &str) -> Result<TokioIo<Upgraded>> {
         let path = format!(
             "/containers/{}/attach?stream=true&stdin=true&stdout=true&stderr=true",

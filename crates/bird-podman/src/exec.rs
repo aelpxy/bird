@@ -17,13 +17,14 @@ pub struct ExecSession {
     pub output: OutputFollower,
 }
 
-// a command on a terminal: one raw stream both ways, with no stdout and stderr framing
-pub struct TtySession {
+// a command attached both ways: on a terminal one raw stream, piped its output comes in podman's
+// stdout and stderr frames (see `Demux`) and closing the write side ends its stdin
+pub struct AttachedExec {
     id: String,
     pub io: TokioIo<Upgraded>,
 }
 
-impl TtySession {
+impl AttachedExec {
     #[must_use]
     pub fn id(&self) -> &str {
         &self.id
@@ -76,7 +77,7 @@ struct ExecState {
 
 impl Podman {
     pub async fn exec(&self, container: &str, command: &[String]) -> Result<ExecSession> {
-        let id = self.create_exec(container, command, false).await?;
+        let id = self.create_exec(container, command, false, false).await?;
 
         let start = serde_json::to_vec(&StartExec {
             detach: false,
@@ -110,16 +111,26 @@ impl Podman {
         Ok(self.inspect_exec(&session.id).await?.exit_code)
     }
 
-    pub async fn exec_tty(&self, container: &str, command: &[String]) -> Result<TtySession> {
-        let id = self.create_exec(container, command, true).await?;
-        let start = StartExec {
-            detach: false,
-            tty: true,
-        };
+    pub async fn exec_tty(&self, container: &str, command: &[String]) -> Result<AttachedExec> {
+        self.exec_attached(container, command, true).await
+    }
+
+    pub async fn exec_piped(&self, container: &str, command: &[String]) -> Result<AttachedExec> {
+        self.exec_attached(container, command, false).await
+    }
+
+    async fn exec_attached(
+        &self,
+        container: &str,
+        command: &[String],
+        tty: bool,
+    ) -> Result<AttachedExec> {
+        let id = self.create_exec(container, command, true, tty).await?;
+        let start = StartExec { detach: false, tty };
         let io = self
             .upgrade(&format!("/exec/{}/start", encode(&id)), &start)
             .await?;
-        Ok(TtySession { id, io })
+        Ok(AttachedExec { id, io })
     }
 
     // only works while the command runs
@@ -141,10 +152,16 @@ impl Podman {
         })
     }
 
-    async fn create_exec(&self, container: &str, command: &[String], tty: bool) -> Result<String> {
+    async fn create_exec(
+        &self,
+        container: &str,
+        command: &[String],
+        stdin: bool,
+        tty: bool,
+    ) -> Result<String> {
         let create = CreateExec {
             cmd: command,
-            attach_stdin: tty,
+            attach_stdin: stdin,
             attach_stdout: true,
             attach_stderr: true,
             tty,

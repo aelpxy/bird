@@ -9,6 +9,7 @@ use hyper_util::rt::TokioIo;
 use tokio::sync::mpsc;
 
 use super::forward;
+use super::tty::Stdio;
 use crate::deploy::{MAX_PROCESSES, ensure_image};
 use crate::state::AppState;
 use crate::{Error, Result};
@@ -85,19 +86,25 @@ async fn follow(state: &AppState, id: &str, events: &mpsc::Sender<Bytes>) -> Res
 }
 
 // attached before it starts, so the first output and the first prompt reach the client
-pub(crate) async fn start_terminal(
+pub(crate) async fn start_attached(
     state: &AppState,
     target: &RunTarget,
     command: &Command,
-    (cols, rows): (u16, u16),
+    stdio: Stdio,
 ) -> Result<(String, TokioIo<Upgraded>)> {
     ensure_image(state, &target.image).await?;
-    let spec = spec(state, target, command, Lifecycle::Terminal);
+    let lifecycle = match stdio {
+        Stdio::Terminal { .. } => Lifecycle::Terminal,
+        Stdio::Piped => Lifecycle::Piped,
+    };
+    let spec = spec(state, target, command, lifecycle);
     let id = state.podman.create_container(&spec).await?;
     let attached = async {
         let io = state.podman.attach(&id).await?;
         state.podman.start_container(&id).await?;
-        if let Err(err) = state.podman.resize_container(&id, cols, rows).await {
+        if let Stdio::Terminal { cols, rows } = stdio
+            && let Err(err) = state.podman.resize_container(&id, cols, rows).await
+        {
             tracing::debug!(error = %err, "could not size the new terminal");
         }
         Ok::<_, Error>(io)
@@ -105,7 +112,7 @@ pub(crate) async fn start_terminal(
     .await;
     match attached {
         Ok(io) => {
-            tracing::info!(service = %target.service.name, container = %spec.name, "running one-off terminal");
+            tracing::info!(service = %target.service.name, container = %spec.name, "running attached one-off command");
             Ok((id, io))
         }
         Err(err) => {

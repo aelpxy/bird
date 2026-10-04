@@ -16,8 +16,8 @@ use crate::client::ApiClient;
 use crate::ui::terminal::{self, RawMode};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
-const CHUNK_BYTES: usize = 32 * 1024;
-const KEY_BUFFER: usize = 64;
+pub(super) const CHUNK_BYTES: usize = 32 * 1024;
+const INPUT_BUFFER: usize = 64;
 // bash when the image has it, for history and line editing, otherwise whatever sh is
 const DEFAULT_SHELL: [&str; 3] = [
     "/bin/sh",
@@ -43,18 +43,10 @@ pub(crate) async fn session(
         command
     };
     let (cols, rows) = terminal::size();
-    let endpoint = match place {
-        Place::Machine(_) => "exec",
-        Place::NewContainer => "run",
-    };
-    let mut path = format!(
-        "/v1/services/{name}/{endpoint}/tty?command={}&cols={cols}&rows={rows}",
-        encode(&serde_json::to_string(&command)?)
+    let path = format!(
+        "{}&cols={cols}&rows={rows}",
+        path(name, &place, "tty", &command)?
     );
-    if let Place::Machine(Some(machine)) = place {
-        path.push_str("&machine=");
-        path.push_str(&encode(machine));
-    }
     let io = client.upgrade(&path, TTY_UPGRADE, TIMEOUT).await?;
     let raw = RawMode::enable()?;
     let outcome = relay(io).await;
@@ -65,9 +57,31 @@ pub(crate) async fn session(
     }
 }
 
+// `mode` is `tty` or `pipe`
+pub(super) fn path(
+    name: &Name,
+    place: &Place<'_>,
+    mode: &str,
+    command: &[String],
+) -> Result<String> {
+    let endpoint = match place {
+        Place::Machine(_) => "exec",
+        Place::NewContainer => "run",
+    };
+    let mut path = format!(
+        "/v1/services/{name}/{endpoint}/{mode}?command={}",
+        encode(&serde_json::to_string(command)?)
+    );
+    if let Place::Machine(Some(machine)) = place {
+        path.push_str("&machine=");
+        path.push_str(&encode(machine));
+    }
+    Ok(path)
+}
+
 async fn relay(io: TokioIo<Upgraded>) -> Result<i32> {
     let (mut from_birdd, mut to_birdd) = tokio::io::split(io);
-    let mut keys = read_keys();
+    let mut keys = read_input();
     let mut resized = signal(SignalKind::window_change())?;
     let mut stdout = tokio::io::stdout();
     let mut buffer = Vec::new();
@@ -76,7 +90,7 @@ async fn relay(io: TokioIo<Upgraded>) -> Result<i32> {
     loop {
         tokio::select! {
             typed = keys.recv(), if typing => match typed {
-                Some(bytes) => to_birdd.write_all(&Frame::Data(bytes).encode()).await?,
+                Some(bytes) => to_birdd.write_all(&Frame::Data(bytes?).encode()).await?,
                 None => typing = false,
             },
             _ = resized.recv() => {
@@ -96,7 +110,7 @@ async fn relay(io: TokioIo<Upgraded>) -> Result<i32> {
                         }
                         Frame::Exit(code) => return Ok(code),
                         Frame::Error(message) => bail!(message),
-                        Frame::Resize { .. } => {}
+                        Frame::Resize { .. } | Frame::Stderr(_) | Frame::Eof => {}
                     }
                 }
             }
@@ -105,17 +119,20 @@ async fn relay(io: TokioIo<Upgraded>) -> Result<i32> {
 }
 
 // a plain thread: tokio's stdin would hold up the exit until one more key was pressed
-fn read_keys() -> mpsc::Receiver<Vec<u8>> {
-    let (keys, receiver) = mpsc::channel(KEY_BUFFER);
+pub(super) fn read_input() -> mpsc::Receiver<std::io::Result<Vec<u8>>> {
+    let (input, receiver) = mpsc::channel(INPUT_BUFFER);
     std::thread::spawn(move || {
         let mut stdin = std::io::stdin().lock();
-        let mut chunk = [0_u8; 4096];
+        let mut chunk = vec![0_u8; CHUNK_BYTES];
         loop {
-            let typed = match stdin.read(&mut chunk) {
-                Ok(0) | Err(_) => break,
-                Ok(read) => chunk.get(..read).unwrap_or_default().to_vec(),
+            let read = match stdin.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => Ok(chunk.get(..read).unwrap_or_default().to_vec()),
+                Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(err) => Err(err),
             };
-            if keys.blocking_send(typed).is_err() {
+            let failed = read.is_err();
+            if input.blocking_send(read).is_err() || failed {
                 break;
             }
         }

@@ -116,14 +116,14 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
                     host_ip: "127.0.0.1",
                     protocol: "tcp",
                 }],
-                Lifecycle::OneOff | Lifecycle::Terminal => Vec::new(),
+                Lifecycle::OneOff | Lifecycle::Terminal | Lifecycle::Piped => Vec::new(),
             },
             restart_policy: match spec.lifecycle {
                 Lifecycle::Service { .. } => "unless-stopped",
-                Lifecycle::OneOff | Lifecycle::Terminal => "no",
+                Lifecycle::OneOff | Lifecycle::Terminal | Lifecycle::Piped => "no",
             },
             terminal: spec.lifecycle == Lifecycle::Terminal,
-            stdin: spec.lifecycle == Lifecycle::Terminal,
+            stdin: matches!(spec.lifecycle, Lifecycle::Terminal | Lifecycle::Piped),
             init: true,
         }
     }
@@ -211,6 +211,10 @@ mod tests {
             (true.into(), true.into())
         );
         assert!(json.get("portmappings").is_none());
+        spec.lifecycle = Lifecycle::Piped;
+        let json = serde_json::to_value(SpecGenerator::from(&spec)).unwrap();
+        assert_eq!(json["stdin"], true);
+        assert!(json.get("terminal").is_none());
     }
 
     #[test]
