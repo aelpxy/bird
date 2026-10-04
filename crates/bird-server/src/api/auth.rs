@@ -43,10 +43,11 @@ impl Principal {
         }
     }
 
-    pub(crate) fn require_admin(&self) -> Result<()> {
+    // `refusal` says what only server admins may do
+    pub(crate) fn require_admin(&self, refusal: &'static str) -> Result<()> {
         match self.role() {
             UserRole::Admin => Ok(()),
-            UserRole::Member => Err(Error::Forbidden("only admins can manage users")),
+            UserRole::Member => Err(Error::Forbidden(refusal)),
         }
     }
 

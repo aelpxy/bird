@@ -1,7 +1,9 @@
 use axum::extract::{FromRequestParts, RawPathParams};
 use axum::http::request::Parts;
-use bird_core::{EnvironmentId, Name};
+use bird_core::{EnvironmentId, Name, OrgRole};
 
+use super::access;
+use super::auth::Principal;
 use crate::state::AppState;
 use crate::{Error, Result, environments};
 
@@ -21,9 +23,12 @@ impl FromRequestParts<AppState> for Scope {
         let params = params(parts, state).await?;
         let project = param(&params, "project")?;
         let environment = param(&params, "environment")?;
-        Ok(Self(
-            environments::find(state, &project, &environment).await?.id,
-        ))
+        // checked once here, before the environment, so every route under a project needs a
+        // member of its org and outsiders cannot tell which environments exist
+        let found = environments::project(state, &project).await?;
+        access::require_project(state, &principal(parts)?, &found, OrgRole::Member).await?;
+        let (_, environment) = environments::find(state, &project, &environment).await?;
+        Ok(Self(environment.id))
     }
 }
 
@@ -35,6 +40,14 @@ impl FromRequestParts<AppState> for ServiceScope {
         let Scope(environment) = Scope::from_request_parts(parts, state).await?;
         Ok(Self { environment, name })
     }
+}
+
+pub(crate) fn principal(parts: &Parts) -> Result<Principal> {
+    parts
+        .extensions
+        .get::<Principal>()
+        .cloned()
+        .ok_or(Error::Forbidden("the request was not authenticated"))
 }
 
 async fn params(parts: &mut Parts, state: &AppState) -> Result<RawPathParams> {

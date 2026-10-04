@@ -7,7 +7,12 @@ pub(crate) enum ProjectCommand {
     #[command(visible_alias = "ls")]
     List,
     /// Create a project, with a `production` environment
-    Create { name: Name },
+    Create {
+        name: Name,
+        /// Org that owns it; left out, the one you administer, or `default` for server admins
+        #[arg(long)]
+        org: Option<Name>,
+    },
     /// Delete a project; refused while any of its environments has services or backups
     #[command(visible_alias = "rm")]
     Remove {

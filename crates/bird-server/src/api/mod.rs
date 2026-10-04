@@ -1,3 +1,4 @@
+mod access;
 mod auth;
 mod backups;
 mod builds;
@@ -9,6 +10,7 @@ mod domains;
 mod error;
 mod logs;
 mod openapi;
+mod orgs;
 mod power;
 mod projects;
 mod registries;
@@ -63,6 +65,10 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(users::remove))
         .routes(routes!(users::list_tokens, users::create_token))
         .routes(routes!(users::remove_token))
+        .routes(routes!(orgs::list, orgs::create))
+        .routes(routes!(orgs::remove))
+        .routes(routes!(orgs::members))
+        .routes(routes!(orgs::set_member, orgs::remove_member))
         .routes(routes!(projects::list, projects::create))
         .routes(routes!(projects::remove))
         .routes(routes!(projects::create_environment))

@@ -38,7 +38,7 @@ pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
 ) -> Result<Json<Vec<UserSummary>>> {
-    principal.require_admin()?;
+    principal.require_admin("only server admins can manage users")?;
     Ok(Json(
         users::list(&state)
             .await?
@@ -55,7 +55,7 @@ pub(crate) async fn create(
     Extension(principal): Extension<Principal>,
     Json(request): Json<CreateUser>,
 ) -> Result<(StatusCode, Json<CreatedUser>)> {
-    principal.require_admin()?;
+    principal.require_admin("only server admins can manage users")?;
     let (user, issued) = users::create(&state, &request.name, request.role).await?;
     let created = CreatedUser {
         user: summary(user),
@@ -71,7 +71,7 @@ pub(crate) async fn remove(
     Extension(principal): Extension<Principal>,
     Path(UserPath { user }): Path<UserPath>,
 ) -> Result<StatusCode> {
-    principal.require_admin()?;
+    principal.require_admin("only server admins can manage users")?;
     users::remove(&state, &user).await?;
     Ok(StatusCode::NO_CONTENT)
 }

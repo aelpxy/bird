@@ -7,6 +7,7 @@ mod environments;
 mod error;
 mod machines;
 mod migrate;
+mod orgs;
 mod projects;
 mod registries;
 mod routes;

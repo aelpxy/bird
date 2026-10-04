@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, HealthCheck, HealthTimeout,
-    Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, Port, ProjectId, RegistryHost,
-    Replicas, ServiceId, TokenId, UserId, VolumeId,
+    Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, OrgId, Port, ProjectId,
+    RegistryHost, Replicas, ServiceId, TokenId, UserId, VolumeId,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -84,6 +84,29 @@ string_enum!(UserRole, "user role" {
     Member => "member",
 });
 
+// what a user may do in an org: members work with services, admins also create and delete
+// projects and environments, owners also manage who belongs
+string_enum!(OrgRole, "org role" {
+    Owner => "owner",
+    Admin => "admin",
+    Member => "member",
+});
+
+impl OrgRole {
+    const fn rank(self) -> u8 {
+        match self {
+            Self::Member => 0,
+            Self::Admin => 1,
+            Self::Owner => 2,
+        }
+    }
+
+    #[must_use]
+    pub const fn at_least(self, needed: Self) -> bool {
+        self.rank() >= needed.rank()
+    }
+}
+
 string_enum!(BackupTrigger, "backup trigger" {
     Manual => "manual",
     Restore => "restore",
@@ -112,8 +135,16 @@ pub struct ApiToken {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Org {
+    pub id: OrgId,
+    pub name: Name,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Project {
     pub id: ProjectId,
+    pub org_id: OrgId,
     pub name: Name,
     pub created_at: i64,
 }
@@ -279,6 +310,14 @@ mod tests {
             assert_eq!(s.as_str().parse::<MachineState>().unwrap(), s);
         }
         assert!("bogus".parse::<DeploymentStatus>().is_err());
+    }
+
+    #[test]
+    fn org_roles_include_the_ones_below() {
+        assert!(OrgRole::Owner.at_least(OrgRole::Admin));
+        assert!(OrgRole::Admin.at_least(OrgRole::Admin));
+        assert!(!OrgRole::Member.at_least(OrgRole::Admin));
+        assert!(OrgRole::Member.at_least(OrgRole::Member));
     }
 
     #[test]

@@ -19,6 +19,7 @@ use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
 use crate::{Config, Error, Result, api, data_dir, environments, listen, routing};
 
+pub(crate) const DEFAULT_ORG: &str = "default";
 const DEFAULT_PROJECT: &str = "default";
 
 // builds use a lot of cpu and memory, one at a time keeps a small server responsive
@@ -31,9 +32,10 @@ pub async fn run(config: Config) -> Result<()> {
     let token_path = data_dir.join("api-token");
     let token = ApiToken::load_or_create(&token_path)?;
 
+    let org: Name = DEFAULT_ORG.parse()?;
     let project: Name = DEFAULT_PROJECT.parse()?;
     let environment: Name = environments::FIRST_ENVIRONMENT.parse()?;
-    db.call(move |store| ensure_environment(store, &project, &environment))
+    db.call(move |store| ensure_environment(store, &org, &project, &environment))
         .await?;
 
     let podman = Podman::new(config.podman_socket.clone().unwrap_or_else(default_socket));
@@ -155,16 +157,23 @@ async fn backup_storage(config: &Config, data_dir: &Path) -> Result<BackupStorag
     })
 }
 
-// the network birdd was started with serves it, as it did before environments had their own
+// the network birdd was started with serves it, as it did before environments had their own;
+// projects from before orgs join the default org
 fn ensure_environment(
     store: &mut Store,
+    org: &Name,
     project: &Name,
     environment: &Name,
 ) -> bird_store::Result<()> {
     store.transaction(|store| {
+        let org = match store.org_by_name(org)? {
+            Some(existing) => existing,
+            None => store.create_org(org)?,
+        };
+        store.adopt_projects(org.id)?;
         let project = match store.project_by_name(project)? {
             Some(existing) => existing,
-            None => store.create_project(project)?,
+            None => store.create_project(org.id, project)?,
         };
         if store
             .environment_by_name(project.id, environment)?

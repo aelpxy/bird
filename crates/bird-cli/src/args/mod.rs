@@ -1,4 +1,5 @@
 mod deploy;
+mod orgs;
 mod projects;
 mod users;
 
@@ -13,6 +14,7 @@ use clap_complete::Shell;
 
 pub(crate) use deploy::DeployArgs;
 use deploy::{parse_env, parse_port};
+pub(crate) use orgs::OrgCommand;
 pub(crate) use projects::{EnvironmentCommand, ProjectCommand};
 pub(crate) use users::{TokenCommand, UserCommand};
 
@@ -206,6 +208,11 @@ pub(crate) enum Command {
     Registry {
         #[command(subcommand)]
         command: Option<RegistryCommand>,
+    },
+    /// Manage orgs and who belongs to them, lists yours by default
+    Org {
+        #[command(subcommand)]
+        command: Option<OrgCommand>,
     },
     /// Manage projects, lists them by default
     Project {

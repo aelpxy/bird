@@ -41,6 +41,9 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::ServiceExists { .. }
         | Error::ProjectExists(_)
         | Error::UserExists(_)
+        | Error::OrgExists(_)
+        | Error::OrgHasProjects { .. }
+        | Error::LastOwner { .. }
         | Error::TokenExists { .. }
         | Error::EnvironmentExists { .. }
         | Error::EnvironmentHasServices { .. }
@@ -50,6 +53,8 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::ServiceNotFound(_)
         | Error::ProjectNotFound(_)
         | Error::UserNotFound(_)
+        | Error::OrgNotFound(_)
+        | Error::NotMember { .. }
         | Error::TokenNotFound { .. }
         | Error::EnvironmentNotFound { .. }
         | Error::DomainNotFound(_)
@@ -71,6 +76,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::AmbiguousMachine(_)
         | Error::InvalidTtyRequest(_)
         | Error::InvalidPath(_)
+        | Error::PickOrg(_)
         | Error::CommandConflict
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Forbidden(_) => StatusCode::FORBIDDEN,

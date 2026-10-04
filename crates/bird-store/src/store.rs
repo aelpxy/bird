@@ -97,19 +97,16 @@ mod tests {
     fn transaction_rolls_back_on_error() {
         let mut store = Store::open_in_memory().unwrap();
         let result = store.transaction(|store| {
-            store.create_project(&name("first"))?;
-            store.create_project(&name("first"))
+            store.create_org(&name("first"))?;
+            store.create_org(&name("first"))
         });
-        assert!(matches!(
-            result,
-            Err(crate::Error::AlreadyExists("project"))
-        ));
-        assert!(store.project_by_name(&name("first")).unwrap().is_none());
+        assert!(matches!(result, Err(crate::Error::AlreadyExists("org"))));
+        assert!(store.org_by_name(&name("first")).unwrap().is_none());
 
         store
-            .transaction(|store| store.create_project(&name("second")))
+            .transaction(|store| store.create_org(&name("second")))
             .unwrap();
-        assert!(store.project_by_name(&name("second")).unwrap().is_some());
+        assert!(store.org_by_name(&name("second")).unwrap().is_some());
     }
 
     #[test]
@@ -117,10 +114,10 @@ mod tests {
         let path = std::env::temp_dir().join(format!("bird-store-{}.db", ProjectId::generate()));
         {
             let store = Store::open(&path).unwrap();
-            store.create_project(&name("default")).unwrap();
+            store.create_org(&name("default")).unwrap();
         }
         let store = Store::open(&path).unwrap();
-        assert!(store.project_by_name(&name("default")).unwrap().is_some());
+        assert!(store.org_by_name(&name("default")).unwrap().is_some());
         drop(store);
         for suffix in ["", "-wal", "-shm"] {
             let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
@@ -132,18 +129,13 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("bird-copy-{}", ProjectId::generate()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(dir.join("bird.db")).unwrap();
-        store.create_project(&name("default")).unwrap();
+        store.create_org(&name("default")).unwrap();
         let copy = dir.join("copy.db");
         store.copy_to(&copy).unwrap();
         assert!(store.copy_to(&copy).is_err());
         drop(store);
         let restored = Store::open(&copy).unwrap();
-        assert!(
-            restored
-                .project_by_name(&name("default"))
-                .unwrap()
-                .is_some()
-        );
+        assert!(restored.org_by_name(&name("default")).unwrap().is_some());
         drop(restored);
         std::fs::remove_dir_all(dir).unwrap();
     }

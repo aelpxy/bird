@@ -8,7 +8,8 @@ pub(crate) fn name(s: &str) -> Name {
 
 pub(crate) fn setup() -> (Store, Service) {
     let store = Store::open_in_memory().unwrap();
-    let project = store.create_project(&name("default")).unwrap();
+    let org = store.create_org(&name("default")).unwrap();
+    let project = store.create_project(org.id, &name("default")).unwrap();
     let env = store
         .create_environment(project.id, &name("production"), None)
         .unwrap();

@@ -12,6 +12,7 @@ mod health;
 mod images;
 mod labels;
 mod listen;
+mod orgs;
 mod routing;
 mod run;
 mod secrets;

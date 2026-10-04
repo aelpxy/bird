@@ -43,7 +43,8 @@ define_id!(
     VolumeId,
     BackupId,
     UserId,
-    TokenId
+    TokenId,
+    OrgId
 );
 
 #[cfg(test)]
