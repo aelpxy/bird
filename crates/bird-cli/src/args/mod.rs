@@ -29,7 +29,8 @@ const EXEC_EXAMPLES: &str = "\
 Examples:
   bird exec                            a shell in the service's first running machine
   bird exec -s db psql -U postgres     an interactive psql prompt
-  bird exec -s db -T pg_dump -U postgres > dump.sql
+  bird exec -s db pg_dump -U postgres -Fc app > app.dump
+  bird exec -s db pg_restore -U postgres -d app < app.dump
   bird exec -m a516d4 ls /data         in a specific machine
 
 Ctrl-C and Ctrl-D go to the remote program; exit the shell or program to leave.";
@@ -106,7 +107,8 @@ pub(crate) enum Command {
         /// Machine to run in, as `bird status` shows it; defaults to the first running one
         #[arg(short, long)]
         machine: Option<String>,
-        /// Stream output without a terminal, keeping stderr apart, even when run from one
+        /// No terminal, even when run from one: piped stdin and the output pass through as bytes,
+        /// with stderr kept apart
         #[arg(short = 'T', long)]
         no_tty: bool,
         /// Command and its arguments; left out, a shell
@@ -121,7 +123,8 @@ pub(crate) enum Command {
     /// variables and network but not its volumes; interactive when used from a terminal
     #[command(after_help = RUN_EXAMPLES)]
     Run {
-        /// Stream output without a terminal, keeping stderr apart, even when run from one
+        /// No terminal, even when run from one: piped stdin and the output pass through as bytes,
+        /// with stderr kept apart
         #[arg(short = 'T', long)]
         no_tty: bool,
         /// Command and its arguments; left out, a shell

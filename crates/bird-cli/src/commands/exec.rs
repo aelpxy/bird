@@ -1,14 +1,12 @@
 use std::fmt;
-use std::io::Write;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bird_api::{CommandEvent, ExecRequest, LogStream, RunRequest};
+use bird_api::{CommandEvent, ExecRequest, RunRequest};
 use bird_core::{Command, Name};
 use serde::Serialize;
 
 use crate::client::ApiClient;
-use crate::ui::Output;
 
 // covers the response head; the command then runs until it exits or birdd's own limit
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -30,7 +28,6 @@ pub(crate) async fn exec(
     name: &Name,
     machine: Option<String>,
     command: Vec<String>,
-    out: Output,
 ) -> Result<()> {
     if command.is_empty() {
         bail!("give a command to run; an interactive shell needs a terminal on stdin and stdout");
@@ -39,36 +36,21 @@ pub(crate) async fn exec(
         command: Command::try_from(command)?,
         machine,
     };
-    stream(client, &format!("/v1/services/{name}/exec"), &request, out).await
+    stream(client, &format!("/v1/services/{name}/exec"), &request).await
 }
 
-pub(crate) async fn run(
-    client: &ApiClient,
-    name: &Name,
-    command: Vec<String>,
-    out: Output,
-) -> Result<()> {
+pub(crate) async fn run(client: &ApiClient, name: &Name, command: Vec<String>) -> Result<()> {
     if command.is_empty() {
         bail!("give a command to run; an interactive shell needs a terminal on stdin and stdout");
     }
     let request = RunRequest {
         command: Command::try_from(command)?,
     };
-    stream(client, &format!("/v1/services/{name}/run"), &request, out).await
+    stream(client, &format!("/v1/services/{name}/run"), &request).await
 }
 
-// flushed per chunk, so prompts and progress without a newline show up as they are written
-fn write_now(mut to: impl Write, text: &str) -> std::io::Result<()> {
-    to.write_all(text.as_bytes())?;
-    to.flush()
-}
-
-async fn stream(
-    client: &ApiClient,
-    path: &str,
-    request: &impl Serialize,
-    out: Output,
-) -> Result<()> {
+// `--json`: each event is printed as birdd sent it
+async fn stream(client: &ApiClient, path: &str, request: &impl Serialize) -> Result<()> {
     let mut last = None;
     client
         .upload_lines(
@@ -79,16 +61,9 @@ async fn stream(
             |line| {
                 let event: CommandEvent =
                     serde_json::from_str(line).context("birdd sent an unexpected event")?;
-                if out.json {
-                    println!("{line}");
-                }
-                match event {
-                    CommandEvent::Output { stream, text } if !out.json => match stream {
-                        LogStream::Stdout => write_now(std::io::stdout().lock(), &text)?,
-                        LogStream::Stderr => write_now(std::io::stderr().lock(), &text)?,
-                    },
-                    CommandEvent::Output { .. } => {}
-                    finished => last = Some(finished),
+                println!("{line}");
+                if !matches!(event, CommandEvent::Output { .. }) {
+                    last = Some(event);
                 }
                 Ok(())
             },

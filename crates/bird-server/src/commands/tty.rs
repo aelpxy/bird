@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use bird_api::Frame;
 use bird_core::Name;
+use bird_podman::{Demux, LogStream};
 use hyper::upgrade::{OnUpgrade, Upgraded};
 use hyper_util::rt::TokioIo;
-use rustix::process::{Pid, Signal, kill_process};
+use rustix::process::{Pid, Signal, kill_process, kill_process_group};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -14,9 +15,19 @@ const CHUNK_BYTES: usize = 32 * 1024;
 const EXIT_POLL: Duration = Duration::from_millis(100);
 const EXIT_WAIT: Duration = Duration::from_secs(2);
 const HANG_UP_GRACE: Duration = Duration::from_secs(2);
+const LINGER: Duration = Duration::from_secs(5);
 // each terminal holds two connections and two tasks; this bounds what one token holder can open
 pub(crate) const MAX_TERMINALS: usize = 64;
 const SHUTDOWN_WAIT: Duration = Duration::from_secs(10);
+
+// how the command's input and output are carried
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Stdio {
+    // one raw stream both ways, sized like the client's terminal
+    Terminal { cols: u16, rows: u16 },
+    // stdin, stdout and stderr kept apart and passed as bytes, for dumps and restores
+    Piped,
+}
 
 // what the terminal is connected to, which decides how it is resized, read and ended
 pub(crate) enum Remote {
@@ -52,11 +63,11 @@ impl Remote {
         }
     }
 
-    // runs however the session ended, so nothing is left behind in the machine or on the host
-    async fn end(&self, state: &AppState, exited: bool) {
+    // runs however the session ended, so nothing is left behind in the machine or on the host;
+    // hanging up an exec that already exited does nothing
+    async fn end(&self, state: &AppState) {
         match self {
-            Self::Exec(id) if !exited => hang_up(state, id).await,
-            Self::Exec(_) => {}
+            Self::Exec(id) => hang_up(state, id).await,
             Self::Container(id) => {
                 if let Err(err) = state.podman.remove_container(id).await {
                     tracing::warn!(container = id, error = %err, "could not remove one-off container");
@@ -78,27 +89,22 @@ pub(crate) async fn serve(
     upgrade: OnUpgrade,
     io: TokioIo<Upgraded>,
     remote: Remote,
+    stdio: Stdio,
     permit: OwnedSemaphorePermit,
 ) {
     let client = match upgrade.await {
         Ok(upgraded) => TokioIo::new(upgraded),
         Err(err) => {
             tracing::debug!(service = %name, error = %err, "terminal client never connected");
-            remote.end(&state, false).await;
+            remote.end(&state).await;
             return;
         }
     };
-    let exited = match bridge(&state, client, io, &remote).await {
-        Ended::Exited(code) => {
-            tracing::info!(service = %name, code, "terminal closed");
-            true
-        }
-        Ended::Left => {
-            tracing::info!(service = %name, "terminal client left, hanging up");
-            false
-        }
-    };
-    remote.end(&state, exited).await;
+    match bridge(&state, client, io, &remote, stdio).await {
+        Ended::Exited(code) => tracing::info!(service = %name, code, "terminal closed"),
+        Ended::Left => tracing::info!(service = %name, "terminal client left, hanging up"),
+    }
+    remote.end(&state).await;
     drop(permit);
 }
 
@@ -118,12 +124,14 @@ async fn bridge(
     client: impl AsyncRead + AsyncWrite,
     process: TokioIo<Upgraded>,
     remote: &Remote,
+    stdio: Stdio,
 ) -> Ended {
     let (mut client_read, mut client_write) = tokio::io::split(client);
     let (mut process_read, mut process_write) = tokio::io::split(process);
     let input = async {
         let mut buffer = Vec::new();
         let mut chunk = vec![0_u8; CHUNK_BYTES];
+        let mut stdin_open = true;
         loop {
             let read = client_read.read(&mut chunk).await?;
             let Some(bytes) = chunk.get(..read).filter(|bytes| !bytes.is_empty()) else {
@@ -132,23 +140,57 @@ async fn bridge(
             buffer.extend_from_slice(bytes);
             while let Some(frame) = Frame::decode(&mut buffer)? {
                 match frame {
-                    Frame::Data(bytes) => process_write.write_all(&bytes).await?,
+                    // a command may stop reading early; its output, not its input, ends the session
+                    Frame::Data(bytes) if stdin_open => {
+                        if let Err(err) = process_write.write_all(&bytes).await {
+                            tracing::debug!(error = %err, "command stopped taking input");
+                            stdin_open = false;
+                        }
+                    }
+                    Frame::Eof if stdin_open => {
+                        stdin_open = false;
+                        if let Err(err) = process_write.shutdown().await {
+                            tracing::debug!(error = %err, "could not close the command's input");
+                        }
+                    }
                     Frame::Resize { cols, rows } => remote.resize(state, cols, rows).await,
-                    Frame::Exit(_) | Frame::Error(_) => {}
+                    Frame::Data(_)
+                    | Frame::Eof
+                    | Frame::Exit(_)
+                    | Frame::Error(_)
+                    | Frame::Stderr(_) => {}
                 }
             }
         }
     };
     let output = async {
+        let mut demux = Demux::default();
         let mut chunk = vec![0_u8; CHUNK_BYTES];
         loop {
-            let read = process_read.read(&mut chunk).await?;
+            // podman resets the connection when the command exits with input still unread
+            let read = process_read.read(&mut chunk).await.unwrap_or_else(|err| {
+                tracing::debug!(error = %err, "command output ended");
+                0
+            });
             let Some(bytes) = chunk.get(..read).filter(|bytes| !bytes.is_empty()) else {
-                return Ok::<_, std::io::Error>(());
+                return Ok::<_, Box<dyn std::error::Error + Send + Sync>>(());
             };
-            client_write
-                .write_all(&Frame::Data(bytes.to_vec()).encode())
-                .await?;
+            match stdio {
+                Stdio::Terminal { .. } => {
+                    client_write
+                        .write_all(&Frame::Data(bytes.to_vec()).encode())
+                        .await?;
+                }
+                Stdio::Piped => {
+                    for (stream, piece) in demux.push(bytes)? {
+                        let frame = match stream {
+                            LogStream::Stdout => Frame::Data(piece.to_vec()),
+                            LogStream::Stderr => Frame::Stderr(piece.to_vec()),
+                        };
+                        client_write.write_all(&frame.encode()).await?;
+                    }
+                }
+            }
         }
     };
     let finished = tokio::select! {
@@ -172,6 +214,12 @@ async fn bridge(
     let code = remote.exit_code(state).await;
     let _ = client_write.write_all(&Frame::Exit(code).encode()).await;
     let _ = client_write.shutdown().await;
+    // drain the client's remaining input, or closing resets the connection and loses the exit frame
+    let _ = tokio::time::timeout(
+        LINGER,
+        tokio::io::copy(&mut client_read, &mut tokio::io::sink()),
+    )
+    .await;
     Ended::Exited(code)
 }
 
@@ -205,7 +253,10 @@ async fn hang_up(state: &AppState, id: &str) {
         let (true, Some(pid)) = (info.running, pid) else {
             return;
         };
-        if let Err(err) = kill_process(pid, signal) {
+        // podman starts an exec as its own group leader; without a terminal nothing else passes the
+        // hang-up on to the command's children
+        let sent = kill_process_group(pid, signal).or_else(|_| kill_process(pid, signal));
+        if let Err(err) = sent {
             tracing::warn!(exec = id, error = %err, "could not hang up terminal process");
             return;
         }

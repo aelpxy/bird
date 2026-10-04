@@ -10,6 +10,7 @@ mod init;
 mod list;
 mod login;
 mod logs;
+mod pipe;
 mod power;
 mod registry;
 mod remove;
@@ -59,20 +60,26 @@ pub(crate) async fn run(args: Args) -> Result<()> {
         } => {
             let client = connect(api)?;
             let name = target()?;
-            if !no_tty && !out.json && crate::ui::terminal::interactive() {
-                let place = tty::Place::Machine(machine.as_deref());
+            if out.json {
+                return exec::exec(&client, &name, machine, command).await;
+            }
+            let place = tty::Place::Machine(machine.as_deref());
+            if !no_tty && crate::ui::terminal::interactive() {
                 tty::session(&client, &name, place, command).await
             } else {
-                exec::exec(&client, &name, machine, command, out).await
+                pipe::session(&client, &name, place, command).await
             }
         }
         Command::Run { no_tty, command } => {
             let client = connect(api)?;
             let name = target()?;
-            if !no_tty && !out.json && crate::ui::terminal::interactive() {
-                tty::session(&client, &name, tty::Place::NewContainer, command).await
+            let place = tty::Place::NewContainer;
+            if out.json {
+                exec::run(&client, &name, command).await
+            } else if !no_tty && crate::ui::terminal::interactive() {
+                tty::session(&client, &name, place, command).await
             } else {
-                exec::run(&client, &name, command, out).await
+                pipe::session(&client, &name, place, command).await
             }
         }
         Command::Env { command } => {
