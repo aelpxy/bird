@@ -49,7 +49,7 @@ async fn exec_streams_output_and_exit_code() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-exec";
+    let name = &format!("bird-test-exec-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, "sleep 60"))
@@ -88,7 +88,7 @@ async fn one_off_container_reports_output_and_exit_code() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-one-off";
+    let name = &format!("bird-test-one-off-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, "echo start; sleep 1; echo done >&2; exit 5"))
@@ -128,7 +128,7 @@ async fn tty_exec_is_interactive_and_resizable() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-tty";
+    let name = &format!("bird-test-tty-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, "sleep 60"))
@@ -144,7 +144,7 @@ async fn tty_exec_is_interactive_and_resizable() {
         .await
         .unwrap();
     let mut output = Vec::new();
-    tokio::time::timeout(Duration::from_secs(10), session.io.read_to_end(&mut output))
+    tokio::time::timeout(LOADED_MACHINE, session.io.read_to_end(&mut output))
         .await
         .unwrap()
         .unwrap();
@@ -178,7 +178,7 @@ async fn terminal_container_is_attached_from_the_start() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-terminal";
+    let name = &format!("bird-test-terminal-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let mut terminal = spec(name, "unused");
     terminal.lifecycle = Lifecycle::Terminal;
@@ -236,7 +236,7 @@ async fn output_is_kept_as_written() {
         .unwrap();
     let expected = format!("{}é", "x".repeat(100_000));
 
-    let name = "bird-test-output-run";
+    let name = &format!("bird-test-output-run-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, UNTERMINATED))
@@ -247,7 +247,7 @@ async fn output_is_kept_as_written() {
     assert!(stdout_of(output).await == expected, "run output changed");
     podman.remove_container(&id).await.unwrap();
 
-    let name = "bird-test-output-exec";
+    let name = &format!("bird-test-output-exec-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, "sleep 60"))
@@ -269,7 +269,7 @@ async fn output_is_kept_as_written() {
 #[ignore = "requires a running podman socket"]
 async fn a_missing_program_fails_at_start() {
     let podman = podman();
-    let name = "bird-test-missing-program";
+    let name = &format!("bird-test-missing-program-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let missing = ContainerSpec {
         entrypoint: Some(vec!["no-such-program".to_owned()]),

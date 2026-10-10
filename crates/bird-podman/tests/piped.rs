@@ -68,7 +68,7 @@ async fn piped_exec_passes_bytes_and_end_of_file() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-piped-exec";
+    let name = &format!("bird-test-piped-exec-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman
         .create_container(&spec(name, &["sleep", "60"]))
@@ -83,8 +83,15 @@ async fn piped_exec_passes_bytes_and_end_of_file() {
     let (stdout, stderr) = round_trip(session.io, input.clone()).await;
     assert!(stdout == input, "stdout changed: {} bytes", stdout.len());
     assert_eq!(stderr, b"read-it-all\n");
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    let info = podman.inspect_exec(&session_id).await.unwrap();
+    // podman records the exit a moment after the stream ends
+    let mut info = podman.inspect_exec(&session_id).await.unwrap();
+    for _ in 0..100 {
+        if !info.running {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        info = podman.inspect_exec(&session_id).await.unwrap();
+    }
     assert_eq!((info.running, info.exit_code), (false, 7));
     podman.remove_container(&id).await.unwrap();
 }
@@ -97,7 +104,7 @@ async fn piped_container_passes_bytes_and_end_of_file() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-piped-run";
+    let name = &format!("bird-test-piped-run-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let mut piped = spec(name, &["sh", "-c", COMMAND]);
     piped.lifecycle = Lifecycle::Piped;

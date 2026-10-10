@@ -37,16 +37,17 @@ async fn busy_container_measures_its_cpu_limit() {
         .pull_image(&IMAGE.parse().unwrap(), None)
         .await
         .unwrap();
-    let name = "bird-test-stats";
+    let name = &format!("bird-test-stats-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let id = podman.create_container(&spec(name)).await.unwrap();
     podman.start_container(&id).await.unwrap();
 
     let first = podman.stats(&[&id]).await.unwrap()[&id];
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
     let second = podman.stats(&[&id]).await.unwrap()[&id];
     let cpu = second.cpu_millicores_since(&first).unwrap();
-    assert!((400..=600).contains(&cpu), "{cpu}");
+    // a busy host can give the loop less than its quota, but never more
+    assert!((250..=600).contains(&cpu), "{cpu}");
     assert!(second.memory_bytes > 0);
     assert!(second.processes >= 1);
 

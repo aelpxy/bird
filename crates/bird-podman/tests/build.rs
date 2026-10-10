@@ -25,6 +25,14 @@ fn context(dockerfile: &str) -> Full<Bytes> {
     ))
 }
 
+// unique per run, so a leftover or a concurrent suite's image is never a cache hit or a clash
+fn marker() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("the clock is after 1970")
+        .as_nanos()
+}
+
 async fn lines(podman: &Podman, dockerfile: &str, tag: &ImageRef) -> Vec<BuildLine> {
     let args = BTreeMap::from([(
         "GREETING".parse().expect("a valid key"),
@@ -45,9 +53,14 @@ async fn lines(podman: &Podman, dockerfile: &str, tag: &ImageRef) -> Vec<BuildLi
 #[ignore = "requires a running podman socket"]
 async fn builds_and_tags_an_image() {
     let podman = podman();
-    let tag: ImageRef = "localhost/bird-test/build:ok".parse().unwrap();
-    let dockerfile = "FROM docker.io/library/alpine:3\nARG GREETING\nRUN echo \"got $GREETING\"\nCOPY hello.txt /hello.txt\n";
-    let lines = lines(&podman, dockerfile, &tag).await;
+    let marker = marker();
+    let tag: ImageRef = format!("localhost/bird-test/build:ok-{marker}")
+        .parse()
+        .unwrap();
+    let dockerfile = format!(
+        "FROM docker.io/library/alpine:3\nARG GREETING\nRUN echo \"got $GREETING\" # {marker}\nCOPY hello.txt /hello.txt\n"
+    );
+    let lines = lines(&podman, &dockerfile, &tag).await;
     assert!(
         !lines.iter().any(|l| matches!(l, BuildLine::Failed(_))),
         "{lines:?}"
@@ -64,7 +77,9 @@ async fn builds_and_tags_an_image() {
 #[ignore = "requires a running podman socket"]
 async fn reports_a_failing_step() {
     let podman = podman();
-    let tag: ImageRef = "localhost/bird-test/build:fail".parse().unwrap();
+    let tag: ImageRef = format!("localhost/bird-test/build:fail-{}", marker())
+        .parse()
+        .unwrap();
     let dockerfile = "FROM docker.io/library/alpine:3\nRUN echo boom && exit 7\n";
     let lines = lines(&podman, dockerfile, &tag).await;
     assert!(
@@ -79,13 +94,14 @@ async fn reports_a_failing_step() {
 #[ignore = "requires a running podman socket"]
 async fn rebuilding_reuses_cached_layers() {
     let podman = podman();
-    let marker = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+    let marker = marker();
     let dockerfile = format!("FROM docker.io/library/alpine:3\nRUN echo {marker} > /marker\n");
-    let first: ImageRef = "localhost/bird-test/build:cache-1".parse().unwrap();
-    let second: ImageRef = "localhost/bird-test/build:cache-2".parse().unwrap();
+    let first: ImageRef = format!("localhost/bird-test/build:cache-1-{marker}")
+        .parse()
+        .unwrap();
+    let second: ImageRef = format!("localhost/bird-test/build:cache-2-{marker}")
+        .parse()
+        .unwrap();
     let cached = |lines: &[BuildLine]| {
         lines
             .iter()

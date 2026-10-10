@@ -58,7 +58,8 @@ async fn networks_are_isolated_from_each_other() {
         "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
     ]);
 
-    let same = reaches(&home, &address);
+    // the server may still be starting, so only the first check waits for it
+    let same = (0..30).any(|_| reaches(&home, &address));
     let across = reaches(&other, &address);
     podman_cli(&["rm", "-f", &server]);
     for network in [&home, &other] {

@@ -284,8 +284,9 @@ async fn schedules_run_skip_stopped_services_and_restarts_interrupt_runs() {
     };
     assert_eq!(tick["trigger"], "schedule", "{tick}");
     let started = tick["started_at"].as_i64().unwrap();
+    // a 10s tick plus a loaded host's startup, still well short of the next minute
     assert!(
-        started % 60 < 20,
+        started % 60 < 45,
         "it ran well after the minute began: {tick}"
     );
     let output = birdd

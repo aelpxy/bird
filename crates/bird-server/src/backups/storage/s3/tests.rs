@@ -17,6 +17,8 @@ struct Server {
 
 impl Server {
     fn start(name: &str) -> Self {
+        // another suite on the same podman removes servers by name before starting its own
+        let name = &format!("{name}-{}", std::process::id());
         let dir = std::env::temp_dir().join(name);
         std::fs::create_dir_all(&dir).expect("temp dir is writable");
         let config = dir.join("s3.json");

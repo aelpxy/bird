@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bird_core::{Command, EnvKey, EnvironmentId, ImageRef, Name, Service};
@@ -18,6 +19,8 @@ const RUN_TIMEOUT: Duration = Duration::from_hours(1);
 const RUN_LABEL: &str = "bird.run";
 // not the machines' environment label, so the orphan sweep still leaves running commands alone
 const RUN_ENVIRONMENT_LABEL: &str = "bird.run-environment";
+// cron jobs due in the same tick start within the same millisecond, so the time alone can repeat
+static RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) struct RunTarget {
     service: Service,
@@ -184,7 +187,11 @@ fn spec(target: &RunTarget, command: &Command, lifecycle: Lifecycle) -> Containe
         _ => (None, Some(command.args().to_vec())),
     };
     ContainerSpec {
-        name: format!("bird-run-{}-{millis}", service.name),
+        name: format!(
+            "bird-run-{}-{millis}-{}",
+            service.name,
+            RUN_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ),
         image: target.image.clone(),
         command,
         entrypoint,

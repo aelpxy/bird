@@ -27,13 +27,26 @@ async fn http_get(port: u16) -> Option<String> {
 }
 
 async fn wait_for_http(port: u16) -> Option<String> {
-    for _ in 0..50 {
+    for _ in 0..300 {
         if let Some(response) = http_get(port).await {
             return Some(response);
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     None
+}
+
+// nginx logs a request after answering it, so the line can trail the response
+async fn wait_for_log(podman: &Podman, id: &str, text: &str) -> Vec<bird_podman::LogLine> {
+    let mut logs = Vec::new();
+    for _ in 0..50 {
+        logs = podman.logs(id, 100).await.expect("logs stay readable");
+        if logs.iter().any(|l| l.text.contains(text)) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    logs
 }
 
 #[tokio::test]
@@ -104,7 +117,7 @@ async fn container_lifecycle() {
     assert_eq!(listed[0].id, id);
     assert_eq!(listed[0].host_port(port), Some(host_port));
 
-    let logs = podman.logs(&id, 100).await.unwrap();
+    let logs = wait_for_log(&podman, &id, "GET /").await;
     assert!(
         logs.iter()
             .any(|l| l.stream == LogStream::Stdout && l.text.contains("GET /")),
