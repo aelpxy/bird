@@ -82,7 +82,7 @@ enum Ended {
     Left,
 }
 
-// no idle timeout: an open shell waiting for input is the normal state, shutdown still ends it
+// a bird-tty client, whose connection hyper hands over once the 101 response is sent
 pub(crate) async fn serve(
     state: AppState,
     name: Name,
@@ -92,20 +92,30 @@ pub(crate) async fn serve(
     stdio: Stdio,
     permit: OwnedSemaphorePermit,
 ) {
-    let client = match upgrade.await {
-        Ok(upgraded) => TokioIo::new(upgraded),
+    match upgrade.await {
+        Ok(upgraded) => session(&state, &name, TokioIo::new(upgraded), io, remote, stdio).await,
         Err(err) => {
             tracing::debug!(service = %name, error = %err, "terminal client never connected");
             remote.end(&state).await;
-            return;
         }
-    };
-    match bridge(&state, client, io, &remote, stdio).await {
+    }
+    drop(permit);
+}
+
+// no idle timeout: an open shell waiting for input is the normal state, shutdown still ends it
+pub(crate) async fn session(
+    state: &AppState,
+    name: &Name,
+    client: impl AsyncRead + AsyncWrite,
+    io: TokioIo<Upgraded>,
+    remote: Remote,
+    stdio: Stdio,
+) {
+    match bridge(state, client, io, &remote, stdio).await {
         Ended::Exited(code) => tracing::info!(service = %name, code, "terminal closed"),
         Ended::Left => tracing::info!(service = %name, "terminal client left, hanging up"),
     }
-    remote.end(&state).await;
-    drop(permit);
+    remote.end(state).await;
 }
 
 // birdd exits once every terminal released its permit, so none is left running in a machine

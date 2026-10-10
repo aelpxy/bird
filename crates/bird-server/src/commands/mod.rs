@@ -3,6 +3,7 @@ mod exec;
 mod piped;
 mod run;
 pub(crate) mod tty;
+pub(crate) mod websocket;
 
 use bird_api::{CommandEvent, LogStream};
 use bird_podman::{OutputChunk, OutputFollower};

@@ -29,7 +29,7 @@
         },
         "responses": {
           "200": {
-            "description": "Signed in, or asked for a two-factor code",
+            "description": "Signed in, or asked for a two-factor code; with `cookie` the session is set as an HttpOnly `bird_session` cookie, marked Secure unless the browser is on this host, and requests using it that change something or open a terminal must send an Origin matching the Host",
             "content": {
               "application/json": {
                 "schema": {
@@ -73,7 +73,7 @@
         "operationId": "logout",
         "responses": {
           "204": {
-            "description": "Signed out"
+            "description": "Signed out, and the session cookie cleared"
           },
           "400": {
             "description": "The request used an api token, not a session",
@@ -2587,7 +2587,7 @@
             }
           },
           "426": {
-            "description": "The request did not ask to upgrade to bird-tty",
+            "description": "The request did not ask to upgrade to bird-tty or websocket",
             "content": {
               "application/json": {
                 "schema": {
@@ -2687,7 +2687,7 @@
         ],
         "responses": {
           "101": {
-            "description": "Switched to bird-tty: both sides send frames of a kind byte, a big-endian u32 length and the payload; data (0) both ways, resize (1, cols and rows as u16) from the client, then exit (2, i32 code) or error (3, text) from birdd"
+            "description": "Switched to bird-tty: both sides send frames of a kind byte, a big-endian u32 length and the payload; data (0) both ways, resize (1, cols and rows as u16) from the client, then exit (2, i32 code) or error (3, text) from birdd. Browsers can upgrade to websocket instead, which carries the same frames in binary messages"
           },
           "400": {
             "description": "Invalid input",
@@ -2720,7 +2720,7 @@
             }
           },
           "426": {
-            "description": "The request did not ask to upgrade to bird-tty",
+            "description": "The request did not ask to upgrade to bird-tty or websocket",
             "content": {
               "application/json": {
                 "schema": {
@@ -3204,7 +3204,7 @@
             }
           },
           "426": {
-            "description": "The request did not ask to upgrade to bird-tty",
+            "description": "The request did not ask to upgrade to bird-tty or websocket",
             "content": {
               "application/json": {
                 "schema": {
@@ -3337,7 +3337,7 @@
             }
           },
           "426": {
-            "description": "The request did not ask to upgrade to bird-tty",
+            "description": "The request did not ask to upgrade to bird-tty or websocket",
             "content": {
               "application/json": {
                 "schema": {
@@ -5848,6 +5848,10 @@
             ],
             "description": "A code from the authenticator app or a recovery code, for users with two-factor on"
           },
+          "cookie": {
+            "type": "boolean",
+            "description": "Keep the session in an `HttpOnly` cookie instead of returning its token, for browsers"
+          },
           "password": {
             "type": "string"
           },
@@ -5881,6 +5885,30 @@
               },
               "token": {
                 "type": "string"
+              },
+              "user": {
+                "$ref": "#/components/schemas/Name"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Signed in with the session in a cookie, which scripts cannot read",
+            "required": [
+              "user",
+              "expires_at",
+              "status"
+            ],
+            "properties": {
+              "expires_at": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "signed_in_with_cookie"
+                ]
               },
               "user": {
                 "$ref": "#/components/schemas/Name"

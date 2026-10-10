@@ -185,7 +185,7 @@ pub enum Error {
     DuplicateCronJob(Name),
     #[error("too many terminals are open, close one and try again")]
     TooManyTerminals,
-    #[error("a terminal needs a connection upgraded to bird-tty")]
+    #[error("a terminal needs a connection upgraded to bird-tty or websocket")]
     UpgradeRequired,
     #[error("invalid terminal request: {0}")]
     InvalidTtyRequest(String),

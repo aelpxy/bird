@@ -12,6 +12,9 @@ pub struct LoginRequest {
     /// A code from the authenticator app or a recovery code, for users with two-factor on
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
+    /// Keep the session in an `HttpOnly` cookie instead of returning its token, for browsers
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cookie: bool,
 }
 
 impl fmt::Debug for LoginRequest {
@@ -32,6 +35,8 @@ pub enum LoginResponse {
         user: Name,
         expires_at: i64,
     },
+    /// Signed in with the session in a cookie, which scripts cannot read
+    SignedInWithCookie { user: Name, expires_at: i64 },
     /// The password was right; send it again with a code
     TwoFactorRequired,
 }
@@ -46,6 +51,11 @@ impl fmt::Debug for LoginResponse {
                 .field("user", user)
                 .field("expires_at", expires_at)
                 .finish_non_exhaustive(),
+            Self::SignedInWithCookie { user, expires_at } => f
+                .debug_struct("SignedInWithCookie")
+                .field("user", user)
+                .field("expires_at", expires_at)
+                .finish(),
             Self::TwoFactorRequired => f.write_str("TwoFactorRequired"),
         }
     }

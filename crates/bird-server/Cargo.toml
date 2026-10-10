@@ -12,7 +12,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow.workspace = true
 argon2.workspace = true
-axum = { workspace = true, features = ["http1", "json", "query", "tokio"] }
+axum = { workspace = true, features = ["http1", "json", "query", "tokio", "ws"] }
 bird-api = { workspace = true, features = ["openapi"] }
 bird-core.workspace = true
 bird-podman.workspace = true
@@ -20,7 +20,7 @@ bird-proxy.workspace = true
 bird-store.workspace = true
 bytes.workspace = true
 clap.workspace = true
-futures-util.workspace = true
+futures-util = { workspace = true, features = ["sink"] }
 http-body.workspace = true
 http-body-util.workspace = true
 hyper = { workspace = true, features = ["http1", "server"] }
@@ -46,6 +46,8 @@ x509-parser.workspace = true
 rcgen.workspace = true
 # talks to an in-process birdd over http in the integration tests
 reqwest = { workspace = true, features = ["json"] }
+# a browser's side of the websocket terminals
+tokio-tungstenite.workspace = true
 
 [lints]
 workspace = true

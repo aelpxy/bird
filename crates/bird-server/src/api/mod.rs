@@ -3,6 +3,7 @@ mod auth;
 mod backups;
 mod builds;
 mod commands;
+mod cookies;
 mod credentials;
 mod cron;
 mod deploy;

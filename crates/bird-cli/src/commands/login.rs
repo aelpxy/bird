@@ -75,10 +75,14 @@ async fn sign_in(api: &str) -> Result<String> {
         username,
         password,
         code: None,
+        cookie: false,
     };
     for _ in 0..2 {
         match client.post("/v1/login", &request, TIMEOUT).await? {
             LoginResponse::SignedIn { token, .. } => return Ok(token),
+            LoginResponse::SignedInWithCookie { .. } => {
+                bail!("birdd set a cookie instead of returning a token")
+            }
             LoginResponse::TwoFactorRequired => {
                 request.code = Some(prompt::line("two-factor code, or a recovery code: ")?);
             }

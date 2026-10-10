@@ -8,6 +8,7 @@ use bird_api::ErrorBody;
 use bird_core::{Name, SessionId, User, UserRole};
 use tracing::Instrument;
 
+use super::cookies;
 use crate::db::Db;
 use crate::login::{SESSION_IDLE, SESSION_PREFIX};
 use crate::token::ApiToken;
@@ -71,9 +72,23 @@ pub(crate) async fn authenticate(
     mut request: Request,
     next: Next,
 ) -> Response {
-    let Some(candidate) = bearer(request.headers()) else {
-        return unauthorized();
+    let (candidate, from_cookie) = match bearer(request.headers()) {
+        Some(token) => (token, false),
+        None => match cookies::session(request.headers()) {
+            Some(token) => (token, true),
+            None => return unauthorized(),
+        },
     };
+    if from_cookie {
+        if !candidate.starts_with(SESSION_PREFIX) {
+            return unauthorized();
+        }
+        // a browser sends the cookie on any request to this host, also ones another site started
+        if cookies::cross_origin(request.method(), request.headers()) {
+            return Error::Forbidden("the session cookie only works from pages on this host")
+                .into_response();
+        }
+    }
     let principal = if auth.root.matches(candidate) {
         Principal::Root
     } else if candidate.starts_with(SESSION_PREFIX) {
