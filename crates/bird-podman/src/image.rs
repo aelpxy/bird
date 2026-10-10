@@ -9,6 +9,9 @@ use crate::query::encode;
 use crate::{Error, Podman, RegistryAuth, Result};
 
 const PULL_TIMEOUT: Duration = Duration::from_secs(600);
+// podman reports a missing tag and a registry blip alike, so every failed pull gets another go
+const PULL_ATTEMPTS: u32 = 3;
+const PULL_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 #[derive(Deserialize)]
 struct PullReport {
@@ -24,6 +27,20 @@ impl Podman {
         image: &ImageRef,
         auth: Option<&RegistryAuth>,
     ) -> Result<String> {
+        let mut attempt = 1;
+        loop {
+            match self.pull_once(image, auth).await {
+                Err(Error::Pull { image, message }) if attempt < PULL_ATTEMPTS => {
+                    tracing::warn!(%image, attempt, error = %message, "image pull failed, retrying");
+                    tokio::time::sleep(PULL_RETRY_DELAY * attempt).await;
+                    attempt += 1;
+                }
+                result => return result,
+            }
+        }
+    }
+
+    async fn pull_once(&self, image: &ImageRef, auth: Option<&RegistryAuth>) -> Result<String> {
         let reference = image.qualified();
         let mut path = format!("/images/pull?reference={}&quiet=true", encode(&reference));
         let response = match auth {
