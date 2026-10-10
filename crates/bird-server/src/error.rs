@@ -48,6 +48,8 @@ pub enum Error {
     EnvironmentHasBackups { scope: String, services: Vec<Name> },
     #[error("give a command or ask for the image's default command, not both")]
     CommandConflict,
+    #[error("give a release command or ask for none, not both")]
+    ReleaseConflict,
     #[error("invalid path: {0}")]
     InvalidPath(String),
     #[error("org {0} not found, see `bird org list`")]
@@ -212,6 +214,8 @@ pub enum Error {
     Busy(Name),
     #[error("{reason}")]
     Unhealthy { reason: String, logs: Vec<String> },
+    #[error("release command {reason}")]
+    ReleaseFailed { reason: String, logs: Vec<String> },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

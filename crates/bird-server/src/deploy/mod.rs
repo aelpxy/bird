@@ -3,17 +3,17 @@ mod machine;
 mod power;
 mod recreate;
 pub(crate) mod references;
+mod release;
 mod remove;
+mod settings;
 mod volumes;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use bird_api::{DeployRequest, DeployResponse, VolumeSpec};
+use bird_api::{DeployRequest, DeployResponse};
 use bird_core::{
-    Deployment, DeploymentStatus, EnvKey, EnvironmentId, Hostname, ImageRef, Name, Port, Service,
-    ServiceState, Volume,
+    Deployment, DeploymentStatus, EnvKey, EnvironmentId, ImageRef, Name, Port, Service,
 };
-use bird_store::Store;
 use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
@@ -42,6 +42,7 @@ pub(crate) async fn redeploy(
         health: None,
         health_timeout: None,
         command: None,
+        release: None,
         memory: None,
         cpus: None,
         volumes: Vec::new(),
@@ -49,6 +50,7 @@ pub(crate) async fn redeploy(
         backup: None,
         cron: None,
         default_command: false,
+        no_release: false,
         allow_image_change: false,
     };
     deploy(state, service.environment_id, request).await
@@ -64,6 +66,9 @@ pub(crate) async fn deploy(
     }
     if request.default_command && request.command.is_some() {
         return Err(crate::Error::CommandConflict);
+    }
+    if request.no_release && request.release.is_some() {
+        return Err(crate::Error::ReleaseConflict);
     }
     if let Some(jobs) = &request.cron {
         cron::check_specs(jobs)?;
@@ -83,7 +88,7 @@ pub(crate) async fn deploy(
     let new_volumes = volumes::preflight(state, environment, &request).await?;
     let jobs = request.cron.take();
     let (service, previous_settings, domains, attached) =
-        save_config(state, environment, request, new_volumes).await?;
+        settings::save(state, environment, request, new_volumes).await?;
     state.domains_changed.notify_one();
 
     let resolved = references::resolve_for(state, environment, &service.name).await?;
@@ -103,14 +108,23 @@ pub(crate) async fn deploy(
         .await?;
     tracing::info!(service = %service.name, deployment = %deployment.id, image = %deployment.image, "deploying");
 
-    let stopped = if attached.is_empty() {
-        Vec::new()
-    } else {
-        recreate::stop_previous(state, previous.as_ref()).await
+    let released = match &service.release {
+        Some(release) => release::run(state, &service, &deployment, &env, release).await,
+        None => Ok(()),
     };
-    if let Err(err) = launch_all(state, &service, &deployment, &env).await {
+    let mut stopped = Vec::new();
+    let launched = match released {
+        Ok(()) => {
+            if !attached.is_empty() {
+                stopped = recreate::stop_previous(state, previous.as_ref()).await;
+            }
+            launch_all(state, &service, &deployment, &env).await
+        }
+        Err(err) => Err(err),
+    };
+    if let Err(err) = launched {
         recreate::restore(state, &stopped).await;
-        restore_settings(state, previous_settings).await;
+        settings::restore(state, previous_settings).await;
         tracing::warn!(service = %service.name, deployment = %deployment.id, error = %err, "deploy failed");
         let id = deployment.id;
         state
@@ -173,158 +187,6 @@ async fn launch_all(
         }
     }
     first_error.map_or(Ok(()), Err)
-}
-
-// a failed deploy must not leave its image, port, command or limits for the next one to inherit
-async fn restore_settings(state: &AppState, previous: Option<Service>) {
-    let Some(previous) = previous else {
-        return;
-    };
-    let name = previous.name.clone();
-    let restored = state
-        .db
-        .call(move |store| store.restore_settings(&previous))
-        .await;
-    if let Err(err) = restored {
-        tracing::error!(service = %name, error = %err, "could not restore service settings");
-    }
-}
-
-async fn save_config(
-    state: &AppState,
-    environment_id: EnvironmentId,
-    request: DeployRequest,
-    new_volumes: Vec<VolumeSpec>,
-) -> Result<(Service, Option<Service>, Vec<Hostname>, Vec<Volume>)> {
-    state
-        .db
-        .call(move |store| {
-            store.transaction(|store| {
-                let previous = store.service_by_name(environment_id, &request.name)?;
-                let service = match previous.clone() {
-                    Some(existing) => {
-                        store.update_service(existing.id, &request.image, request.port)?;
-                        Service {
-                            image: request.image.clone(),
-                            port: request.port,
-                            ..existing
-                        }
-                    }
-                    None => store.create_service(
-                        environment_id,
-                        &request.name,
-                        &request.image,
-                        request.port,
-                    )?,
-                };
-                let service = apply_settings(store, service, &request)?;
-                let mut owned: BTreeSet<Hostname> = store
-                    .list_domains(service.id)?
-                    .into_iter()
-                    .map(|d| d.hostname)
-                    .collect();
-                for domain in &request.domains {
-                    if owned.insert(domain.clone()) {
-                        store.add_domain(service.id, domain)?;
-                    }
-                }
-                for (key, value) in &request.env {
-                    store.set_variable(service.id, key, value)?;
-                }
-                for volume in &new_volumes {
-                    store.create_volume(service.id, &volume.name, &volume.path)?;
-                }
-                if let Some(schedule) = request.backup {
-                    store.set_backup_schedule(service.id, schedule)?;
-                }
-                let domains = store
-                    .list_domains(service.id)?
-                    .into_iter()
-                    .map(|d| d.hostname)
-                    .collect();
-                let attached = store.list_volumes(service.id)?;
-                Ok((service, previous, domains, attached))
-            })
-        })
-        .await
-}
-
-// the settings a deploy may change; anything left out of the request keeps its saved value
-fn apply_settings(
-    store: &Store,
-    service: Service,
-    request: &DeployRequest,
-) -> bird_store::Result<Service> {
-    // deploying means running, also for a service that was stopped
-    let service = if service.state == ServiceState::Stopped {
-        store.set_service_state(service.id, ServiceState::Running)?;
-        Service {
-            state: ServiceState::Running,
-            ..service
-        }
-    } else {
-        service
-    };
-    let service = match &request.health {
-        Some(health) => {
-            store.set_health(service.id, health)?;
-            Service {
-                health: health.clone(),
-                ..service
-            }
-        }
-        None => service,
-    };
-    let service = match request.health_timeout {
-        Some(health_timeout) => {
-            store.set_health_timeout(service.id, health_timeout)?;
-            Service {
-                health_timeout,
-                ..service
-            }
-        }
-        None => service,
-    };
-    let service = if request.memory.is_some() || request.cpus.is_some() {
-        let memory = request.memory.unwrap_or(service.memory);
-        let cpus = request.cpus.unwrap_or(service.cpus);
-        store.set_resources(service.id, memory, cpus)?;
-        Service {
-            memory,
-            cpus,
-            ..service
-        }
-    } else {
-        service
-    };
-    let service = match request.replicas {
-        Some(replicas) => {
-            store.set_replicas(service.id, replicas)?;
-            Service {
-                replicas,
-                ..service
-            }
-        }
-        None => service,
-    };
-    let service = match &request.command {
-        Some(command) => {
-            store.set_command(service.id, Some(command))?;
-            Service {
-                command: Some(command.clone()),
-                ..service
-            }
-        }
-        None if request.default_command => {
-            store.set_command(service.id, None)?;
-            Service {
-                command: None,
-                ..service
-            }
-        }
-        None => service,
-    };
-    Ok(service)
 }
 
 async fn has_volumes(state: &AppState, environment_id: EnvironmentId, name: &Name) -> Result<bool> {

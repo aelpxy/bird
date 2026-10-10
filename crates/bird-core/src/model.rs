@@ -141,6 +141,8 @@ pub struct Service {
     pub health_timeout: HealthTimeout,
     pub state: ServiceState,
     pub command: Option<Command>,
+    /// Runs once per deploy before new machines start, like database migrations
+    pub release: Option<Command>,
     pub memory: MemoryLimit,
     pub cpus: CpuLimit,
     pub created_at: i64,

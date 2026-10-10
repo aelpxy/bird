@@ -96,6 +96,7 @@ dockerfile = \"Dockerfile\"
 # cpus = 0.5
 # replicas = 2
 # command = ["./server", "--listen", "0.0.0.0:{port}"]
+# release = ["./migrate"]
 
 {build}
 

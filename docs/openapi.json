@@ -5562,8 +5562,23 @@
           "name": {
             "$ref": "#/components/schemas/Name"
           },
+          "no_release": {
+            "type": "boolean",
+            "description": "Forget the saved release command; not together with `release`"
+          },
           "port": {
             "$ref": "#/components/schemas/Port"
+          },
+          "release": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Command",
+                "description": "Command run once in a new container before machines start, like migrations; a failure stops the deploy. Left out, an existing service keeps its saved one"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "replicas": {
             "oneOf": [

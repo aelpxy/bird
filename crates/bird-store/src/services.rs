@@ -27,6 +27,7 @@ impl Store {
             health_timeout: HealthTimeout::DEFAULT,
             state: ServiceState::Running,
             command: None,
+            release: None,
             memory: MemoryLimit::DEFAULT,
             cpus: CpuLimit::DEFAULT,
             created_at: now(),
@@ -82,13 +83,18 @@ impl Store {
 
     // `None` goes back to the image's own command
     pub fn set_command(&self, id: ServiceId, command: Option<&Command>) -> Result<()> {
-        let encoded = command
-            .map(|command| serde_json::to_string(command.args()))
-            .transpose()
-            .map_err(Error::Encode)?;
         let changed = self.execute(
             "UPDATE services SET command = ?2 WHERE id = ?1",
-            params![id.to_string(), encoded],
+            params![id.to_string(), encode_command(command)?],
+        )?;
+        expect_changed(changed, "service")
+    }
+
+    // `None` deploys without a release command
+    pub fn set_release(&self, id: ServiceId, release: Option<&Command>) -> Result<()> {
+        let changed = self.execute(
+            "UPDATE services SET release_command = ?2 WHERE id = ?1",
+            params![id.to_string(), encode_command(release)?],
         )?;
         expect_changed(changed, "service")
     }
@@ -103,17 +109,12 @@ impl Store {
 
     // puts back what a deploy changed, so a failed deploy leaves no settings behind
     pub fn restore_settings(&self, service: &Service) -> Result<()> {
-        let command = service
-            .command
-            .as_ref()
-            .map(|command| serde_json::to_string(command.args()))
-            .transpose()
-            .map_err(Error::Encode)?;
+        let command = encode_command(service.command.as_ref())?;
         let (health, health_path) = health_columns(&service.health);
         let changed = self.execute(
             "UPDATE services SET image = ?2, port = ?3, health = ?4, health_path = ?5,
              health_timeout_secs = ?6, command = ?7, memory_mb = ?8, cpu_millicores = ?9,
-             state = ?10
+             state = ?10, release_command = ?11
              WHERE id = ?1",
             params![
                 service.id.to_string(),
@@ -125,7 +126,8 @@ impl Store {
                 command,
                 service.memory.mebibytes(),
                 service.cpus.millicores(),
-                service.state.as_str()
+                service.state.as_str(),
+                encode_command(service.release.as_ref())?
             ],
         )?;
         expect_changed(changed, "service")
@@ -134,7 +136,7 @@ impl Store {
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
              FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
@@ -148,7 +150,7 @@ impl Store {
     ) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
              FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
@@ -159,7 +161,7 @@ impl Store {
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
              FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],
@@ -174,6 +176,13 @@ impl Store {
 }
 
 // the column's CHECK predates paths, so a path check is stored as http plus its path
+fn encode_command(command: Option<&Command>) -> Result<Option<String>> {
+    command
+        .map(|command| serde_json::to_string(command.args()))
+        .transpose()
+        .map_err(Error::Encode)
+}
+
 fn health_columns(health: &HealthCheck) -> (&'static str, Option<&str>) {
     match health {
         HealthCheck::Http => ("http", None),
@@ -291,6 +300,11 @@ mod tests {
         store.set_command(service.id, None).unwrap();
         assert_eq!(store.service(service.id).unwrap().unwrap().command, None);
         store.set_command(service.id, Some(&command)).unwrap();
+        store.set_release(service.id, Some(&command)).unwrap();
+        assert_eq!(
+            store.service(service.id).unwrap().unwrap().release,
+            Some(command)
+        );
         store
             .set_health(service.id, &"/up".parse().unwrap())
             .unwrap();

@@ -1,3 +1,4 @@
+mod collect;
 mod exec;
 mod piped;
 mod run;
@@ -9,6 +10,7 @@ use bytes::Bytes;
 use serde::Serialize;
 use tokio::sync::mpsc;
 
+pub(crate) use collect::run_collecting;
 pub(crate) use exec::{exec, pick_machine};
 pub(crate) use run::{
     RunTarget, remove_leftover_runs, run, run_target, run_with_limit, start_attached,

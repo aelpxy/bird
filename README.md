@@ -98,6 +98,7 @@ image = "ghcr.io/acme/api:1.4"     # the image to run, or use [build] below inst
 port = 3000                        # what the app listens on
 domains = ["api.example.com", "www.example.com"]
 command = ["bin/server", "--workers", "4"]   # instead of the image's own command
+release = ["bin/migrate"]          # runs once per deploy before new machines start
 
 health = "/healthz"                # "http", "tcp" or a path that must answer 2xx
 health_timeout = "2m"              # how long a new machine has to pass it
@@ -140,6 +141,7 @@ command = ["bin/cleanup"]
 | `port` | `80` | The app must listen on `0.0.0.0`. |
 | `domains` | none | Only added. Deploying never removes domains set elsewhere. |
 | `command` | the image's | Kept for later deploys. `bird deploy --default-command` goes back to the image's. |
+| `release` | none | Runs in a fresh container with the new image and variables but no volumes, before any new machine starts. If it fails or runs over 10 minutes, the deploy fails and the old machines keep serving. Kept for later deploys and rollbacks; `bird deploy --no-release` drops it. |
 | `health` | `"http"` (any answer on `/`) | `"tcp"` only waits for the port to accept connections. |
 | `health_timeout` | `60s` | `"90s"`, `"2m"` or a number of seconds, up to an hour. |
 | `memory` | `1g` | 32 MiB to 256 GiB. |
@@ -248,9 +250,10 @@ bird gets and renews a certificate for every domain and redirects HTTP to HTTPS 
 When you run `bird deploy`, birdd:
 
 1. Saves the service settings.
-2. Pulls or builds the image and starts new machines on the environment's network.
-3. Waits up to 60 seconds for them to pass a health check. By default that's any HTTP answer on `/`.
-4. Moves traffic to the new machines and removes the old ones.
+2. Pulls or builds the image and runs the `release` command, if set, in a one-off container.
+3. Starts new machines on the environment's network.
+4. Waits up to 60 seconds for them to pass a health check. By default that's any HTTP answer on `/`.
+5. Moves traffic to the new machines and removes the old ones.
 
 If the new machines never get healthy, traffic stays on the old deployment. Your app has to listen on `0.0.0.0` on its port (`80` unless you set `--port`). Services find each other by name, like `postgres` or `postgres.internal`.
 

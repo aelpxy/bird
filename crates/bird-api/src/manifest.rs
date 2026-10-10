@@ -37,6 +37,8 @@ pub struct Manifest {
     pub health_timeout: Option<HealthTimeout>,
     #[serde(default)]
     pub command: Option<Command>,
+    #[serde(default)]
+    pub release: Option<Command>,
     #[serde(default, deserialize_with = "text_or_number")]
     pub memory: Option<MemoryLimit>,
     #[serde(default, deserialize_with = "text_or_number")]
@@ -97,6 +99,7 @@ impl Manifest {
             health: None,
             health_timeout: None,
             command: None,
+            release: None,
             memory: None,
             cpus: None,
             replicas: None,
@@ -119,6 +122,7 @@ impl Manifest {
             health: self.health,
             health_timeout: self.health_timeout,
             command: self.command,
+            release: self.release,
             memory: self.memory,
             cpus: self.cpus,
             volumes: self.volumes,
@@ -128,6 +132,7 @@ impl Manifest {
                 keep: spec.keep,
             }),
             default_command: false,
+            no_release: false,
             cron: None,
             allow_image_change: false,
         }

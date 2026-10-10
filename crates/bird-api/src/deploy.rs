@@ -29,6 +29,12 @@ pub struct DeployRequest {
     /// Forget the saved command and run the image's own again; not together with `command`
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub default_command: bool,
+    /// Command run once in a new container before machines start, like migrations; a failure stops the deploy. Left out, an existing service keeps its saved one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<Command>,
+    /// Forget the saved release command; not together with `release`
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub no_release: bool,
     /// The service's cron jobs once the deploy succeeds, replacing the ones it had; left out, they stay as they are
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cron: Option<Vec<CronJobSpec>>,

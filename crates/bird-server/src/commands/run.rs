@@ -28,6 +28,22 @@ pub(crate) struct RunTarget {
 }
 
 impl RunTarget {
+    // a deployment's image and variables before it has any machines, like a release command
+    pub(crate) async fn for_deployment(
+        state: &AppState,
+        service: &Service,
+        image: &ImageRef,
+        env: &BTreeMap<EnvKey, String>,
+    ) -> Result<Self> {
+        Ok(Self {
+            network: state.network(service.environment_id).await?,
+            skip_entrypoint: false,
+            service: service.clone(),
+            image: image.clone(),
+            env: env.clone(),
+        })
+    }
+
     // by default the command goes to the image's entrypoint as arguments, like `docker run`
     pub(crate) fn skipping_entrypoint(self, skip: bool) -> Self {
         Self {

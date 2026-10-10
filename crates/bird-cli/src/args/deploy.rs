@@ -64,6 +64,9 @@ pub(crate) struct DeployArgs {
     /// Forget a command given before, here or in bird.toml, and run the image's own again
     #[arg(long, conflicts_with = "command")]
     pub(crate) default_command: bool,
+    /// Forget the release command set in bird.toml before, and deploy without one
+    #[arg(long)]
+    pub(crate) no_release: bool,
     /// Command to run instead of the image default, after `--`; it is kept for later deploys
     #[arg(last = true)]
     pub(crate) command: Vec<String>,

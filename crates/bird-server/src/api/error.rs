@@ -12,7 +12,7 @@ impl IntoResponse for Error {
             tracing::error!(error = %self, "request failed");
         }
         let logs = match &self {
-            Error::Unhealthy { logs, .. } => logs.clone(),
+            Error::Unhealthy { logs, .. } | Error::ReleaseFailed { logs, .. } => logs.clone(),
             _ => Vec::new(),
         };
         let body = ErrorBody {
@@ -86,6 +86,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::WeakPassword { .. }
         | Error::NotASession
         | Error::CommandConflict
+        | Error::ReleaseConflict
         | Error::DuplicateCronJob(_)
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Forbidden(_) | Error::WrongPassword => StatusCode::FORBIDDEN,
@@ -96,7 +97,7 @@ fn status_of(error: &Error) -> StatusCode {
         Error::TooManyTerminals | Error::TooManyCronRuns | Error::ShuttingDown => {
             StatusCode::SERVICE_UNAVAILABLE
         }
-        Error::Unhealthy { .. } => StatusCode::BAD_GATEWAY,
+        Error::Unhealthy { .. } | Error::ReleaseFailed { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }

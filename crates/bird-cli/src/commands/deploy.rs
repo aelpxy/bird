@@ -30,6 +30,7 @@ pub(crate) async fn run(
     }
     let allow_image_change = args.allow_image_change;
     let default_command = args.default_command;
+    let no_release = args.no_release;
     let from_file = loaded.is_some();
     let (mut manifest, source) = merge(loaded, args, service)?;
     // the file is the whole list, so jobs taken out of it stop; other deploys keep them
@@ -48,6 +49,10 @@ pub(crate) async fn run(
     if default_command {
         request.command = None;
         request.default_command = true;
+    }
+    if no_release {
+        request.release = None;
+        request.no_release = true;
     }
     let spinner = Spinner::start(format!("deploying {} ({})", request.name, request.image));
     let response: DeployResponse = client
