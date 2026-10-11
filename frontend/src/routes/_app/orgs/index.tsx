@@ -38,7 +38,7 @@ function Orgs() {
       <PageHeader
         eyebrow="Ownership"
         title="Orgs"
-        description="Orgs own projects; their members work in them."
+        description="Orgs own projects, and their members work in them."
         actions={
           <FormDialog
             dialog={newOrg}

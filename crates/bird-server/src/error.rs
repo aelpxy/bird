@@ -82,7 +82,7 @@ pub enum Error {
     WeakPassword { min: usize, max: usize },
     #[error("start two-factor setup first")]
     NoPendingTwoFactor,
-    #[error("signing out needs a session; this request used an api token")]
+    #[error("signing out needs a session, but this request used an api token")]
     NotASession,
     #[error("session {0} not found, see `bird session list`")]
     SessionNotFound(bird_core::SessionId),
@@ -118,7 +118,7 @@ pub enum Error {
         now: bird_core::MountPath,
     },
     #[error(
-        "volume {volume} holds data written by {was}, running {now} on it could corrupt it; migrate the data first, then pass --allow-image-change"
+        "volume {volume} holds data written by {was}, running {now} on it could corrupt it. Migrate the data first, then pass --allow-image-change"
     )]
     ImageChange {
         volume: Name,
@@ -220,7 +220,7 @@ pub enum Error {
     #[error("backup data {0} is missing from storage")]
     BackupDataMissing(String),
     #[error(
-        "the backup has volume {volume}, which {service} does not have; deploy it with -v {volume}:<path> first"
+        "the backup has volume {volume}, which {service} does not have. Deploy it with -v {volume}:<path> first"
     )]
     BackupVolumeMissing { service: Name, volume: Name },
     #[error("backup storage: {0}")]

@@ -35,7 +35,7 @@ export function MembersPanel({ org, session }: { org: string; session: Session }
     <div className="flex flex-col gap-6">
       {members.data.length === 0 ? (
         <p className="border border-dashed border-line-strong px-4 py-6 text-center text-sm text-fg-muted">
-          No members yet. Server admins can still manage it; add someone below.
+          No members yet. Server admins can still manage it. Add someone below.
         </p>
       ) : (
       <ul className="divide-y divide-line border border-line bg-surface">

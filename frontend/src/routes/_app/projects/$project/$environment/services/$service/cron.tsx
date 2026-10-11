@@ -39,7 +39,7 @@ function Cron() {
   }
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-fg-muted">Schedules are in UTC. Jobs come from bird.toml; each run is a fresh container.</p>
+      <p className="text-sm text-fg-muted">Schedules are in UTC. Jobs come from bird.toml, and each run is a fresh container.</p>
       <CronJobsTable scope={scope} service={service} jobs={jobs.data} />
     </div>
   )

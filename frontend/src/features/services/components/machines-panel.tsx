@@ -107,7 +107,7 @@ function MachineCharts({ machine, service }: { machine: Machine; service: Servic
     return (
       <p className="text-xs text-fg-faint">
         {machine.state === 'running'
-          ? `Collecting usage; the charts fill in every ${SAMPLE_SECONDS} seconds and keep the last hour.`
+          ? `Collecting usage. The charts fill in every ${SAMPLE_SECONDS} seconds and keep the last hour.`
           : 'Usage is only kept while the machine runs.'}
       </p>
     )

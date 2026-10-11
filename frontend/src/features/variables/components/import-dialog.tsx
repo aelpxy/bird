@@ -42,7 +42,7 @@ export function ImportDialog({ onImport }: ImportDialogProps) {
       }
       size="lg"
       title="Import variables"
-      description="Paste KEY=value lines. Names that exist already get the new value; others stay as they are."
+      description="Paste KEY=value lines. Names that exist already get the new value, and others stay as they are."
       submitLabel="Save variables"
     >
       <dialog.form.AppField name="dotenv">

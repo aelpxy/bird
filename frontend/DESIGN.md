@@ -87,6 +87,11 @@ moves traffic once the new machines are healthy, run at once and report with a t
 - Forms in dialogs use `useDialogForm` and `FormDialog`: the dialog closes when the submit
   resolves and stays open showing birdd's error, with the app's log lines when a deploy failed.
 
+## Words
+
+- Write the way people talk: short sentences, joined with "and", "but" or "so", or split in two.
+  No semicolons in anything the dashboard shows.
+
 ## Accessibility
 
 - Every control has a visible label, or an `sr-only` one when a row would repeat it.

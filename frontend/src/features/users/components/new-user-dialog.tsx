@@ -35,7 +35,7 @@ export function NewUserDialog({ onCreated }: { onCreated: (name: string, token: 
         </Button>
       }
       title="New user"
-      description="They get an API token to start with; set a password if they should use this dashboard."
+      description="They get an API token to start with. Set a password if they should use this dashboard."
       submitLabel="Create user"
     >
       <dialog.form.AppField name="name">

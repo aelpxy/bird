@@ -104,7 +104,7 @@ export function VolumesPanel({ scope, service }: { scope: Scope; service: Servic
                   <Plus aria-hidden className="size-3.5" />
                   Add and redeploy
                 </form.SubmitButton>
-                <p className="text-xs text-fg-faint">A volume keeps its path for good; to move data, add a new one.</p>
+                <p className="text-xs text-fg-faint">A volume keeps its path for good. To move data, add a new one.</p>
               </div>
             </form.FormElement>
           </form.AppForm>

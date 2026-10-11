@@ -100,7 +100,7 @@ export function ServiceConfig({ scope, service }: { scope: Scope; service: Servi
             ))}
           </ul>
         ) : (
-          <p className="text-ui text-fg-faint">None; nothing written survives a deploy</p>
+          <p className="text-ui text-fg-faint">None, so nothing written survives a deploy</p>
         )}
         {service.volumes.length > 0 && (
           <Link

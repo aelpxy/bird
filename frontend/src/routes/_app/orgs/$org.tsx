@@ -37,7 +37,7 @@ function Org() {
       <Section title="Projects" description="Everything this org owns. Its members work in these." actions={<NewProjectDialog org={org} />}>
         <OrgProjects org={org} />
       </Section>
-      <Section title="Members" description="Owners and admins manage members; owners can delete the org.">
+      <Section title="Members" description="Owners and admins manage members. Only owners can delete the org.">
         <MembersPanel org={org} session={session} />
       </Section>
       <Section title="Danger zone">

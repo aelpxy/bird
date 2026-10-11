@@ -22,7 +22,7 @@ function Environments() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey })
 
   return (
-      <Section title="Environments" description="Each has its own private network. An environment can only be deleted once it has no services or backups; leftover backups are under Backups.">
+      <Section title="Environments" description="Each has its own private network. An environment can only be deleted once it has no services or backups. Leftover backups are under Backups.">
         <ul className="divide-y divide-line border border-line bg-surface">
           {(project?.environments ?? []).map((environment) => (
             <li key={environment} className="flex items-center justify-between gap-3 px-4 py-3">

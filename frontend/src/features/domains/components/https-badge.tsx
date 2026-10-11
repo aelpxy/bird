@@ -15,7 +15,7 @@ export function HttpsBadge({ https }: { https: Https }) {
       )
     case 'pending':
       return (
-        <span title="birdd is asking Let's Encrypt for a certificate; this needs the domain's DNS to point at this server">
+        <span title="birdd is asking Let's Encrypt for a certificate. This needs the domain's DNS to point at this server">
           <Badge tone="info" dot pulse>
             Issuing
           </Badge>
