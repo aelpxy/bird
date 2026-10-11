@@ -10,6 +10,7 @@ impl Store {
         let domain = Domain {
             hostname: hostname.clone(),
             service_id,
+            redirect_to: None,
             created_at: now(),
         };
         self.execute(
@@ -32,9 +33,23 @@ impl Store {
         expect_changed(changed, "domain")
     }
 
+    /// Points `hostname` at `target`, or back at the app with `None`; the caller checks both
+    /// belong to one service
+    pub fn set_domain_redirect(
+        &self,
+        hostname: &Hostname,
+        target: Option<&Hostname>,
+    ) -> Result<()> {
+        let changed = self.execute(
+            "UPDATE domains SET redirect_to = ?2 WHERE hostname = ?1",
+            params![hostname.as_str(), target.map(Hostname::as_str)],
+        )?;
+        expect_changed(changed, "domain")
+    }
+
     pub fn list_domains(&self, service_id: ServiceId) -> Result<Vec<Domain>> {
         self.query_all(
-            "SELECT hostname, service_id, created_at FROM domains
+            "SELECT hostname, service_id, created_at, redirect_to FROM domains
              WHERE service_id = ?1 ORDER BY hostname",
             [service_id.to_string()],
             rows::domain,

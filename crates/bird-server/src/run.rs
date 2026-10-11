@@ -58,22 +58,8 @@ pub async fn run_until(
     podman.ensure_network(&config.network).await?;
 
     let shutdown = Shutdown::when(stop);
-    let state = AppState {
-        db,
-        podman,
-        routes: Routes::new(),
-        default_network: Arc::from(config.network.as_str()),
-        deploys: DeployGuard::default(),
-        domains_changed: Arc::new(Notify::new()),
-        reconcile_now: Arc::new(Notify::new()),
-        shutdown: shutdown.clone(),
-        builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
-        terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
-        logins: Arc::new(LoginThrottle::default()),
-        crons: Arc::new(CronRuns::default()),
-        dashboard_domain: config.dashboard_domain.clone(),
-        backups: Arc::new(backup_storage(&config, &data_dir).await?),
-    };
+    let backups = backup_storage(&config, &data_dir).await?;
+    let state = app_state(&config, db, podman, shutdown.clone(), backups);
     environments::ensure_networks(&state).await?;
     supervisor::recover_interrupted(&state).await?;
     cron::interrupt_left_over(&state).await?;
@@ -205,6 +191,33 @@ fn seed_empty_server(
         }
         Ok(())
     })
+}
+
+fn app_state(
+    config: &Config,
+    db: Db,
+    podman: Podman,
+    shutdown: Shutdown,
+    backups: BackupStorage,
+) -> AppState {
+    AppState {
+        db,
+        podman,
+        routes: Routes::new(),
+        default_network: Arc::from(config.network.as_str()),
+        deploys: DeployGuard::default(),
+        domains_changed: Arc::new(Notify::new()),
+        reconcile_now: Arc::new(Notify::new()),
+        shutdown,
+        builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
+        terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
+        logins: Arc::new(LoginThrottle::default()),
+        crons: Arc::new(CronRuns::default()),
+        dashboard_domain: config.dashboard_domain.clone(),
+        acme: config.acme_directory.as_ref().map(|_| Arc::default()),
+        policies: Arc::default(),
+        backups: Arc::new(backups),
+    }
 }
 
 async fn edge(config: &Config, state: &AppState) -> Result<Option<(Tls, AcmeSettings)>> {

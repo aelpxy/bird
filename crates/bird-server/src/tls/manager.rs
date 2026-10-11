@@ -6,7 +6,7 @@ use bird_core::Hostname;
 use bird_proxy::{CertStore, Challenges};
 use instant_acme::Account;
 
-use super::{AcmeSettings, account, issue, load_certificates};
+use super::{AcmeSettings, Failure, account, issue, load_certificates};
 use crate::Result;
 use crate::backoff::Backoff;
 use crate::state::AppState;
@@ -98,10 +98,18 @@ impl CertManager {
             match result {
                 Ok(not_after) => {
                     backoff.reset();
+                    if let Some(failures) = &self.state.acme {
+                        failures.clear(&hostname);
+                    }
                     tracing::info!(%hostname, not_after, "certificate issued");
                 }
                 Err(err) => {
                     let wait = backoff.fail(Instant::now());
+                    if let Some(failures) = &self.state.acme {
+                        let retry_at = unix_now().saturating_add_unsigned(wait.as_secs());
+                        let error = err.to_string();
+                        failures.record(hostname.clone(), Failure { error, retry_at });
+                    }
                     tracing::warn!(%hostname, error = %err, retry_in_secs = wait.as_secs(), "certificate request failed");
                 }
             }

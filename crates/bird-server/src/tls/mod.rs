@@ -1,5 +1,6 @@
 mod account;
 mod expiry;
+mod failures;
 mod issue;
 mod manager;
 
@@ -10,6 +11,7 @@ use bird_proxy::CertStore;
 use crate::Result;
 use crate::state::AppState;
 
+pub(crate) use failures::{CertFailures, Failure};
 pub(crate) use manager::CertManager;
 
 #[derive(Debug, Clone)]

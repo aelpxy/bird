@@ -141,6 +141,12 @@ pub enum Error {
     ServiceExists { name: Name, template: Name },
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
+    #[error("cannot redirect {from} to {to}: {reason}")]
+    InvalidRedirect {
+        from: bird_core::Hostname,
+        to: bird_core::Hostname,
+        reason: &'static str,
+    },
     #[error("domain {0} serves bird's dashboard")]
     DashboardDomain(bird_core::Hostname),
     #[error(

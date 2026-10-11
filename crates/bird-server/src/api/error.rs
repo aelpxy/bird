@@ -89,6 +89,7 @@ fn status_of(error: &Error) -> StatusCode {
         | Error::CommandConflict
         | Error::ReleaseConflict
         | Error::DuplicateCronJob(_)
+        | Error::InvalidRedirect { .. }
         | Error::Reference(_) => StatusCode::BAD_REQUEST,
         Error::Forbidden(_) | Error::WrongPassword => StatusCode::FORBIDDEN,
         Error::InvalidLogin | Error::InvalidCode => StatusCode::UNAUTHORIZED,

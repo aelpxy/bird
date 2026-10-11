@@ -445,7 +445,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Send a domain's visitors to another domain of the service, or back to the app */
+        put: operations["update_domain"];
         post?: never;
         /** Stop routing a domain to a service */
         delete: operations["remove_domain"];
@@ -515,6 +516,24 @@ export interface paths {
         /** Read or follow logs */
         get: operations["logs"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{project}/environments/{environment}/services/{name}/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** How the proxy treats the service's requests */
+        get: operations["get_proxy_settings"];
+        /** Replace the service's proxy settings; they apply to the next request */
+        put: operations["set_proxy_settings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -975,6 +994,11 @@ export interface components {
             /** Format: int64 */
             size_bytes: number;
         };
+        /**
+         * Format: int32
+         * @description 1 to 10240
+         */
+        BodyLimitMb: number;
         BuildEvent: {
             line: string;
             /** @enum {string} */
@@ -1138,6 +1162,11 @@ export interface components {
             /** @description Needed when turning off your own; admins resetting someone else's leave it out */
             password?: string | null;
         };
+        DomainStatus: {
+            hostname: components["schemas"]["Hostname"];
+            https: components["schemas"]["Https"];
+            redirect_to?: components["schemas"]["Hostname"] | null;
+        };
         EnvKey: string;
         ErrorBody: {
             error: string;
@@ -1161,6 +1190,28 @@ export interface components {
         /** Format: int32 */
         HealthTimeout: number;
         Hostname: string;
+        /** @description Where the domain's certificate stands */
+        Https: {
+            /** Format: int64 */
+            expires_at: number;
+            /** @enum {string} */
+            state: "issued";
+        } | {
+            /** @enum {string} */
+            state: "pending";
+        } | {
+            error: string;
+            /** Format: int64 */
+            retry_at: number;
+            /** @enum {string} */
+            state: "failing";
+        } | {
+            /** @enum {string} */
+            state: "off";
+        } | {
+            /** @enum {string} */
+            state: "local";
+        };
         ImageRef: string;
         IssuedToken: {
             /** Format: int64 */
@@ -1262,6 +1313,51 @@ export interface components {
             name: components["schemas"]["Name"];
             org: components["schemas"]["Name"];
         };
+        /** @description How bird's proxy treats one service's requests; the default changes nothing */
+        ProxySettings: {
+            /**
+             * @description Response headers set on every answer, replacing the app's
+             * @default {}
+             */
+            headers: components["schemas"]["ResponseHeaders"];
+            /**
+             * @description Answer 503 instead of passing requests to the app
+             * @default false
+             */
+            maintenance: boolean;
+            /** @default null */
+            max_body_mb: components["schemas"]["BodyLimitMb"] | null;
+            /** @default null */
+            rate_limit: components["schemas"]["RateLimit"] | null;
+            /**
+             * @description Add HSTS on https, nosniff, frame and referrer policies unless the app sets them
+             * @default false
+             */
+            security_headers: boolean;
+            /** @default null */
+            timeout_secs: components["schemas"]["ProxyTimeout"] | null;
+        };
+        /**
+         * Format: int32
+         * @description 1 to 3600
+         */
+        ProxyTimeout: number;
+        /**
+         * Format: int32
+         * @description 1 to 100000
+         */
+        RateBurst: number;
+        RateLimit: {
+            /** @description Requests allowed at once before the sustained rate applies */
+            burst: components["schemas"]["RateBurst"];
+            /** @description Sustained requests per second */
+            per_second: components["schemas"]["RatePerSecond"];
+        };
+        /**
+         * Format: int32
+         * @description 1 to 10000
+         */
+        RatePerSecond: number;
         /** @description Single-use codes for signing in without the authenticator, shown only this once */
         RecoveryCodes: {
             codes: string[];
@@ -1280,6 +1376,10 @@ export interface components {
         };
         /** Format: int32 */
         Replicas: number;
+        /** @description Header names are lowercase, values printable ASCII */
+        ResponseHeaders: {
+            [key: string]: string;
+        };
         RestoreRequest: {
             /** @description Restore data written by a different image than the service runs now */
             allow_image_change?: boolean;
@@ -1371,6 +1471,9 @@ export interface components {
         TwoFactorSetup: {
             secret: string;
             uri: string;
+        };
+        UpdateDomain: {
+            redirect_to?: components["schemas"]["Hostname"] | null;
         };
         UpdateVariables: {
             deploy?: boolean;
@@ -3002,13 +3105,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Domains routed to the service */
+            /** @description Domains routed to the service, with where each one's certificate stands */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["DomainStatus"][];
                 };
             };
             /** @description Missing or invalid API token */
@@ -3089,6 +3192,64 @@ export interface operations {
             };
             /** @description Conflicting state or operation in progress */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_domain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project name */
+                project: string;
+                /** @description Environment name */
+                environment: string;
+                /** @description Service name */
+                name: string;
+                /** @description Domain to change */
+                hostname: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDomain"];
+            };
+        };
+        responses: {
+            /** @description Saved and in effect */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The target is not another domain of this service, or redirects itself */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Missing or invalid API token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service or resource not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3386,6 +3547,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LogEntry"][];
+                };
+            };
+            /** @description Missing or invalid API token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service or resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_proxy_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project name */
+                project: string;
+                /** @description Environment name */
+                environment: string;
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The service's proxy settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxySettings"];
+                };
+            };
+            /** @description Missing or invalid API token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service or resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    set_proxy_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project name */
+                project: string;
+                /** @description Environment name */
+                environment: string;
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxySettings"];
+            };
+        };
+        responses: {
+            /** @description Saved and in effect */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxySettings"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             /** @description Missing or invalid API token */

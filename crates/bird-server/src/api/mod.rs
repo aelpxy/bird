@@ -18,6 +18,7 @@ mod openapi;
 mod orgs;
 mod power;
 mod projects;
+mod proxy;
 mod registries;
 mod scale;
 mod scope;
@@ -108,7 +109,8 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(services::list))
         .routes(routes!(services::get, services::remove))
         .routes(routes!(domains::list, domains::add))
-        .routes(routes!(domains::remove))
+        .routes(routes!(domains::update, domains::remove))
+        .routes(routes!(proxy::get, proxy::set))
         .routes(routes!(deployments::list))
         .routes(routes!(deployments::rollback))
         .routes(routes!(logs::logs))

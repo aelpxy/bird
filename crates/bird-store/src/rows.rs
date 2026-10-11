@@ -3,7 +3,7 @@ use std::str::FromStr;
 use bird_core::{
     Backup, BackupKeep, BackupSchedule, BackupVolume, Certificate, Command, Deployment, Domain,
     EnvKey, Environment, HealthCheck, Hostname, ImageRef, Machine, MachineId, Port, Project,
-    Registry, Replicas, Service, ServiceId, Variable, Volume,
+    ProxySettings, Registry, Replicas, Service, ServiceId, Variable, Volume,
 };
 
 use crate::RouteEntry;
@@ -149,6 +149,7 @@ pub(crate) fn domain(row: &Row<'_>) -> rusqlite::Result<Domain> {
         hostname: parse(row, 0)?,
         service_id: parse(row, 1)?,
         created_at: row.get(2)?,
+        redirect_to: parse_optional(row, 3)?,
     })
 }
 
@@ -164,7 +165,23 @@ pub(crate) fn route(row: &Row<'_>) -> rusqlite::Result<RouteEntry> {
     Ok(RouteEntry {
         hostname: parse(row, 0)?,
         address: parse_optional(row, 1)?,
+        service_id: parse(row, 2)?,
+        proxy: proxy(row, 3)?,
+        redirect_to: parse_optional(row, 4)?,
+        machine_id: parse_optional(row, 5)?,
     })
+}
+
+pub(crate) fn proxy(row: &Row<'_>, idx: usize) -> rusqlite::Result<ProxySettings> {
+    let raw: Option<String> = row.get(idx)?;
+    raw.map_or_else(
+        || Ok(ProxySettings::default()),
+        |raw| {
+            serde_json::from_str(&raw).map_err(|err| {
+                rusqlite::Error::FromSqlConversionFailure(idx, Type::Text, Box::new(err))
+            })
+        },
+    )
 }
 
 pub(crate) fn key_value(row: &Row<'_>) -> rusqlite::Result<(EnvKey, String)> {

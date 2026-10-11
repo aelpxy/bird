@@ -46,6 +46,7 @@ import { Route as AppProjectsProjectEnvironmentServicesServiceVariablesRouteImpo
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsIndexRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/index'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsDangerRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/danger'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/domains'
+import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsProxyRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/proxy'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsScalingRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/scaling'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/volumes'
 
@@ -257,6 +258,13 @@ const AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute =
         AppProjectsProjectEnvironmentServicesServiceSettingsRoute,
     } as any,
   )
+const AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute =
+  AppProjectsProjectEnvironmentServicesServiceSettingsProxyRouteImport.update({
+    id: '/proxy',
+    path: '/proxy',
+    getParentRoute: () =>
+      AppProjectsProjectEnvironmentServicesServiceSettingsRoute,
+  } as any)
 const AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute =
   AppProjectsProjectEnvironmentServicesServiceSettingsScalingRouteImport.update(
     {
@@ -312,6 +320,7 @@ export interface FileRoutesByFullPath {
   '/projects/$project/$environment/services/$service/': typeof AppProjectsProjectEnvironmentServicesServiceIndexRoute
   '/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
+  '/projects/$project/$environment/services/$service/settings/proxy': typeof AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute
   '/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
   '/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/projects/$project/$environment/services/$service/settings/': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
@@ -346,6 +355,7 @@ export interface FileRoutesByTo {
   '/projects/$project/$environment/services/$service': typeof AppProjectsProjectEnvironmentServicesServiceIndexRoute
   '/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
+  '/projects/$project/$environment/services/$service/settings/proxy': typeof AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute
   '/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
   '/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/projects/$project/$environment/services/$service/settings': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
@@ -388,6 +398,7 @@ export interface FileRoutesById {
   '/_app/projects/$project/$environment/services/$service/': typeof AppProjectsProjectEnvironmentServicesServiceIndexRoute
   '/_app/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/_app/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
+  '/_app/projects/$project/$environment/services/$service/settings/proxy': typeof AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute
   '/_app/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
   '/_app/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/_app/projects/$project/$environment/services/$service/settings/': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
@@ -430,6 +441,7 @@ export interface FileRouteTypes {
     | '/projects/$project/$environment/services/$service/'
     | '/projects/$project/$environment/services/$service/settings/danger'
     | '/projects/$project/$environment/services/$service/settings/domains'
+    | '/projects/$project/$environment/services/$service/settings/proxy'
     | '/projects/$project/$environment/services/$service/settings/scaling'
     | '/projects/$project/$environment/services/$service/settings/volumes'
     | '/projects/$project/$environment/services/$service/settings/'
@@ -464,6 +476,7 @@ export interface FileRouteTypes {
     | '/projects/$project/$environment/services/$service'
     | '/projects/$project/$environment/services/$service/settings/danger'
     | '/projects/$project/$environment/services/$service/settings/domains'
+    | '/projects/$project/$environment/services/$service/settings/proxy'
     | '/projects/$project/$environment/services/$service/settings/scaling'
     | '/projects/$project/$environment/services/$service/settings/volumes'
     | '/projects/$project/$environment/services/$service/settings'
@@ -505,6 +518,7 @@ export interface FileRouteTypes {
     | '/_app/projects/$project/$environment/services/$service/'
     | '/_app/projects/$project/$environment/services/$service/settings/danger'
     | '/_app/projects/$project/$environment/services/$service/settings/domains'
+    | '/_app/projects/$project/$environment/services/$service/settings/proxy'
     | '/_app/projects/$project/$environment/services/$service/settings/scaling'
     | '/_app/projects/$project/$environment/services/$service/settings/volumes'
     | '/_app/projects/$project/$environment/services/$service/settings/'
@@ -776,6 +790,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRouteImport
       parentRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsRoute
     }
+    '/_app/projects/$project/$environment/services/$service/settings/proxy': {
+      id: '/_app/projects/$project/$environment/services/$service/settings/proxy'
+      path: '/proxy'
+      fullPath: '/projects/$project/$environment/services/$service/settings/proxy'
+      preLoaderRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsProxyRouteImport
+      parentRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsRoute
+    }
     '/_app/projects/$project/$environment/services/$service/settings/scaling': {
       id: '/_app/projects/$project/$environment/services/$service/settings/scaling'
       path: '/scaling'
@@ -845,6 +866,7 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
 interface AppProjectsProjectEnvironmentServicesServiceSettingsRouteChildren {
   AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
+  AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
@@ -856,6 +878,8 @@ const AppProjectsProjectEnvironmentServicesServiceSettingsRouteChildren: AppProj
       AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute,
     AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute:
       AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute,
+    AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute:
+      AppProjectsProjectEnvironmentServicesServiceSettingsProxyRoute,
     AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute:
       AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute,
     AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute:

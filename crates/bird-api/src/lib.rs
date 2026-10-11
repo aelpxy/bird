@@ -26,7 +26,7 @@ pub use commands::{CommandEvent, ExecRequest, RunRequest};
 pub use cron::{CronJobSummary, CronRunDetail, CronRunSummary};
 pub use deploy::{DeployRequest, DeployResponse};
 pub use deployments::{DeploymentInfo, RollbackRequest};
-pub use domains::AddDomain;
+pub use domains::{AddDomain, DomainStatus, Https, UpdateDomain};
 pub use error::ErrorBody;
 pub use logins::{
     DisableTwoFactor, LoginRequest, LoginResponse, RecoveryCodes, SessionSummary, SetPassword,

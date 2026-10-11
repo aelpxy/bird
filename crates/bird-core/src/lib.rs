@@ -8,6 +8,7 @@ mod health;
 mod id;
 mod image;
 mod model;
+mod proxy;
 pub mod reference;
 mod replicas;
 mod resources;
@@ -29,6 +30,9 @@ pub use model::{
     ApiToken, Backup, BackupTrigger, BackupVolume, Certificate, Deployment, DeploymentStatus,
     Domain, Environment, Machine, MachineState, Org, OrgRole, Project, Registry, Service,
     ServiceState, Session, User, UserRole, Variable, Volume,
+};
+pub use proxy::{
+    BodyLimitMb, ProxySettings, ProxyTimeout, RateBurst, RateLimit, RatePerSecond, ResponseHeaders,
 };
 pub use replicas::Replicas;
 pub use resources::{CpuLimit, MemoryLimit};

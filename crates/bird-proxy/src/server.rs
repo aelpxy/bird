@@ -128,7 +128,8 @@ impl Connection {
         I: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         let forwarder = self.forwarder;
-        let forwarded_for = forwarded_for(self.client_addr.ip());
+        let client_ip = self.client_addr.ip();
+        let forwarded_for = forwarded_for(client_ip);
         let mut shutdown = self.watch.clone();
         let tunnels = Arc::new(self.watch);
         let permit = Arc::new(self.permit);
@@ -139,7 +140,7 @@ impl Connection {
             let permit = Arc::clone(&permit);
             async move {
                 let mut response = forwarder
-                    .handle(request, forwarded_for, scheme, &tunnels, &permit)
+                    .handle(request, client_ip, forwarded_for, scheme, &tunnels, &permit)
                     .await;
                 set_server(response.headers_mut());
                 Ok::<_, Infallible>(response)

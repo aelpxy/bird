@@ -19,6 +19,8 @@ tracing.workspace = true
 
 [dev-dependencies]
 rcgen.workspace = true
+# builds proxy settings the way birdd reads them
+serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util", "signal"] }
 
 [lints]

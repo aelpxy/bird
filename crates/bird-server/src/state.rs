@@ -9,8 +9,10 @@ use crate::backups::BackupStorage;
 use crate::cron::CronRuns;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
+use crate::routing::Policies;
 use crate::shutdown::Shutdown;
 use crate::throttle::LoginThrottle;
+use crate::tls::CertFailures;
 use crate::{Error, Result};
 
 #[derive(Clone)]
@@ -33,6 +35,9 @@ pub(crate) struct AppState {
     pub(crate) crons: Arc<CronRuns>,
     // served by birdd itself through the proxy, so no service may claim it
     pub(crate) dashboard_domain: Option<Hostname>,
+    // present when birdd gets certificates
+    pub(crate) acme: Option<Arc<CertFailures>>,
+    pub(crate) policies: Arc<Policies>,
 }
 
 impl AppState {

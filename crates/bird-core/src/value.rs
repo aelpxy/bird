@@ -48,6 +48,8 @@ pub enum ValidationError {
     CronSchedule(String, String),
     #[error("invalid job timeout {0:?}: use 1s to 24h, like 90s, 30m or 2h")]
     CronTimeout(String),
+    #[error("invalid proxy setting: {0}")]
+    Proxy(String),
     #[error("invalid backup interval {0:?}: use 1h to 30d, like 6h or 1d")]
     BackupInterval(String),
     #[error("invalid number of backups to keep {0:?}: use 1 to 1000")]

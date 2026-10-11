@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use bird_core::{DeploymentStatus, Hostname, MachineState};
+use bird_core::{DeploymentStatus, Hostname, MachineId, MachineState, ProxySettings, ServiceId};
 use rusqlite::params;
 
 use crate::{Result, Store, rows};
@@ -9,13 +9,18 @@ use crate::{Result, Store, rows};
 pub struct RouteEntry {
     pub hostname: Hostname,
     pub address: Option<SocketAddr>,
+    pub machine_id: Option<MachineId>,
+    pub service_id: ServiceId,
+    pub proxy: ProxySettings,
+    pub redirect_to: Option<Hostname>,
 }
 
 impl Store {
     pub fn list_routes(&self) -> Result<Vec<RouteEntry>> {
         self.query_all(
-            "SELECT d.hostname, m.address
+            "SELECT d.hostname, m.address, d.service_id, s.proxy, d.redirect_to, m.id
              FROM domains d
+             JOIN services s ON s.id = d.service_id
              LEFT JOIN deployments dep ON dep.service_id = d.service_id AND dep.status = ?1
              LEFT JOIN machines m ON m.deployment_id = dep.id AND m.state = ?2
                  AND m.address IS NOT NULL
@@ -45,7 +50,11 @@ mod tests {
             store.list_routes().unwrap(),
             vec![RouteEntry {
                 hostname: host.clone(),
-                address: None
+                address: None,
+                machine_id: None,
+                service_id: service.id,
+                proxy: ProxySettings::default(),
+                redirect_to: None,
             }]
         );
 
@@ -77,7 +86,11 @@ mod tests {
             store.list_routes().unwrap(),
             vec![RouteEntry {
                 hostname: host,
-                address: Some("127.0.0.1:1002".parse().unwrap())
+                address: Some("127.0.0.1:1002".parse().unwrap()),
+                machine_id: Some(new_machine.id),
+                service_id: service.id,
+                proxy: ProxySettings::default(),
+                redirect_to: None,
             }]
         );
     }

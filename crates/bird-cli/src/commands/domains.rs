@@ -1,9 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use bird_api::AddDomain;
+use bird_api::{AddDomain, DomainStatus, Https};
 use bird_core::{Hostname, Name};
 
+use super::table::render;
 use crate::args::DomainsCommand;
 use crate::client::ApiClient;
 use crate::ui::Output;
@@ -19,11 +20,11 @@ pub(crate) async fn run(
 ) -> Result<()> {
     match command {
         DomainsCommand::List => {
-            let hostnames: Vec<Hostname> = client
+            let domains: Vec<DomainStatus> = client
                 .get(&client.scoped(&format!("services/{name}/domains")), TIMEOUT)
                 .await?;
-            if !out.json(&hostnames)? {
-                print_domains(name, &hostnames);
+            if !out.json(&domains)? {
+                print_domains(name, &domains);
             }
         }
         DomainsCommand::Add { hostname } => {
@@ -59,14 +60,27 @@ pub(crate) async fn run(
     Ok(())
 }
 
-fn print_domains(name: &Name, hostnames: &[Hostname]) {
-    if hostnames.is_empty() {
+fn print_domains(name: &Name, domains: &[DomainStatus]) {
+    if domains.is_empty() {
         println!(
             "{name} has no domains, add one with {}",
             style::out(Paint::Bold, "bird domains add <hostname>")
         );
+        return;
     }
-    for hostname in hostnames {
-        println!("{hostname}");
+    let rows: Vec<Vec<String>> = domains
+        .iter()
+        .map(|domain| vec![domain.hostname.to_string(), https(&domain.https)])
+        .collect();
+    print!("{}", render(&["DOMAIN", "HTTPS"], &rows));
+}
+
+fn https(https: &Https) -> String {
+    match https {
+        Https::Issued { .. } => "issued".to_owned(),
+        Https::Pending => "pending".to_owned(),
+        Https::Failing { error, .. } => format!("failing: {error}"),
+        Https::Off => "off".to_owned(),
+        Https::Local => "local".to_owned(),
     }
 }

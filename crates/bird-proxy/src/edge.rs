@@ -1,9 +1,12 @@
-use hyper::header::{HeaderValue, LOCATION};
+use std::time::Duration;
+
+use hyper::header::{HeaderValue, LOCATION, RETRY_AFTER};
 use hyper::http::uri::PathAndQuery;
 use hyper::{Response, StatusCode, Uri};
 
 use crate::Challenges;
 use crate::body::{ProxyBody, error_response, text_response};
+use crate::scheme::Scheme;
 
 const ACME_CHALLENGE_PREFIX: &str = "/.well-known/acme-challenge/";
 const DEFAULT_HTTPS_PORT: u16 = 443;
@@ -27,6 +30,38 @@ pub(crate) fn https_redirect(host: &str, uri: &Uri, https_port: u16) -> Response
     let mut response = text_response(StatusCode::PERMANENT_REDIRECT, "redirecting to https\n");
     response.headers_mut().insert(LOCATION, location);
     response
+}
+
+// a domain that only points visitors at another domain of the same app, like www to the apex
+pub(crate) fn domain_redirect(target: &str, uri: &Uri, scheme: Scheme) -> Response<ProxyBody> {
+    let path = uri.path_and_query().map_or("/", PathAndQuery::as_str);
+    let Ok(location) = HeaderValue::try_from(format!("{}://{target}{path}", scheme.as_str()))
+    else {
+        return error_response(StatusCode::BAD_REQUEST, "invalid request target\n");
+    };
+    let mut response = text_response(StatusCode::PERMANENT_REDIRECT, "moved\n");
+    response.headers_mut().insert(LOCATION, location);
+    response
+}
+
+pub(crate) fn too_many_requests(wait: Duration) -> Response<ProxyBody> {
+    // whole seconds, rounded up so a client that waits exactly this long gets through
+    let seconds = wait.as_secs() + u64::from(wait.subsec_nanos() > 0);
+    let mut response = error_response(
+        StatusCode::TOO_MANY_REQUESTS,
+        "too many requests, slow down\n",
+    );
+    response
+        .headers_mut()
+        .insert(RETRY_AFTER, HeaderValue::from(seconds.max(1)));
+    response
+}
+
+pub(crate) fn maintenance() -> Response<ProxyBody> {
+    error_response(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "this app is down for maintenance, try again soon\n",
+    )
 }
 
 #[cfg(test)]

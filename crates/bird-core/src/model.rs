@@ -174,6 +174,8 @@ pub struct Machine {
 pub struct Domain {
     pub hostname: Hostname,
     pub service_id: ServiceId,
+    /// Answer with a redirect to this other domain of the service instead of proxying
+    pub redirect_to: Option<Hostname>,
     pub created_at: i64,
 }
 

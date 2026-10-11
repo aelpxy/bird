@@ -16,5 +16,9 @@ thiserror.workspace = true
 utoipa = { workspace = true, optional = true }
 uuid.workspace = true
 
+[dev-dependencies]
+# reads settings the way the api and the store do
+serde_json.workspace = true
+
 [lints]
 workspace = true

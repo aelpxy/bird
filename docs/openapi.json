@@ -2264,13 +2264,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Domains routed to the service",
+            "description": "Domains routed to the service, with where each one's certificate stands",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string"
+                    "$ref": "#/components/schemas/DomainStatus"
                   }
                 }
               }
@@ -2401,6 +2401,96 @@
       }
     },
     "/v1/projects/{project}/environments/{environment}/services/{name}/domains/{hostname}": {
+      "put": {
+        "tags": [
+          "domains"
+        ],
+        "summary": "Send a domain's visitors to another domain of the service, or back to the app",
+        "operationId": "update_domain",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hostname",
+            "in": "path",
+            "description": "Domain to change",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDomain"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Saved and in effect"
+          },
+          "400": {
+            "description": "The target is not another domain of this service, or redirects itself",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "domains"
@@ -2872,6 +2962,164 @@
                   "items": {
                     "$ref": "#/components/schemas/LogEntry"
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/proxy": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "How the proxy treats the service's requests",
+        "operationId": "get_proxy_settings",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service's proxy settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxySettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Replace the service's proxy settings; they apply to the next request",
+        "operationId": "set_proxy_settings",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxySettings"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Saved and in effect",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxySettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -5101,6 +5349,12 @@
           }
         }
       },
+      "BodyLimitMb": {
+        "type": "integer",
+        "format": "int32",
+        "description": "1 to 10240",
+        "minimum": 0
+      },
       "BuildEvent": {
         "oneOf": [
           {
@@ -5776,6 +6030,32 @@
         },
         "additionalProperties": false
       },
+      "DomainStatus": {
+        "type": "object",
+        "required": [
+          "hostname",
+          "https"
+        ],
+        "properties": {
+          "hostname": {
+            "$ref": "#/components/schemas/Hostname"
+          },
+          "https": {
+            "$ref": "#/components/schemas/Https"
+          },
+          "redirect_to": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Hostname",
+                "description": "Visitors are sent to this other domain of the service instead of the app"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "EnvKey": {
         "type": "string"
       },
@@ -5845,6 +6125,100 @@
       },
       "Hostname": {
         "type": "string"
+      },
+      "Https": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Served over https; http redirects to it",
+            "required": [
+              "expires_at",
+              "state"
+            ],
+            "properties": {
+              "expires_at": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "issued"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "birdd is asking for a certificate",
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The last request failed and is retried at `retry_at`, both in unix seconds",
+            "required": [
+              "error",
+              "retry_at",
+              "state"
+            ],
+            "properties": {
+              "error": {
+                "type": "string"
+              },
+              "retry_at": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "failing"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "birdd runs without an acme directory, so it serves plain http only",
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "off"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "`*.localhost` names never get certificates",
+            "required": [
+              "state"
+            ],
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "local"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Where the domain's certificate stands"
       },
       "ImageRef": {
         "type": "string"
@@ -6176,6 +6550,100 @@
           }
         }
       },
+      "ProxySettings": {
+        "type": "object",
+        "description": "How bird's proxy treats one service's requests; the default changes nothing",
+        "properties": {
+          "headers": {
+            "$ref": "#/components/schemas/ResponseHeaders",
+            "description": "Response headers set on every answer, replacing the app's",
+            "default": {}
+          },
+          "maintenance": {
+            "type": "boolean",
+            "description": "Answer 503 instead of passing requests to the app",
+            "default": false
+          },
+          "max_body_mb": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BodyLimitMb",
+                "description": "Largest request body in MiB, 100 when unset"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "rate_limit": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RateLimit",
+                "description": "Requests each visitor may make, counted per IP address (IPv6 per /64)"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "security_headers": {
+            "type": "boolean",
+            "description": "Add HSTS on https, nosniff, frame and referrer policies unless the app sets them",
+            "default": false
+          },
+          "timeout_secs": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProxyTimeout",
+                "description": "Seconds the app has to start answering, 60 when unset"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProxyTimeout": {
+        "type": "integer",
+        "format": "int32",
+        "description": "1 to 3600",
+        "minimum": 0
+      },
+      "RateBurst": {
+        "type": "integer",
+        "format": "int32",
+        "description": "1 to 100000",
+        "minimum": 0
+      },
+      "RateLimit": {
+        "type": "object",
+        "required": [
+          "per_second",
+          "burst"
+        ],
+        "properties": {
+          "burst": {
+            "$ref": "#/components/schemas/RateBurst",
+            "description": "Requests allowed at once before the sustained rate applies"
+          },
+          "per_second": {
+            "$ref": "#/components/schemas/RatePerSecond",
+            "description": "Sustained requests per second"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RatePerSecond": {
+        "type": "integer",
+        "format": "int32",
+        "description": "1 to 10000",
+        "minimum": 0
+      },
       "RecoveryCodes": {
         "type": "object",
         "description": "Single-use codes for signing in without the authenticator, shown only this once",
@@ -6237,6 +6705,16 @@
         "format": "int32",
         "maximum": 32,
         "minimum": 1
+      },
+      "ResponseHeaders": {
+        "type": "object",
+        "description": "Header names are lowercase, values printable ASCII",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "propertyNames": {
+          "type": "string"
+        }
       },
       "RestoreRequest": {
         "type": "object",
@@ -6603,6 +7081,23 @@
             "type": "string"
           }
         }
+      },
+      "UpdateDomain": {
+        "type": "object",
+        "properties": {
+          "redirect_to": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Hostname",
+                "description": "Another domain of the same service to redirect to, or null to serve the app again"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateVariables": {
         "type": "object",

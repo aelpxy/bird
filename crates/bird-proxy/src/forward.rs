@@ -1,11 +1,12 @@
 use std::error::Error;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use bird_core::Hostname;
 use http_body_util::{BodyExt, LengthLimitError, Limited};
 use hyper::body::{Body, Incoming};
-use hyper::header::{HOST, HeaderValue, UPGRADE};
+use hyper::header::{HOST, HeaderName, HeaderValue, UPGRADE};
 use hyper::http::uri::{self, Authority, PathAndQuery};
 use hyper::{Request, Response, StatusCode, Uri, Version};
 use hyper_util::client::legacy::Client;
@@ -18,9 +19,12 @@ use crate::drain::Watch;
 use crate::headers::{set_forwarded, strip_hop_by_hop};
 use crate::host::{host_from_target, request_host};
 use crate::idle::IdleTimeout;
-use crate::routes::{RouteError, Routes};
+use crate::policy::RoutePolicy;
+use crate::routes::{RouteError, Routes, Target};
 use crate::scheme::Scheme;
 use crate::{ProxyConfig, Tls, edge, upgrade};
+
+const X_MACHINE_ID: HeaderName = HeaderName::from_static("x-machine-id");
 
 pub(crate) struct Forwarder {
     routes: Routes,
@@ -30,6 +34,7 @@ pub(crate) struct Forwarder {
     control: Option<Control>,
 }
 
+#[derive(Debug, Clone, Copy)]
 struct Limits {
     response_timeout: Duration,
     body_idle_timeout: Duration,
@@ -80,6 +85,7 @@ impl Forwarder {
     pub(crate) async fn handle(
         &self,
         mut request: Request<Incoming>,
+        client_ip: IpAddr,
         forwarded_for: Option<HeaderValue>,
         scheme: Scheme,
         watch: &Watch,
@@ -105,25 +111,24 @@ impl Forwarder {
         {
             return edge::https_redirect(&host, request.uri(), tls.https_port);
         }
-        let picked = match control {
-            Some(control) => Ok((control.upstream.clone(), &control.limits)),
-            None => self
-                .routes
-                .pick(&host)
-                .map(|upstream| (upstream, &self.limits)),
+        let dispatch = match control {
+            Some(control) => Dispatch {
+                upstream: control.upstream.clone(),
+                machine: None,
+                limits: control.limits,
+                policy: None,
+            },
+            None => match self.dispatch(&host, request.uri(), scheme, client_ip) {
+                Ok(dispatch) => dispatch,
+                Err(response) => return *response,
+            },
         };
-        let (upstream, limits) = match picked {
-            Ok(picked) => picked,
-            Err(RouteError::UnknownHost) => {
-                return error_response(StatusCode::NOT_FOUND, "no app is deployed at this host\n");
-            }
-            Err(RouteError::NoUpstreams) => {
-                return error_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "no machines are running for this app\n",
-                );
-            }
-        };
+        let Dispatch {
+            upstream,
+            machine,
+            limits,
+            policy,
+        } = dispatch;
 
         if usize::try_from(request.body().size_hint().lower())
             .map_or(true, |length| length > limits.max_body_bytes)
@@ -162,6 +167,12 @@ impl Forwarder {
                 {
                     upgrade::restore_headers(&mut parts.headers, accepted);
                 }
+                if let Some(policy) = &policy {
+                    policy.apply(&mut parts.headers, scheme);
+                }
+                if let Some(machine) = machine {
+                    parts.headers.insert(X_MACHINE_ID, machine);
+                }
                 tracing::debug!(%method, %upstream, status = %parts.status, "proxied");
                 Response::from_parts(
                     parts,
@@ -180,6 +191,72 @@ impl Forwarder {
                 error_response(StatusCode::GATEWAY_TIMEOUT, "upstream timed out\n")
             }
         }
+    }
+}
+
+struct Dispatch {
+    upstream: Authority,
+    machine: Option<HeaderValue>,
+    limits: Limits,
+    policy: Option<Arc<RoutePolicy>>,
+}
+
+impl Forwarder {
+    // the app's upstream with its own limits, or the answer the proxy gives in its place
+    fn dispatch(
+        &self,
+        host: &str,
+        uri: &Uri,
+        scheme: Scheme,
+        client_ip: IpAddr,
+    ) -> Result<Dispatch, Box<Response<ProxyBody>>> {
+        let (upstream, machine, policy) = match self.routes.pick(host) {
+            Ok(Target::Upstream {
+                authority,
+                machine,
+                policy,
+            }) => (authority, machine, policy),
+            Ok(Target::Redirect(target)) => {
+                return Err(Box::new(edge::domain_redirect(
+                    target.as_str(),
+                    uri,
+                    scheme,
+                )));
+            }
+            Err(RouteError::UnknownHost) => {
+                return Err(Box::new(error_response(
+                    StatusCode::NOT_FOUND,
+                    "no app is deployed at this host\n",
+                )));
+            }
+            Err(RouteError::NoUpstreams) => {
+                return Err(Box::new(error_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "no machines are running for this app\n",
+                )));
+            }
+        };
+        let mut limits = self.limits;
+        if let Some(policy) = &policy {
+            if policy.maintenance {
+                return Err(Box::new(edge::maintenance()));
+            }
+            if let Some(Err(wait)) = policy
+                .rate_limit
+                .as_ref()
+                .map(|limit| limit.check(client_ip))
+            {
+                return Err(Box::new(edge::too_many_requests(wait)));
+            }
+            limits.max_body_bytes = policy.max_body_bytes.unwrap_or(limits.max_body_bytes);
+            limits.response_timeout = policy.response_timeout.unwrap_or(limits.response_timeout);
+        }
+        Ok(Dispatch {
+            upstream,
+            machine,
+            limits,
+            policy,
+        })
     }
 }
 

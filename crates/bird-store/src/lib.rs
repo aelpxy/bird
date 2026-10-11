@@ -11,6 +11,7 @@ mod machines;
 mod migrate;
 mod orgs;
 mod projects;
+mod proxy;
 mod registries;
 mod routes;
 mod rows;
