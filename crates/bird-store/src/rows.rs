@@ -113,6 +113,7 @@ pub(crate) fn service(row: &Row<'_>) -> rusqlite::Result<Service> {
         release: command(row, 14)?,
         memory: limit(row, 9)?,
         cpus: limit(row, 10)?,
+        stop: json_or_default(row, 15, |raw| serde_json::from_str(raw))?,
     })
 }
 
@@ -173,11 +174,20 @@ pub(crate) fn route(row: &Row<'_>) -> rusqlite::Result<RouteEntry> {
 }
 
 pub(crate) fn proxy(row: &Row<'_>, idx: usize) -> rusqlite::Result<ProxySettings> {
+    json_or_default(row, idx, |raw| serde_json::from_str(raw))
+}
+
+// settings kept as JSON, NULL meaning the defaults
+fn json_or_default<T: Default>(
+    row: &Row<'_>,
+    idx: usize,
+    decode: fn(&str) -> serde_json::Result<T>,
+) -> rusqlite::Result<T> {
     let raw: Option<String> = row.get(idx)?;
     raw.map_or_else(
-        || Ok(ProxySettings::default()),
+        || Ok(T::default()),
         |raw| {
-            serde_json::from_str(&raw).map_err(|err| {
+            decode(&raw).map_err(|err| {
                 rusqlite::Error::FromSqlConversionFailure(idx, Type::Text, Box::new(err))
             })
         },

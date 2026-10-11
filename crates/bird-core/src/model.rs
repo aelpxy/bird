@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     BackupId, Command, CpuLimit, DeploymentId, EnvKey, EnvironmentId, HealthCheck, HealthTimeout,
     Hostname, ImageRef, MachineId, MemoryLimit, MountPath, Name, OrgId, Port, ProjectId,
-    RegistryHost, Replicas, ServiceId, SessionId, TokenId, UserId, VolumeId,
+    RegistryHost, Replicas, ServiceId, SessionId, StopSettings, TokenId, UserId, VolumeId,
 };
 
 string_enum!(DeploymentStatus, "deployment status" {
@@ -145,6 +145,7 @@ pub struct Service {
     pub release: Option<Command>,
     pub memory: MemoryLimit,
     pub cpus: CpuLimit,
+    pub stop: StopSettings,
     pub created_at: i64,
 }
 

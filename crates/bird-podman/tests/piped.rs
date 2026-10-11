@@ -26,6 +26,7 @@ fn spec(name: &str, command: &[&str]) -> ContainerSpec {
         },
         env: BTreeMap::new(),
         labels: BTreeMap::new(),
+        stop: bird_podman::StopPolicy::default(),
     }
 }
 

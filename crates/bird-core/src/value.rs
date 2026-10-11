@@ -50,6 +50,8 @@ pub enum ValidationError {
     CronTimeout(String),
     #[error("invalid proxy setting: {0}")]
     Proxy(String),
+    #[error("invalid stop setting: {0}")]
+    Stop(String),
     #[error("invalid backup interval {0:?}: use 1h to 30d, like 6h or 1d")]
     BackupInterval(String),
     #[error("invalid number of backups to keep {0:?}: use 1 to 1000")]

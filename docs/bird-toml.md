@@ -19,6 +19,10 @@ memory = "512m"                    # per machine, like "512m" or "2g"
 cpus = 0.5                         # per machine, in cores
 replicas = 2                       # machines to run
 
+drain = "10s"                      # old machines finish requests this long after traffic moves
+kill_signal = "SIGINT"             # what machines get when told to stop
+kill_timeout = "30s"               # how long they have to exit before being killed
+
 volumes = [{ name = "data", path = "/var/lib/app" }]
 
 # [build]                          # or build from source, without an image line
@@ -60,6 +64,9 @@ command = ["bin/cleanup"]
 | `memory` | `1g` | 32 MiB to 256 GiB. |
 | `cpus` | `1` | 0.1 to 64. |
 | `replicas` | `1` | Up to 32. A service with volumes runs exactly one. |
+| `drain` | `5s` | `0s` to `5m`. Old machines keep serving requests already on them this long after a deploy, restart or scale-down moves traffic off them. Services with volumes skip it, since their old machine stops first. |
+| `kill_signal` | `SIGTERM` | `SIGTERM`, `SIGINT`, `SIGQUIT`, `SIGHUP`, `SIGUSR1` or `SIGUSR2`. |
+| `kill_timeout` | `10s` | `1s` to `5m`. After this the machine is killed. Applies to machines started after the change. |
 | `volumes` | none | Kept across deploys. Only `bird rm --purge` deletes them. |
 | `[build]` | none | `context` defaults to the file's directory, `dockerfile` to `Dockerfile`. `.dockerignore` is honored. |
 | `[env]` | none | Only added. Keep secrets out of the file and set them with `bird env set`. |

@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use bird_core::{
-    BackupInterval, BackupKeep, BackupSchedule, BuildFile, Command, CpuLimit, CronJobSpec, EnvKey,
-    HealthCheck, HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
+    BackupInterval, BackupKeep, BackupSchedule, BuildFile, Command, CpuLimit, CronJobSpec,
+    DrainTime, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef, KillSignal, KillTimeout,
+    MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Deserializer};
 
@@ -54,6 +55,12 @@ pub struct Manifest {
     /// `[[cron]]` entries; a deploy from bird.toml makes them the service's jobs
     #[serde(default)]
     pub cron: Vec<CronJobSpec>,
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub drain: Option<DrainTime>,
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub kill_signal: Option<KillSignal>,
+    #[serde(default, deserialize_with = "text_or_number")]
+    pub kill_timeout: Option<KillTimeout>,
 }
 
 // `[backup] every = "1d"` backs the volumes up on a schedule, keeping the newest `keep` copies
@@ -107,6 +114,9 @@ impl Manifest {
             volumes: Vec::new(),
             backup: None,
             cron: Vec::new(),
+            drain: None,
+            kill_signal: None,
+            kill_timeout: None,
         }
     }
 
@@ -135,6 +145,9 @@ impl Manifest {
             no_release: false,
             cron: None,
             allow_image_change: false,
+            drain: self.drain,
+            kill_signal: self.kill_signal,
+            kill_timeout: self.kill_timeout,
         }
     }
 }

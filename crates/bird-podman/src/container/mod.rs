@@ -4,7 +4,7 @@ mod spec;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bird_core::{EnvKey, ImageRef, Port};
+use bird_core::{EnvKey, ImageRef, KillSignal, KillTimeout, Port};
 use hyper::Method;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
@@ -31,6 +31,14 @@ pub struct ContainerSpec {
     pub limits: Limits,
     pub env: BTreeMap<EnvKey, String>,
     pub labels: BTreeMap<String, String>,
+    pub stop: StopPolicy,
+}
+
+/// What `stop` sends the container and how long it waits before killing it; every stop uses it
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StopPolicy {
+    pub signal: KillSignal,
+    pub timeout: KillTimeout,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,6 +101,9 @@ pub struct ContainerInfo {
     pub ports: Vec<PublishedPort>,
     pub aliases: Vec<String>,
     pub oom_killed: bool,
+    /// As podman reports it, a name like SIGTERM or a number; only known from inspecting
+    pub stop_signal: Option<String>,
+    pub stop_timeout_secs: Option<u64>,
 }
 
 impl ContainerInfo {
@@ -131,14 +142,15 @@ impl Podman {
         Ok(())
     }
 
-    pub async fn stop_container(&self, id: &str, grace: Duration) -> Result<()> {
-        let path = format!(
-            "/containers/{}/stop?timeout={}",
-            encode(id),
-            grace.as_secs()
-        );
+    // podman waits the container's own stop timeout, set when it was created, then kills it
+    pub async fn stop_container(&self, id: &str) -> Result<()> {
+        let path = format!("/containers/{}/stop", encode(id));
         let response = self
-            .send(Method::POST, &path, grace + DEFAULT_TIMEOUT)
+            .send(
+                Method::POST,
+                &path,
+                KillTimeout::MAX.duration() + DEFAULT_TIMEOUT,
+            )
             .await?;
         check(response, || format!("container {id}"))?;
         Ok(())

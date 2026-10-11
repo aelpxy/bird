@@ -50,6 +50,8 @@ export function ServiceConfig({ scope, service }: { scope: Scope; service: Servi
     { label: 'Memory', value: mebibytes(service.memory) },
     { label: 'CPU', value: `${Number((service.cpus / 1000).toFixed(2))}`, unit: service.cpus === 1000 ? 'core' : 'cores' },
   ]
+  // birdd's defaults, for a summary from before stop settings existed
+  const stop = service.stop ?? { drain: 5, kill_signal: 'SIGTERM', kill_timeout: 10 }
   return (
     <div className="divide-y divide-line border border-line bg-surface">
       <Block label="Image">
@@ -71,6 +73,13 @@ export function ServiceConfig({ scope, service }: { scope: Scope; service: Servi
           <CommandLine args={service.release} />
         </Block>
       )}
+
+      <Block label="Stopping old machines">
+        <p className="text-ui text-fg-muted">
+          {stop.drain > 0 ? `They finish requests for ${stop.drain}s, then get ` : 'They get '}
+          <span className="font-mono text-fg">{stop.kill_signal}</span> and are killed if still running {stop.kill_timeout}s later.
+        </p>
+      </Block>
 
       <dl className="grid grid-cols-3 divide-x divide-line">
         {tiles.map((tile) => (

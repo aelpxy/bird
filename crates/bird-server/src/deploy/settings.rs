@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use bird_api::{DeployRequest, VolumeSpec};
-use bird_core::{EnvironmentId, Hostname, Service, ServiceState, Volume};
+use bird_core::{EnvironmentId, Hostname, Service, ServiceState, StopSettings, Volume};
 use bird_store::Store;
 
 use crate::state::AppState;
@@ -133,6 +133,20 @@ fn apply_settings(
             cpus,
             ..service
         }
+    } else {
+        service
+    };
+    let service = if request.drain.is_some()
+        || request.kill_signal.is_some()
+        || request.kill_timeout.is_some()
+    {
+        let stop = StopSettings {
+            drain: request.drain.unwrap_or(service.stop.drain),
+            kill_signal: request.kill_signal.unwrap_or(service.stop.kill_signal),
+            kill_timeout: request.kill_timeout.unwrap_or(service.stop.kill_timeout),
+        };
+        store.set_stop_settings(service.id, &stop)?;
+        Service { stop, ..service }
     } else {
         service
     };

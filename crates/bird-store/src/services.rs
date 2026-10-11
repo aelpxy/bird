@@ -1,6 +1,6 @@
 use bird_core::{
     Command, CpuLimit, EnvironmentId, HealthCheck, HealthTimeout, ImageRef, MemoryLimit, Name,
-    Port, Replicas, Service, ServiceId, ServiceState,
+    Port, Replicas, Service, ServiceId, ServiceState, StopSettings,
 };
 use rusqlite::params;
 
@@ -30,6 +30,7 @@ impl Store {
             release: None,
             memory: MemoryLimit::DEFAULT,
             cpus: CpuLimit::DEFAULT,
+            stop: StopSettings::default(),
             created_at: now(),
         };
         self.execute(
@@ -99,6 +100,14 @@ impl Store {
         expect_changed(changed, "service")
     }
 
+    pub fn set_stop_settings(&self, id: ServiceId, stop: &StopSettings) -> Result<()> {
+        let changed = self.execute(
+            "UPDATE services SET stop = ?2 WHERE id = ?1",
+            params![id.to_string(), encode_stop(stop)?],
+        )?;
+        expect_changed(changed, "service")
+    }
+
     pub fn set_resources(&self, id: ServiceId, memory: MemoryLimit, cpus: CpuLimit) -> Result<()> {
         let changed = self.execute(
             "UPDATE services SET memory_mb = ?2, cpu_millicores = ?3 WHERE id = ?1",
@@ -114,7 +123,7 @@ impl Store {
         let changed = self.execute(
             "UPDATE services SET image = ?2, port = ?3, health = ?4, health_path = ?5,
              health_timeout_secs = ?6, command = ?7, memory_mb = ?8, cpu_millicores = ?9,
-             state = ?10, release_command = ?11
+             state = ?10, release_command = ?11, stop = ?12
              WHERE id = ?1",
             params![
                 service.id.to_string(),
@@ -127,7 +136,8 @@ impl Store {
                 service.memory.mebibytes(),
                 service.cpus.millicores(),
                 service.state.as_str(),
-                encode_command(service.release.as_ref())?
+                encode_command(service.release.as_ref())?,
+                encode_stop(&service.stop)?
             ],
         )?;
         expect_changed(changed, "service")
@@ -136,7 +146,8 @@ impl Store {
     pub fn service(&self, id: ServiceId) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command,
+                    stop
              FROM services WHERE id = ?1",
             [id.to_string()],
             rows::service,
@@ -150,7 +161,8 @@ impl Store {
     ) -> Result<Option<Service>> {
         self.query_one(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command,
+                    stop
              FROM services
              WHERE environment_id = ?1 AND name = ?2",
             params![environment_id.to_string(), name.as_str()],
@@ -161,7 +173,8 @@ impl Store {
     pub fn list_services(&self, environment_id: EnvironmentId) -> Result<Vec<Service>> {
         self.query_all(
             "SELECT id, environment_id, name, image, port, created_at, replicas, health, command,
-                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command
+                    memory_mb, cpu_millicores, health_path, health_timeout_secs, state, release_command,
+                    stop
              FROM services
              WHERE environment_id = ?1 ORDER BY name",
             [environment_id.to_string()],
@@ -181,6 +194,14 @@ fn encode_command(command: Option<&Command>) -> Result<Option<String>> {
         .map(|command| serde_json::to_string(command.args()))
         .transpose()
         .map_err(Error::Encode)
+}
+
+// the defaults are stored as NULL, so changing them later reaches services that never chose
+fn encode_stop(stop: &StopSettings) -> Result<Option<String>> {
+    if stop.is_default() {
+        return Ok(None);
+    }
+    serde_json::to_string(stop).map(Some).map_err(Error::Encode)
 }
 
 fn health_columns(health: &HealthCheck) -> (&'static str, Option<&str>) {

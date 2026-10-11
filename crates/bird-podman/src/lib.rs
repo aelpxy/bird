@@ -21,7 +21,7 @@ pub use auth::RegistryAuth;
 pub use build::{BuildLine, BuildOutput};
 pub use client::{Podman, default_socket};
 pub use container::{
-    ContainerInfo, ContainerSpec, ContainerState, Lifecycle, Limits, PublishedPort,
+    ContainerInfo, ContainerSpec, ContainerState, Lifecycle, Limits, PublishedPort, StopPolicy,
 };
 pub use demux::{Demux, Piece, is_attach_reset_notice};
 pub use error::{Error, Result};

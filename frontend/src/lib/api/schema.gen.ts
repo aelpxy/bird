@@ -1202,12 +1202,15 @@ export interface components {
             /** @description Forget the saved command and run the image's own again; not together with `command` */
             default_command?: boolean;
             domains?: components["schemas"]["Hostname"][];
+            drain?: components["schemas"]["DrainTime"] | null;
             env?: {
                 [key: string]: string;
             };
             health?: components["schemas"]["HealthCheck"] | null;
             health_timeout?: components["schemas"]["HealthTimeout"] | null;
             image: components["schemas"]["ImageRef"];
+            kill_signal?: components["schemas"]["KillSignal"] | null;
+            kill_timeout?: components["schemas"]["KillTimeout"] | null;
             memory?: components["schemas"]["MemoryLimit"] | null;
             name: components["schemas"]["Name"];
             /** @description Forget the saved release command; not together with `release` */
@@ -1257,6 +1260,11 @@ export interface components {
             https: components["schemas"]["Https"];
             redirect_to?: components["schemas"]["Hostname"] | null;
         };
+        /**
+         * Format: int32
+         * @description How long old machines keep running after traffic moves off them, so requests finish
+         */
+        DrainTime: number;
         EnvKey: string;
         ErrorBody: {
             error: string;
@@ -1310,6 +1318,16 @@ export interface components {
             /** @description The secret to send as a bearer token */
             token: string;
         };
+        /**
+         * @description How a service's machines are told to stop
+         * @enum {string}
+         */
+        KillSignal: "SIGTERM" | "SIGINT" | "SIGQUIT" | "SIGHUP" | "SIGUSR1" | "SIGUSR2";
+        /**
+         * Format: int32
+         * @description How long a machine has to exit after its kill signal before it is killed
+         */
+        KillTimeout: number;
         LogEntry: {
             /**
              * Format: int64
@@ -1558,6 +1576,8 @@ export interface components {
             replicas: components["schemas"]["Replicas"];
             /** @description Stopped services keep their machines stopped until started again */
             state: components["schemas"]["ServiceState"];
+            /** @description How old machines are drained and stopped */
+            stop?: components["schemas"]["StopSettings"];
             volumes: components["schemas"]["VolumeSpec"][];
         };
         /** Format: uuid */
@@ -1582,6 +1602,21 @@ export interface components {
             /** @description Needed when changing your own password once you have one; admins resetting someone else's leave it out */
             current?: string | null;
             new: string;
+        };
+        /** @description How a service's old machines are stopped; the default is a short drain and SIGTERM */
+        StopSettings: {
+            /**
+             * @description Seconds old machines keep serving requests in flight after traffic moves, 0 to 300
+             * @default 5
+             */
+            drain: components["schemas"]["DrainTime"];
+            /** @default SIGTERM */
+            kill_signal: components["schemas"]["KillSignal"];
+            /**
+             * @description Seconds to exit after the signal before being killed, 1 to 300
+             * @default 10
+             */
+            kill_timeout: components["schemas"]["KillTimeout"];
         };
         TemplateDeployResponse: {
             connection?: components["schemas"]["EnvKey"] | null;

@@ -13,6 +13,7 @@ mod proxy;
 pub mod reference;
 mod replicas;
 mod resources;
+mod stop;
 mod value;
 
 pub use backup_schedule::{BackupInterval, BackupKeep, BackupSchedule};
@@ -38,6 +39,7 @@ pub use proxy::{
 };
 pub use replicas::Replicas;
 pub use resources::{CpuLimit, MemoryLimit};
+pub use stop::{DrainTime, KillSignal, KillTimeout, StopSettings};
 pub use string_enum::ParseEnumError;
 pub use value::{
     BuildFile, EnvKey, Hostname, ImageRef, MountPath, Name, Port, RegistryHost, ValidationError,

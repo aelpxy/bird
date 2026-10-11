@@ -21,7 +21,9 @@ use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
 pub(crate) use log::{DeployLog, RunningLogs, running};
-pub(crate) use machine::{MAX_PROCESSES, Pull, destroy_container, ensure_image, launch, set_state};
+pub(crate) use machine::{
+    MAX_PROCESSES, Pull, destroy_container, ensure_image, launch, set_state, wait_for_drain,
+};
 pub(crate) use power::{restart, start, stop};
 pub(crate) use remove::remove_service;
 
@@ -57,6 +59,9 @@ pub(crate) async fn redeploy(
         default_command: false,
         no_release: false,
         allow_image_change: false,
+        drain: None,
+        kill_signal: None,
+        kill_timeout: None,
     };
     deploy(state, service.environment_id, request, log).await
 }
@@ -204,6 +209,10 @@ async fn roll_out(state: &AppState, rollout: Rollout, log: &DeployLog) -> Result
         .await?;
     routing::refresh(state).await?;
     if let Some(previous) = previous {
+        // with volumes the old machine stopped before the new one started, so nothing is in flight
+        if attached.is_empty() {
+            machine::drain(state, &service, log).await;
+        }
         log.bird("Stopping the previous machines");
         machine::retire(state, previous.id).await;
     }

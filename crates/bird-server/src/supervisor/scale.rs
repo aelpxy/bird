@@ -1,6 +1,6 @@
 use bird_core::{Machine, MachineState, Service};
 
-use crate::deploy::{destroy_container, set_state};
+use crate::deploy::{destroy_container, set_state, wait_for_drain};
 use crate::routing;
 use crate::state::AppState;
 
@@ -11,6 +11,7 @@ pub(super) async fn retire_extra(state: &AppState, service: &Service, extra: &[&
         if let Err(err) = routing::refresh(state).await {
             tracing::warn!(error = %err, "could not refresh routes before scaling down");
         }
+        wait_for_drain(state, service).await;
         if let Some(container_id) = &machine.container_id {
             destroy_container(state, container_id).await;
         }

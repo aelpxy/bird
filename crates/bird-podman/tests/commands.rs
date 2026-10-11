@@ -31,6 +31,7 @@ fn spec(name: &str, command: &str) -> ContainerSpec {
         },
         env: BTreeMap::from([("GREETING".parse().expect("a valid key"), "hi".to_owned())]),
         labels: BTreeMap::new(),
+        stop: bird_podman::StopPolicy::default(),
     }
 }
 

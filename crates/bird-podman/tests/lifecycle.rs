@@ -49,6 +49,20 @@ async fn wait_for_log(podman: &Podman, id: &str, text: &str) -> Vec<bird_podman:
     logs
 }
 
+// the signal and timeout given at create stick to the container, so every later stop uses them
+async fn assert_stop_policy(podman: &Podman, id: &str) {
+    let info = podman
+        .inspect_container(id)
+        .await
+        .expect("the container exists");
+    assert_eq!(info.stop_timeout_secs, Some(3));
+    assert!(
+        matches!(info.stop_signal.as_deref(), Some("SIGINT" | "2")),
+        "{:?}",
+        info.stop_signal
+    );
+}
+
 // a time after every line leaves none, one before them all keeps them
 async fn assert_since_filters(podman: &Podman, id: &str) {
     let future = std::time::SystemTime::now() + Duration::from_secs(3600);
@@ -121,6 +135,10 @@ async fn container_lifecycle() {
         }],
         env: BTreeMap::from([("GREETING".parse().unwrap(), "hi".to_owned())]),
         labels: BTreeMap::from([("bird.test".to_owned(), name.clone())]),
+        stop: bird_podman::StopPolicy {
+            signal: bird_core::KillSignal::Int,
+            timeout: bird_core::KillTimeout::try_from(3).expect("3 seconds is within bounds"),
+        },
     };
     let id = podman.create_container(&spec).await.unwrap();
     assert!(matches!(
@@ -172,14 +190,9 @@ async fn container_lifecycle() {
         ContainerState::Running
     );
 
-    podman
-        .stop_container(&id, Duration::from_secs(5))
-        .await
-        .unwrap();
-    podman
-        .stop_container(&id, Duration::from_secs(5))
-        .await
-        .unwrap();
+    assert_stop_policy(&podman, &id).await;
+    podman.stop_container(&id).await.unwrap();
+    podman.stop_container(&id).await.unwrap();
     assert_eq!(
         podman.inspect_container(&id).await.unwrap().state,
         ContainerState::Exited

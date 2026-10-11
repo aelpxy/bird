@@ -152,6 +152,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             deployment: None,
             failed_deploy,
             references,
+            stop: service.stop,
         });
     };
     let machines = store
@@ -188,6 +189,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         }),
         failed_deploy,
         references,
+        stop: service.stop,
     })
 }
 

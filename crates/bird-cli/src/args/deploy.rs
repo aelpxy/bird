@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use bird_api::VolumeSpec;
 use bird_core::{
-    CpuLimit, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef, MemoryLimit, Port, Replicas,
+    CpuLimit, DrainTime, EnvKey, HealthCheck, HealthTimeout, Hostname, ImageRef, KillSignal,
+    KillTimeout, MemoryLimit, Port, Replicas,
 };
 
 const EXAMPLES: &str = "\
@@ -43,6 +44,17 @@ pub(crate) struct DeployArgs {
     /// How long a new machine has to pass its health check, like 90s or 5m (new services default to 60s)
     #[arg(long)]
     pub(crate) health_timeout: Option<HealthTimeout>,
+    /// How long old machines keep serving requests in flight after traffic moves, like 5s or 1m
+    /// (new services default to 5s, 0s turns it off)
+    #[arg(long)]
+    pub(crate) drain: Option<DrainTime>,
+    /// Signal machines get when told to stop, like SIGINT (new services default to SIGTERM)
+    #[arg(long)]
+    pub(crate) kill_signal: Option<KillSignal>,
+    /// How long machines have to exit after the signal before they are killed, like 30s or 2m
+    /// (new services default to 10s)
+    #[arg(long)]
+    pub(crate) kill_timeout: Option<KillTimeout>,
     /// Environment variable as KEY=VALUE, repeatable
     #[arg(long = "env", short = 'e', value_parser = parse_env, value_name = "KEY=VALUE")]
     pub(crate) env: Vec<(EnvKey, String)>,

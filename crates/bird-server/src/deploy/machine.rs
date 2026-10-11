@@ -3,7 +3,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use bird_core::{Deployment, DeploymentId, EnvKey, ImageRef, MachineId, MachineState, Service};
-use bird_podman::{ContainerSpec, ContainerState, Lifecycle, Limits, RegistryAuth};
+use bird_podman::{ContainerSpec, ContainerState, Lifecycle, Limits, RegistryAuth, StopPolicy};
 use tokio::time::Instant;
 
 use super::log::DeployLog;
@@ -14,7 +14,6 @@ use crate::{Error, Result, health, labels};
 // enough for any real app, low enough that a fork bomb cannot exhaust the host
 pub(crate) const MAX_PROCESSES: u32 = 4096;
 const READY_POLL: Duration = Duration::from_millis(250);
-const STOP_GRACE: Duration = Duration::from_secs(10);
 const FAILURE_LOG_LINES: u32 = 30;
 
 // built images live only in local podman storage, there is nothing to pull them from
@@ -89,6 +88,10 @@ pub(crate) async fn launch(
         },
         env,
         labels: labels::for_machine(service, deployment.id, machine.id),
+        stop: StopPolicy {
+            signal: service.stop.kill_signal,
+            timeout: service.stop.kill_timeout,
+        },
     };
 
     let container_id = match state.podman.create_container(&spec).await {
@@ -204,6 +207,29 @@ async fn unhealthy(state: &AppState, container_id: &str, reason: String) -> Erro
     Error::Unhealthy { reason, logs }
 }
 
+pub(super) async fn drain(state: &AppState, service: &Service, log: &DeployLog) {
+    if service.stop.drain.secs() > 0 {
+        log.bird(format!(
+            "Letting requests in flight finish for {}",
+            service.stop.drain
+        ));
+    }
+    wait_for_drain(state, service).await;
+}
+
+// requests already on a machine taken out of routing finish before it is told to stop; shutting
+// birdd down cuts the wait short, since machines keep running across a restart anyway
+pub(crate) async fn wait_for_drain(state: &AppState, service: &Service) {
+    let drain = service.stop.drain;
+    if drain.secs() == 0 {
+        return;
+    }
+    tokio::select! {
+        () = tokio::time::sleep(drain.duration()) => {}
+        () = state.shutdown.wait() => {}
+    }
+}
+
 pub(crate) async fn retire(state: &AppState, deployment_id: DeploymentId) {
     let machines = match state
         .db
@@ -228,7 +254,7 @@ pub(crate) async fn retire(state: &AppState, deployment_id: DeploymentId) {
 }
 
 pub(crate) async fn destroy_container(state: &AppState, container_id: &str) {
-    match state.podman.stop_container(container_id, STOP_GRACE).await {
+    match state.podman.stop_container(container_id).await {
         Ok(()) | Err(bird_podman::Error::NotFound { .. }) => {}
         Err(err) => tracing::warn!(container = container_id, error = %err, "stop failed"),
     }

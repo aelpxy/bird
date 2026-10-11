@@ -31,6 +31,8 @@ pub(super) struct SpecGenerator<'a> {
     // a replaced entrypoint runs as pid 1 itself, so a missing program fails at start with podman's
     // own error instead of the init's vague one
     init: bool,
+    stop_signal: u8,
+    stop_timeout: u32,
 }
 
 #[derive(Serialize)]
@@ -130,6 +132,8 @@ impl<'a> From<&'a ContainerSpec> for SpecGenerator<'a> {
             terminal: spec.lifecycle == Lifecycle::Terminal,
             stdin: matches!(spec.lifecycle, Lifecycle::Terminal | Lifecycle::Piped),
             init: spec.entrypoint.is_none(),
+            stop_signal: spec.stop.signal.number(),
+            stop_timeout: spec.stop.timeout.secs(),
         }
     }
 }
@@ -159,6 +163,7 @@ mod tests {
             },
             env: BTreeMap::from([("A".parse().unwrap(), "b".to_owned())]),
             labels: BTreeMap::new(),
+            stop: crate::StopPolicy::default(),
         }
     }
 

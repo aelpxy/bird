@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bird_core::{Deployment, Machine, MachineState};
 
 use super::machine::set_state;
@@ -7,7 +5,6 @@ use crate::routing;
 use crate::state::AppState;
 
 // databases get time to flush and shut down cleanly before their volume changes hands
-const STOP_GRACE: Duration = Duration::from_secs(30);
 
 // a volume can only be used by one machine, so the old one stops before the new one starts
 pub(super) async fn stop_previous(state: &AppState, previous: Option<&Deployment>) -> Vec<Machine> {
@@ -39,7 +36,7 @@ pub(super) async fn stop_previous(state: &AppState, previous: Option<&Deployment
     }
     for machine in &running {
         if let Some(container_id) = &machine.container_id
-            && let Err(err) = state.podman.stop_container(container_id, STOP_GRACE).await
+            && let Err(err) = state.podman.stop_container(container_id).await
         {
             tracing::warn!(machine = %machine.id, error = %err, "could not stop machine");
         }

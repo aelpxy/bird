@@ -182,6 +182,9 @@ fn merge(
     }
     manifest.health = args.health.or(manifest.health);
     manifest.health_timeout = args.health_timeout.or(manifest.health_timeout);
+    manifest.drain = args.drain.or(manifest.drain);
+    manifest.kill_signal = args.kill_signal.or(manifest.kill_signal);
+    manifest.kill_timeout = args.kill_timeout.or(manifest.kill_timeout);
     manifest.memory = args.memory.or(manifest.memory);
     manifest.cpus = args.cpus.or(manifest.cpus);
     manifest.replicas = args.replicas.or(manifest.replicas);

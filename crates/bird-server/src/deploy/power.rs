@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bird_core::{Deployment, EnvironmentId, Machine, MachineState, Name, Service, ServiceState};
 
 use super::machine::boot;
@@ -8,7 +6,6 @@ use crate::state::AppState;
 use crate::{Error, Result, routing};
 
 // databases get time to shut down cleanly, the same as when a volume deploy stops them
-const STOP_GRACE: Duration = Duration::from_secs(30);
 
 // containers are kept, so logs survive and starting again needs no pull or new container
 pub(crate) async fn stop(state: &AppState, environment: EnvironmentId, name: &Name) -> Result<()> {
@@ -46,7 +43,7 @@ pub(crate) async fn stop(state: &AppState, environment: EnvironmentId, name: &Na
         let Some(container_id) = &machine.container_id else {
             continue;
         };
-        if let Err(err) = state.podman.stop_container(container_id, STOP_GRACE).await {
+        if let Err(err) = state.podman.stop_container(container_id).await {
             tracing::warn!(machine = %machine.id, error = %err, "could not stop container");
         }
     }
@@ -132,8 +129,9 @@ pub(crate) async fn restart(
     for machine in running {
         set_state(state, machine.id, MachineState::Starting).await;
         routing::refresh(state).await?;
+        super::machine::wait_for_drain(state, &service).await;
         if let Some(container_id) = &machine.container_id
-            && let Err(err) = state.podman.stop_container(container_id, STOP_GRACE).await
+            && let Err(err) = state.podman.stop_container(container_id).await
         {
             set_state(state, machine.id, MachineState::Failed).await;
             return Err(err.into());

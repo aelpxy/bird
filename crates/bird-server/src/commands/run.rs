@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bird_core::{Command, EnvKey, EnvironmentId, ImageRef, Name, Service};
-use bird_podman::{ContainerSpec, Lifecycle, Limits};
+use bird_podman::{ContainerSpec, Lifecycle, Limits, StopPolicy};
 use bytes::Bytes;
 use hyper::upgrade::Upgraded;
 use hyper_util::rt::TokioIo;
@@ -214,6 +214,11 @@ fn spec(target: &RunTarget, command: &Command, lifecycle: Lifecycle) -> Containe
                 service.environment_id.to_string(),
             ),
         ]),
+        // a one-off keeps the service's signal, so a job that cleans up on SIGINT still does
+        stop: StopPolicy {
+            signal: service.stop.kill_signal,
+            timeout: service.stop.kill_timeout,
+        },
     }
 }
 

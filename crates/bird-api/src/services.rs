@@ -1,7 +1,7 @@
 use bird_core::{
     BackupSchedule, Command, CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout,
     Hostname, ImageRef, MachineId, MachineState, MemoryLimit, MetricPoint, MetricsRange, Name,
-    Port, Replicas, ServiceState,
+    Port, Replicas, ServiceState, StopSettings,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,6 +36,9 @@ pub struct ServiceSummary {
     /// Services in the same environment whose variables this one reads
     #[serde(default)]
     pub references: Vec<Name>,
+    /// How old machines are drained and stopped
+    #[serde(default)]
+    pub stop: StopSettings,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

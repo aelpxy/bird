@@ -27,6 +27,11 @@ struct InspectState {
 struct InspectConfig {
     #[serde(default)]
     labels: Option<BTreeMap<String, String>>,
+    // a name in podman 5, a number in older versions
+    #[serde(default)]
+    stop_signal: Option<serde_json::Value>,
+    #[serde(default)]
+    stop_timeout: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -108,6 +113,11 @@ impl From<Inspect> for ContainerInfo {
             ports,
             aliases,
             oom_killed: inspect.state.oom_killed,
+            stop_signal: inspect.config.stop_signal.map(|signal| match signal {
+                serde_json::Value::String(name) => name,
+                other => other.to_string(),
+            }),
+            stop_timeout_secs: inspect.config.stop_timeout,
         }
     }
 }
@@ -133,6 +143,8 @@ impl From<ListEntry> for ContainerInfo {
             ports,
             aliases: Vec::new(),
             oom_killed: false,
+            stop_signal: None,
+            stop_timeout_secs: None,
         }
     }
 }

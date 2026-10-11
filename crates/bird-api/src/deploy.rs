@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use bird_core::{
-    BackupSchedule, Command, CpuLimit, CronJobSpec, DeploymentId, EnvKey, HealthCheck,
-    HealthTimeout, Hostname, ImageRef, MemoryLimit, Name, Port, Replicas,
+    BackupSchedule, Command, CpuLimit, CronJobSpec, DeploymentId, DrainTime, EnvKey, HealthCheck,
+    HealthTimeout, Hostname, ImageRef, KillSignal, KillTimeout, MemoryLimit, Name, Port, Replicas,
 };
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +54,15 @@ pub struct DeployRequest {
     pub backup: Option<BackupSchedule>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub allow_image_change: bool,
+    /// Seconds old machines keep serving requests in flight after traffic moves, 0 to 300; left out, a new service gets 5 and an existing one keeps its setting
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drain: Option<DrainTime>,
+    /// Signal machines get when told to stop; left out, a new service gets SIGTERM and an existing one keeps its setting
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kill_signal: Option<KillSignal>,
+    /// Seconds machines have to exit after the signal before they are killed, 1 to 300; left out, a new service gets 10 and an existing one keeps its setting
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kill_timeout: Option<KillTimeout>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

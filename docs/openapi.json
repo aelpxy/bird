@@ -6238,6 +6238,17 @@
               "$ref": "#/components/schemas/Hostname"
             }
           },
+          "drain": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/DrainTime",
+                "description": "Seconds old machines keep serving requests in flight after traffic moves, 0 to 300; left out, a new service gets 5 and an existing one keeps its setting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "env": {
             "type": "object",
             "additionalProperties": {
@@ -6270,6 +6281,28 @@
           },
           "image": {
             "$ref": "#/components/schemas/ImageRef"
+          },
+          "kill_signal": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KillSignal",
+                "description": "Signal machines get when told to stop; left out, a new service gets SIGTERM and an existing one keeps its setting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kill_timeout": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/KillTimeout",
+                "description": "Seconds machines have to exit after the signal before they are killed, 1 to 300; left out, a new service gets 10 and an existing one keeps its setting"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "memory": {
             "oneOf": [
@@ -6480,6 +6513,12 @@
           }
         }
       },
+      "DrainTime": {
+        "type": "integer",
+        "format": "int32",
+        "description": "How long old machines keep running after traffic moves off them, so requests finish",
+        "minimum": 0
+      },
       "EnvKey": {
         "type": "string"
       },
@@ -6669,6 +6708,24 @@
             "description": "The secret to send as a bearer token"
           }
         }
+      },
+      "KillSignal": {
+        "type": "string",
+        "description": "How a service's machines are told to stop",
+        "enum": [
+          "SIGTERM",
+          "SIGINT",
+          "SIGQUIT",
+          "SIGHUP",
+          "SIGUSR1",
+          "SIGUSR2"
+        ]
+      },
+      "KillTimeout": {
+        "type": "integer",
+        "format": "int32",
+        "description": "How long a machine has to exit after its kill signal before it is killed",
+        "minimum": 0
       },
       "LogEntry": {
         "type": "object",
@@ -7421,6 +7478,10 @@
             "$ref": "#/components/schemas/ServiceState",
             "description": "Stopped services keep their machines stopped until started again"
           },
+          "stop": {
+            "$ref": "#/components/schemas/StopSettings",
+            "description": "How old machines are drained and stopped"
+          },
           "volumes": {
             "type": "array",
             "items": {
@@ -7503,6 +7564,27 @@
           },
           "new": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StopSettings": {
+        "type": "object",
+        "description": "How a service's old machines are stopped; the default is a short drain and SIGTERM",
+        "properties": {
+          "drain": {
+            "$ref": "#/components/schemas/DrainTime",
+            "description": "Seconds old machines keep serving requests in flight after traffic moves, 0 to 300",
+            "default": 5
+          },
+          "kill_signal": {
+            "$ref": "#/components/schemas/KillSignal",
+            "default": "SIGTERM"
+          },
+          "kill_timeout": {
+            "$ref": "#/components/schemas/KillTimeout",
+            "description": "Seconds to exit after the signal before being killed, 1 to 300",
+            "default": 10
           }
         },
         "additionalProperties": false
