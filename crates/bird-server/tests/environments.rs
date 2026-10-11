@@ -94,6 +94,19 @@ async fn environments_are_isolated() {
         "{:?}",
         reference.body
     );
+    let linked = birdd
+        .call(
+            &root,
+            reqwest::Method::PATCH,
+            &format!("{production}/services/probe/variables"),
+            Some(json!({ "set": { "X": "${{only-here.HOSTNAME}}" }, "deploy": false })),
+        )
+        .await;
+    assert_eq!(linked.status, StatusCode::OK, "{:?}", linked.body);
+    let probe = birdd
+        .get(&root, &format!("{production}/services/probe"))
+        .await;
+    assert_eq!(probe.body["references"], json!(["only-here"]));
 
     // an environment with services is not deleted, an empty one takes its network with it
     let refused = birdd

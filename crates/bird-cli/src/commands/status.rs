@@ -224,6 +224,7 @@ mod tests {
                 }],
             }),
             failed_deploy: None,
+            references: Vec::new(),
         }
     }
 

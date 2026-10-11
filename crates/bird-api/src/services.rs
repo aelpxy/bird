@@ -32,6 +32,9 @@ pub struct ServiceSummary {
     /// The newest deployment when it failed; an older active one may still be serving
     #[serde(default)]
     pub failed_deploy: Option<FailedDeploy>,
+    /// Services in the same environment whose variables this one reads
+    #[serde(default)]
+    pub references: Vec<Name>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

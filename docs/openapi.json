@@ -7237,6 +7237,13 @@
           "port": {
             "$ref": "#/components/schemas/Port"
           },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Name"
+            },
+            "description": "Services in the same environment whose variables this one reads"
+          },
           "release": {
             "oneOf": [
               {

@@ -1513,6 +1513,8 @@ export interface components {
             memory: components["schemas"]["MemoryLimit"];
             name: components["schemas"]["Name"];
             port: components["schemas"]["Port"];
+            /** @description Services in the same environment whose variables this one reads */
+            references?: components["schemas"]["Name"][];
             release?: components["schemas"]["Command"] | null;
             replicas: components["schemas"]["Replicas"];
             /** @description Stopped services keep their machines stopped until started again */

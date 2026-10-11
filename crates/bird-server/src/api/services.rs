@@ -1,8 +1,11 @@
+use std::collections::BTreeSet;
+
 use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use bird_api::ErrorBody;
 use bird_api::{DeploymentSummary, FailedDeploy, MachineSummary, ServiceSummary, VolumeSpec};
+use bird_core::reference::referenced_services;
 use bird_core::{DeploymentStatus, EnvironmentId, MachineId, MachineState, Name};
 use bird_store::Store;
 use serde::Deserialize;
@@ -121,6 +124,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         .map(|d| d.hostname)
         .collect();
     let backup_schedule = store.backup_schedule(service.id)?;
+    let references = references(store, &service)?;
     let failed_deploy = store
         .list_deployments(service.id)?
         .into_iter()
@@ -148,6 +152,7 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             backup_schedule,
             deployment: None,
             failed_deploy,
+            references,
         });
     };
     let machines = store
@@ -184,5 +189,16 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             machines,
         }),
         failed_deploy,
+        references,
     })
+}
+
+fn references(store: &Store, service: &bird_core::Service) -> bird_store::Result<Vec<Name>> {
+    let names: BTreeSet<Name> = store
+        .list_variables(service.id)?
+        .iter()
+        .flat_map(|variable| referenced_services(&variable.value))
+        .filter(|name| *name != service.name)
+        .collect();
+    Ok(names.into_iter().collect())
 }
