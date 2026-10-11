@@ -1,12 +1,13 @@
 import { Server } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { eyebrowClass } from '@/components/ui/control-styles'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Table, TableCell, TableRow } from '@/components/ui/table'
 import { bytes, timeAgo } from '@/lib/format'
 import type { Machine, Service } from '@/features/services/api'
 import { machineTones } from '@/features/services/status'
 
-const COLUMNS = ['Machine', 'State', 'CPU', 'Memory', 'Network']
+const LAYOUT = 'sm:grid-cols-[8.5rem_6.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]'
+const COLUMNS = [{ label: 'Machine' }, { label: 'State' }, { label: 'CPU' }, { label: 'Memory' }, { label: 'Network' }]
 
 export function MachinesPanel({ service }: { service: Service }) {
   const machines = service.deployment?.machines ?? []
@@ -20,24 +21,11 @@ export function MachinesPanel({ service }: { service: Service }) {
     )
   }
   return (
-    <div className="overflow-x-auto border border-line bg-surface">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="border-b border-line">
-            {COLUMNS.map((column) => (
-              <th key={column} scope="col" className={`px-3.5 py-2 font-medium whitespace-nowrap ${eyebrowClass}`}>
-                {column}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-line">
-          {machines.map((machine) => (
-            <MachineRow key={machine.id} machine={machine} service={service} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table label="Machines" columns={COLUMNS} layout={LAYOUT}>
+      {machines.map((machine) => (
+        <MachineRow key={machine.id} machine={machine} service={service} />
+      ))}
+    </Table>
   )
 }
 
@@ -45,15 +33,15 @@ function MachineRow({ machine, service }: { machine: Machine; service: Service }
   const stats = machine.stats
   const memoryLimit = service.memory * 1024 * 1024
   return (
-    <tr className="font-mono text-xs whitespace-nowrap">
-      <td className="px-3.5 py-2.5 text-fg-muted" title={machine.id}>
-        {machine.id.slice(0, 13)}
-      </td>
-      <td className="px-3.5 py-2.5">
+    <TableRow layout={LAYOUT} className="font-mono text-xs">
+      <TableCell className="truncate text-fg-muted">
+        <span title={machine.id}>{machine.id.slice(0, 13)}</span>
+      </TableCell>
+      <TableCell>
         <Badge tone={machineTones[machine.state]} dot pulse={machine.state === 'starting'}>
           {machine.state}
         </Badge>
-      </td>
+      </TableCell>
       {stats ? (
         <>
           <Meter
@@ -63,16 +51,18 @@ function MachineRow({ machine, service }: { machine: Machine; service: Service }
             ratio={stats.cpu_millicores / service.cpus}
           />
           <Meter label="Memory" value={bytes(stats.memory_bytes)} limit={bytes(memoryLimit)} ratio={stats.memory_bytes / memoryLimit} />
-          <td className="tabular px-3.5 py-2.5 text-fg">
-            ↓{bytes(stats.net_rx_bytes)} <span className="text-fg-faint">↑{bytes(stats.net_tx_bytes)}</span>
-          </td>
+          <TableCell label="Network" className="tabular text-fg">
+            <span>
+              ↓{bytes(stats.net_rx_bytes)} <span className="text-fg-faint">↑{bytes(stats.net_tx_bytes)}</span>
+            </span>
+          </TableCell>
         </>
       ) : (
-        <td colSpan={3} className="px-3.5 py-2.5 text-fg-faint">
+        <TableCell className="text-fg-faint max-sm:col-span-2 sm:col-span-3">
           {machine.state === 'running' ? 'Measuring…' : `Updated ${timeAgo(machine.updated_at)}`}
-        </td>
+        </TableCell>
       )}
-    </tr>
+    </TableRow>
   )
 }
 
@@ -80,9 +70,9 @@ function Meter({ label, value, limit, ratio }: { label: string; value: string; l
   const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)))
   const color = percent >= 90 ? 'bg-bad' : percent >= 70 ? 'bg-warn' : 'bg-fg'
   return (
-    <td className="tabular px-3.5 py-2.5">
+    <TableCell label={label} className="tabular">
       <div className="flex items-center gap-3">
-        <span className="text-fg">
+        <span className="whitespace-nowrap text-fg">
           {value}
           <span className="text-fg-faint"> / {limit}</span>
         </span>
@@ -99,6 +89,6 @@ function Meter({ label, value, limit, ratio }: { label: string; value: string; l
           <div className={`h-full ${color} transition-[width] duration-500`} style={{ width: `${percent}%` }} />
         </div>
       </div>
-    </td>
+    </TableCell>
   )
 }

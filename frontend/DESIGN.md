@@ -63,6 +63,7 @@ classes is a sign a primitive is missing.
 | ----------------------------------------- | ------------------------------------------------------------ |
 | A box                                     | `Panel` (`tone="danger"` or `"notice"` for warnings)         |
 | Rows of things                            | `List`, `ListItem`, `ListText`                               |
+| Rows compared across columns              | `Table`, `TableRow`, `TableCell` (`tableRowClass` for links) |
 | Page and section titles                   | `PageHeader` (with `eyebrow`), `Section`                     |
 | Icon-only action                          | `IconButton` with a `label`                                  |
 | One of a few choices that need explaining | `ChoiceGroup` and `ChoiceCard`                               |

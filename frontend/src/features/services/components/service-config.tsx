@@ -48,7 +48,7 @@ export function ServiceConfig({ scope, service }: { scope: Scope; service: Servi
   const tiles = [
     { label: 'Machines', value: String(service.replicas) },
     { label: 'Memory', value: mebibytes(service.memory) },
-    { label: 'CPU', value: `${Number((service.cpus / 1000).toFixed(2))}` , unit: service.cpus === 1000 ? 'core' : 'cores' },
+    { label: 'CPU', value: `${Number((service.cpus / 1000).toFixed(2))}`, unit: service.cpus === 1000 ? 'core' : 'cores' },
   ]
   return (
     <div className="divide-y divide-line border border-line bg-surface">
