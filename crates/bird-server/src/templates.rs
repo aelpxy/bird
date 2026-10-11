@@ -4,9 +4,15 @@ use bird_core::{EnvKey, ImageRef, Name};
 use crate::{Error, Result};
 
 const SERVICE_PLACEHOLDER: &str = "{service}";
-const BUILT_IN: [&str; 2] = [
+const BUILT_IN: [&str; 8] = [
     include_str!("../templates/postgres.toml"),
+    include_str!("../templates/pgvector.toml"),
+    include_str!("../templates/mysql.toml"),
+    include_str!("../templates/mariadb.toml"),
+    include_str!("../templates/clickhouse.toml"),
     include_str!("../templates/valkey.toml"),
+    include_str!("../templates/dragonfly.toml"),
+    include_str!("../templates/meilisearch.toml"),
 ];
 
 // a bird.toml manifest plus what the template list shows about it
@@ -137,7 +143,7 @@ mod tests {
     #[test]
     fn unknown_templates_are_reported() {
         assert!(matches!(
-            find(&"mysql".parse().unwrap()),
+            find(&"oracle".parse().unwrap()),
             Err(Error::TemplateNotFound(_))
         ));
     }

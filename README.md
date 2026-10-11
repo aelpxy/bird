@@ -180,12 +180,23 @@ bird env unset OLD_KEY
 ### Templates
 
 ```sh
-bird templates                         # postgres, valkey
+bird templates                         # every template below
 bird add postgres
 bird env set -s app DATABASE_URL='${{postgres.DATABASE_URL}}'
 ```
 
 A template gives you a ready service with a volume, a generated password and a connection string.
+
+| Template | What | Connect with |
+| --- | --- | --- |
+| `postgres` | PostgreSQL 18 | `DATABASE_URL` |
+| `pgvector` | PostgreSQL 18 with pgvector; run `CREATE EXTENSION vector` once per database | `DATABASE_URL` |
+| `mysql` | MySQL 8.4 LTS | `DATABASE_URL` |
+| `mariadb` | MariaDB 11.8 LTS | `DATABASE_URL` |
+| `clickhouse` | ClickHouse 25.8 LTS over HTTP | `CLICKHOUSE_URL` |
+| `valkey` | Valkey 9.2, Redis compatible | `VALKEY_URL` |
+| `dragonfly` | Dragonfly 2, Redis compatible | `DRAGONFLY_URL` |
+| `meilisearch` | Meilisearch 1, search | `MEILI_URL` and `MEILI_MASTER_KEY` |
 
 ### Projects and environments
 

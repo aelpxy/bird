@@ -1,0 +1,15 @@
+name = "dragonfly"
+description = "Dragonfly, a Redis and Valkey compatible in-memory store, with a password and snapshots on a persistent volume"
+image = "ghcr.io/dragonflydb/dragonfly:v2.0.2"
+port = 6379
+health = "tcp"
+connection = "DRAGONFLY_URL"
+command = ["sh", "-c", "exec dragonfly --logtostderr --requirepass \"$DRAGONFLY_PASSWORD\" --dir /data"]
+
+[[volumes]]
+name = "data"
+path = "/data"
+
+[env]
+DRAGONFLY_PASSWORD = "${{secret}}"
+DRAGONFLY_URL = "redis://default:${{DRAGONFLY_PASSWORD}}@{service}.internal:6379"

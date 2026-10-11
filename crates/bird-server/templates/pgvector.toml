@@ -1,0 +1,16 @@
+name = "pgvector"
+description = "PostgreSQL 18 with the pgvector extension for embeddings, a persistent volume and a generated password; run CREATE EXTENSION vector once per database"
+image = "docker.io/pgvector/pgvector:pg18"
+port = 5432
+health = "tcp"
+connection = "DATABASE_URL"
+
+[[volumes]]
+name = "data"
+path = "/var/lib/postgresql"
+
+[env]
+POSTGRES_USER = "postgres"
+POSTGRES_DB = "postgres"
+POSTGRES_PASSWORD = "${{secret}}"
+DATABASE_URL = "postgresql://${{POSTGRES_USER}}:${{POSTGRES_PASSWORD}}@{service}.internal:5432/${{POSTGRES_DB}}"

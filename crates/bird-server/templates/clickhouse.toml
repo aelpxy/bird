@@ -1,0 +1,19 @@
+name = "clickhouse"
+description = "ClickHouse 25.8 LTS for analytics over HTTP on 8123, with an app database and user, a generated password and a persistent volume"
+image = "docker.io/clickhouse/clickhouse-server:25.8"
+port = 8123
+health = "/ping"
+health_timeout = "2m"
+memory = "2g"
+connection = "CLICKHOUSE_URL"
+
+[[volumes]]
+name = "data"
+path = "/var/lib/clickhouse"
+
+[env]
+CLICKHOUSE_DB = "app"
+CLICKHOUSE_USER = "app"
+CLICKHOUSE_PASSWORD = "${{secret}}"
+CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT = "1"
+CLICKHOUSE_URL = "http://${{CLICKHOUSE_USER}}:${{CLICKHOUSE_PASSWORD}}@{service}.internal:8123/${{CLICKHOUSE_DB}}"

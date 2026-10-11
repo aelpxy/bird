@@ -1,0 +1,16 @@
+name = "meilisearch"
+description = "Meilisearch 1 search engine in production mode with a generated master key and a persistent volume"
+image = "docker.io/getmeili/meilisearch:v1"
+port = 7700
+health = "/health"
+connection = "MEILI_URL"
+
+[[volumes]]
+name = "data"
+path = "/meili_data"
+
+[env]
+MEILI_ENV = "production"
+MEILI_NO_ANALYTICS = "true"
+MEILI_MASTER_KEY = "${{secret}}"
+MEILI_URL = "http://{service}.internal:7700"

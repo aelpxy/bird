@@ -1,0 +1,18 @@
+name = "mariadb"
+description = "MariaDB 11.8 LTS with an app database and user, generated passwords and a persistent volume"
+image = "docker.io/library/mariadb:11.8"
+port = 3306
+health = "tcp"
+health_timeout = "3m"
+connection = "DATABASE_URL"
+
+[[volumes]]
+name = "data"
+path = "/var/lib/mysql"
+
+[env]
+MARIADB_DATABASE = "app"
+MARIADB_USER = "app"
+MARIADB_PASSWORD = "${{secret}}"
+MARIADB_ROOT_PASSWORD = "${{secret}}"
+DATABASE_URL = "mysql://${{MARIADB_USER}}:${{MARIADB_PASSWORD}}@{service}.internal:3306/${{MARIADB_DATABASE}}"
