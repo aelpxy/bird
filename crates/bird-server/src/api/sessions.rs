@@ -22,7 +22,7 @@ pub(crate) struct SessionPath {
 }
 
 /// List where a user is signed in: your own, or anyone's for admins
-#[utoipa::path(get, path = "/v1/users/{user}/sessions", tag = "users", params(("user" = String, Path, description = "User name")), responses((status = 200, description = "Sessions that have not expired, newest use first", body = Vec<SessionSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_sessions", path = "/v1/users/{user}/sessions", tag = "users", params(("user" = String, Path, description = "User name")), responses((status = 200, description = "Sessions that have not expired, newest use first", body = Vec<SessionSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -53,7 +53,7 @@ pub(crate) async fn list(
 }
 
 /// Sign a session out: your own, or anyone's for admins
-#[utoipa::path(delete, path = "/v1/users/{user}/sessions/{id}", tag = "users", params(("user" = String, Path, description = "User name"), ("id" = String, Path, description = "Session id")), responses((status = 204, description = "Signed out"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_session", path = "/v1/users/{user}/sessions/{id}", tag = "users", params(("user" = String, Path, description = "User name"), ("id" = String, Path, description = "Session id")), responses((status = 204, description = "Signed out"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,

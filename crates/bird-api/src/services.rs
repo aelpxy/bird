@@ -1,6 +1,6 @@
 use bird_core::{
-    BackupSchedule, CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout, Hostname,
-    ImageRef, MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
+    BackupSchedule, Command, CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout,
+    Hostname, ImageRef, MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +19,12 @@ pub struct ServiceSummary {
     pub cpus: CpuLimit,
     pub health: HealthCheck,
     pub health_timeout: HealthTimeout,
+    /// Command the machines run instead of the image's own; left out, the image's
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<Command>,
+    /// Runs once per deploy before new machines start
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<Command>,
     pub domains: Vec<Hostname>,
     pub volumes: Vec<VolumeSpec>,
     pub backup_schedule: Option<BackupSchedule>,

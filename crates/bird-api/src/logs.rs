@@ -15,4 +15,7 @@ pub struct LogEntry {
     pub machine: MachineId,
     pub stream: LogStream,
     pub text: String,
+    /// When podman recorded the line, in unix milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<i64>,
 }

@@ -25,7 +25,7 @@ pub(crate) struct EnvironmentPath {
 }
 
 /// List the projects of your orgs, or every project for server admins
-#[utoipa::path(get, path = "/v1/projects", tag = "projects", responses((status = 200, description = "Projects with their org and environments", body = Vec<ProjectSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_projects", path = "/v1/projects", tag = "projects", responses((status = 200, description = "Projects with their org and environments", body = Vec<ProjectSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -55,7 +55,7 @@ pub(crate) async fn list(
 }
 
 /// Create a project with a `production` environment, for the org's admins
-#[utoipa::path(post, path = "/v1/projects", tag = "projects", request_body = CreateProject, responses((status = 201, description = "Project created", body = ProjectSummary), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "create_project", path = "/v1/projects", tag = "projects", request_body = CreateProject, responses((status = 201, description = "Project created", body = ProjectSummary), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -77,7 +77,7 @@ pub(crate) async fn create(
 }
 
 /// Delete a project whose environments have no services or backups left, for the org's admins
-#[utoipa::path(delete, path = "/v1/projects/{project}", tag = "projects", params(("project" = String, Path, description = "Project name")), responses((status = 204, description = "Project deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_project", path = "/v1/projects/{project}", tag = "projects", params(("project" = String, Path, description = "Project name")), responses((status = 204, description = "Project deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,

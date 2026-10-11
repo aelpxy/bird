@@ -135,7 +135,7 @@
           "orgs"
         ],
         "summary": "List your orgs, or every org for server admins",
-        "operationId": "list",
+        "operationId": "list_orgs",
         "responses": {
           "200": {
             "description": "Orgs with your role in each",
@@ -167,7 +167,7 @@
           "orgs"
         ],
         "summary": "Create an org, for server admins; a user who creates one becomes its owner",
-        "operationId": "create",
+        "operationId": "create_org",
         "requestBody": {
           "content": {
             "application/json": {
@@ -238,7 +238,7 @@
           "orgs"
         ],
         "summary": "Delete an org that owns no projects, for its owners",
-        "operationId": "remove",
+        "operationId": "remove_org",
         "parameters": [
           {
             "name": "org",
@@ -524,7 +524,7 @@
           "projects"
         ],
         "summary": "List the projects of your orgs, or every project for server admins",
-        "operationId": "list",
+        "operationId": "list_projects",
         "responses": {
           "200": {
             "description": "Projects with their org and environments",
@@ -556,7 +556,7 @@
           "projects"
         ],
         "summary": "Create a project with a `production` environment, for the org's admins",
-        "operationId": "create",
+        "operationId": "create_project",
         "requestBody": {
           "content": {
             "application/json": {
@@ -637,7 +637,7 @@
           "projects"
         ],
         "summary": "Delete a project whose environments have no services or backups left, for the org's admins",
-        "operationId": "remove",
+        "operationId": "remove_project",
         "parameters": [
           {
             "name": "project",
@@ -862,13 +862,77 @@
         }
       }
     },
+    "/v1/projects/{project}/environments/{environment}/backups": {
+      "get": {
+        "tags": [
+          "backups"
+        ],
+        "summary": "List every backup in an environment, newest first, also of services removed since",
+        "operationId": "list_environment_backups",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backups of every service, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackupInfo"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or environment not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{project}/environments/{environment}/deploy": {
       "post": {
         "tags": [
           "deployments"
         ],
         "summary": "Deploy an image, creating the service on first deploy",
-        "operationId": "create",
+        "operationId": "deploy",
         "parameters": [
           {
             "name": "project",
@@ -959,7 +1023,7 @@
           "services"
         ],
         "summary": "List services",
-        "operationId": "list",
+        "operationId": "list_services",
         "parameters": [
           {
             "name": "project",
@@ -1013,7 +1077,7 @@
           "services"
         ],
         "summary": "Show one service",
-        "operationId": "get",
+        "operationId": "get_service",
         "parameters": [
           {
             "name": "project",
@@ -1090,7 +1154,7 @@
           "services"
         ],
         "summary": "Remove a service and its machines",
-        "operationId": "remove",
+        "operationId": "remove_service",
         "parameters": [
           {
             "name": "project",
@@ -1172,7 +1236,7 @@
           "backups"
         ],
         "summary": "List backups of a service, newest first",
-        "operationId": "list",
+        "operationId": "list_backups",
         "parameters": [
           {
             "name": "project",
@@ -1233,7 +1297,7 @@
           "backups"
         ],
         "summary": "Back up a service's volumes",
-        "operationId": "create",
+        "operationId": "create_backup",
         "parameters": [
           {
             "name": "project",
@@ -1464,7 +1528,7 @@
           "backups"
         ],
         "summary": "Delete a backup and its archives",
-        "operationId": "remove",
+        "operationId": "remove_backup",
         "parameters": [
           {
             "name": "project",
@@ -1635,7 +1699,7 @@
           "builds"
         ],
         "summary": "Build an image from source",
-        "operationId": "create",
+        "operationId": "create_build",
         "parameters": [
           {
             "name": "project",
@@ -1755,7 +1819,7 @@
           "cron"
         ],
         "summary": "List a service's cron jobs with their next and last run",
-        "operationId": "list",
+        "operationId": "list_cron_jobs",
         "parameters": [
           {
             "name": "project",
@@ -2007,7 +2071,7 @@
           "cron"
         ],
         "summary": "Show a cron run with the end of its output",
-        "operationId": "run",
+        "operationId": "get_cron_run",
         "parameters": [
           {
             "name": "project",
@@ -2095,7 +2159,7 @@
           "deployments"
         ],
         "summary": "List deployments",
-        "operationId": "list",
+        "operationId": "list_deployments",
         "parameters": [
           {
             "name": "project",
@@ -2168,7 +2232,7 @@
           "domains"
         ],
         "summary": "List domains of a service",
-        "operationId": "list",
+        "operationId": "list_domains",
         "parameters": [
           {
             "name": "project",
@@ -2342,7 +2406,7 @@
           "domains"
         ],
         "summary": "Stop routing a domain to a service",
-        "operationId": "remove",
+        "operationId": "remove_domain",
         "parameters": [
           {
             "name": "project",
@@ -2414,7 +2478,7 @@
           "commands"
         ],
         "summary": "Run a command in a running machine",
-        "operationId": "exec",
+        "operationId": "exec_command",
         "parameters": [
           {
             "name": "project",
@@ -2615,7 +2679,7 @@
           "commands"
         ],
         "summary": "Open an interactive terminal in a running machine",
-        "operationId": "exec",
+        "operationId": "open_exec_terminal",
         "parameters": [
           {
             "name": "project",
@@ -3031,7 +3095,7 @@
           "commands"
         ],
         "summary": "Run a command in a new container from the service's image",
-        "operationId": "run",
+        "operationId": "run_command",
         "parameters": [
           {
             "name": "project",
@@ -3232,7 +3296,7 @@
           "commands"
         ],
         "summary": "Open an interactive terminal in a new container from the service's image",
-        "operationId": "run",
+        "operationId": "open_run_terminal",
         "parameters": [
           {
             "name": "project",
@@ -3365,7 +3429,7 @@
           "services"
         ],
         "summary": "Set the number of machines",
-        "operationId": "update",
+        "operationId": "scale_service",
         "parameters": [
           {
             "name": "project",
@@ -3628,7 +3692,7 @@
           "variables"
         ],
         "summary": "List variable names",
-        "operationId": "list",
+        "operationId": "list_variables",
         "parameters": [
           {
             "name": "project",
@@ -3699,7 +3763,7 @@
           "variables"
         ],
         "summary": "Set or unset variables",
-        "operationId": "update",
+        "operationId": "update_variables",
         "parameters": [
           {
             "name": "project",
@@ -3809,7 +3873,7 @@
           "variables"
         ],
         "summary": "Reveal one variable",
-        "operationId": "get",
+        "operationId": "get_variable",
         "parameters": [
           {
             "name": "project",
@@ -3888,7 +3952,7 @@
           "templates"
         ],
         "summary": "Create a service from a template",
-        "operationId": "deploy",
+        "operationId": "deploy_template",
         "parameters": [
           {
             "name": "project",
@@ -3988,7 +4052,7 @@
           "registries"
         ],
         "summary": "List registries bird can pull private images from",
-        "operationId": "list",
+        "operationId": "list_registries",
         "responses": {
           "200": {
             "description": "Registries with stored credentials; passwords are never returned",
@@ -4022,7 +4086,7 @@
           "registries"
         ],
         "summary": "Store credentials for a registry",
-        "operationId": "login",
+        "operationId": "log_in_to_registry",
         "parameters": [
           {
             "name": "host",
@@ -4075,7 +4139,7 @@
           "registries"
         ],
         "summary": "Forget the credentials of a registry",
-        "operationId": "logout",
+        "operationId": "log_out_of_registry",
         "parameters": [
           {
             "name": "host",
@@ -4120,7 +4184,7 @@
           "templates"
         ],
         "summary": "List built-in templates",
-        "operationId": "list",
+        "operationId": "list_templates",
         "responses": {
           "200": {
             "description": "Templates that can create a service",
@@ -4154,7 +4218,7 @@
           "users"
         ],
         "summary": "List users, for admins",
-        "operationId": "list",
+        "operationId": "list_users",
         "responses": {
           "200": {
             "description": "Every user",
@@ -4196,7 +4260,7 @@
           "users"
         ],
         "summary": "Create a user and a first token for them, for admins",
-        "operationId": "create",
+        "operationId": "create_user",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4267,7 +4331,7 @@
           "users"
         ],
         "summary": "Delete a user and their tokens, for admins",
-        "operationId": "remove",
+        "operationId": "remove_user",
         "parameters": [
           {
             "name": "user",
@@ -4397,7 +4461,7 @@
           "users"
         ],
         "summary": "List where a user is signed in: your own, or anyone's for admins",
-        "operationId": "list",
+        "operationId": "list_sessions",
         "parameters": [
           {
             "name": "user",
@@ -4462,7 +4526,7 @@
           "users"
         ],
         "summary": "Sign a session out: your own, or anyone's for admins",
-        "operationId": "remove",
+        "operationId": "remove_session",
         "parameters": [
           {
             "name": "user",
@@ -5816,6 +5880,14 @@
           "text"
         ],
         "properties": {
+          "at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When podman recorded the line, in unix milliseconds"
+          },
           "machine": {
             "$ref": "#/components/schemas/MachineId"
           },
@@ -6265,6 +6337,17 @@
               }
             ]
           },
+          "command": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Command",
+                "description": "Command the machines run instead of the image's own; left out, the image's"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cpus": {
             "$ref": "#/components/schemas/CpuLimit"
           },
@@ -6312,6 +6395,17 @@
           },
           "port": {
             "$ref": "#/components/schemas/Port"
+          },
+          "release": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Command",
+                "description": "Runs once per deploy before new machines start"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "replicas": {
             "$ref": "#/components/schemas/Replicas"

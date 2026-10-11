@@ -9,7 +9,7 @@ use crate::state::AppState;
 use crate::{Error, Result, deploy, templates};
 
 /// List built-in templates
-#[utoipa::path(get, path = "/v1/templates", tag = "templates", responses((status = 200, description = "Templates that can create a service", body = Vec<TemplateSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_templates", path = "/v1/templates", tag = "templates", responses((status = 200, description = "Templates that can create a service", body = Vec<TemplateSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list() -> Result<Json<Vec<TemplateSummary>>> {
     let templates = templates::built_in()?;
     Ok(Json(
@@ -23,7 +23,7 @@ pub(crate) struct TemplatePath {
 }
 
 /// Create a service from a template
-#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/templates/{template}/deploy", tag = "templates", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("template" = String, Path, description = "Template name, like postgres")), request_body = CreateFromTemplate, responses((status = 200, description = "Service created and running", body = TemplateDeployResponse), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Unknown template", body = ErrorBody), (status = 409, description = "A service with that name already exists", body = ErrorBody), (status = 502, description = "The service did not become healthy", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "deploy_template", path = "/v1/projects/{project}/environments/{environment}/templates/{template}/deploy", tag = "templates", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("template" = String, Path, description = "Template name, like postgres")), request_body = CreateFromTemplate, responses((status = 200, description = "Service created and running", body = TemplateDeployResponse), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Unknown template", body = ErrorBody), (status = 409, description = "A service with that name already exists", body = ErrorBody), (status = 502, description = "The service did not become healthy", body = ErrorBody)))]
 pub(crate) async fn deploy(
     State(state): State<AppState>,
     Scope(environment_id): Scope,

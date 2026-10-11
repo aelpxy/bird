@@ -9,7 +9,7 @@ use crate::state::AppState;
 use crate::{Error, Result};
 
 /// Set the number of machines
-#[utoipa::path(put, path = "/v1/projects/{project}/environments/{environment}/services/{name}/scale", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = ScaleRequest, responses((status = 202, description = "Replica count saved, machines converge in the background"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 409, description = "Services with volumes run a single machine", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(put, operation_id = "scale_service", path = "/v1/projects/{project}/environments/{environment}/services/{name}/scale", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = ScaleRequest, responses((status = 202, description = "Replica count saved, machines converge in the background"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 409, description = "Services with volumes run a single machine", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn update(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

@@ -12,7 +12,7 @@ use crate::{Error, Result};
 const REFUSAL: &str = "only server admins can manage registry credentials";
 
 /// List registries bird can pull private images from
-#[utoipa::path(get, path = "/v1/registries", tag = "registries", responses((status = 200, description = "Registries with stored credentials; passwords are never returned", body = Vec<RegistrySummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_registries", path = "/v1/registries", tag = "registries", responses((status = 200, description = "Registries with stored credentials; passwords are never returned", body = Vec<RegistrySummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<RegistrySummary>>> {
     let registries = state.db.call(|store| store.list_registries()).await?;
     Ok(Json(
@@ -28,7 +28,7 @@ pub(crate) async fn list(State(state): State<AppState>) -> Result<Json<Vec<Regis
 }
 
 /// Store credentials for a registry
-#[utoipa::path(put, path = "/v1/registries/{host}", tag = "registries", params(("host" = String, Path, description = "Registry host, like ghcr.io")), request_body = RegistryLogin, responses((status = 204, description = "Credentials stored, used for every pull from this host"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(put, operation_id = "log_in_to_registry", path = "/v1/registries/{host}", tag = "registries", params(("host" = String, Path, description = "Registry host, like ghcr.io")), request_body = RegistryLogin, responses((status = 204, description = "Credentials stored, used for every pull from this host"), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn login(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -54,7 +54,7 @@ pub(crate) async fn login(
 }
 
 /// Forget the credentials of a registry
-#[utoipa::path(delete, path = "/v1/registries/{host}", tag = "registries", params(("host" = String, Path, description = "Registry host, like ghcr.io")), responses((status = 204, description = "Credentials removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "No credentials for this host", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "log_out_of_registry", path = "/v1/registries/{host}", tag = "registries", params(("host" = String, Path, description = "Registry host, like ghcr.io")), responses((status = 204, description = "Credentials removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "No credentials for this host", body = ErrorBody)))]
 pub(crate) async fn logout(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,

@@ -13,7 +13,7 @@ use crate::{Error, Result, cron};
 const LISTED_RUNS: u32 = 50;
 
 /// List a service's cron jobs with their next and last run
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/cron", tag = "cron", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Jobs by name; times are unix seconds and schedules are UTC", body = Vec<CronJobSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_cron_jobs", path = "/v1/projects/{project}/environments/{environment}/services/{name}/cron", tag = "cron", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Jobs by name; times are unix seconds and schedules are UTC", body = Vec<CronJobSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -52,7 +52,7 @@ pub(crate) async fn trigger(
 }
 
 /// Show a cron run with the end of its output
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/cron/{job}/runs/{id}", tag = "cron", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("job" = String, Path, description = "Job name"), ("id" = String, Path, description = "Run id")), responses((status = 200, description = "The run; output is the last 64 KiB, or why a skipped run did not start", body = CronRunDetail), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service, job or run not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "get_cron_run", path = "/v1/projects/{project}/environments/{environment}/services/{name}/cron/{job}/runs/{id}", tag = "cron", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("job" = String, Path, description = "Job name"), ("id" = String, Path, description = "Run id")), responses((status = 200, description = "The run; output is the last 64 KiB, or why a skipped run did not start", body = CronRunDetail), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service, job or run not found", body = ErrorBody)))]
 pub(crate) async fn run(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

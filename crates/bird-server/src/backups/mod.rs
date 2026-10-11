@@ -29,6 +29,16 @@ pub(crate) async fn list(
         .await
 }
 
+pub(crate) async fn list_environment(
+    state: &AppState,
+    environment_id: EnvironmentId,
+) -> Result<Vec<Backup>> {
+    state
+        .db
+        .call(move |store| store.list_environment_backups(environment_id))
+        .await
+}
+
 pub(crate) async fn remove(
     state: &AppState,
     environment: EnvironmentId,

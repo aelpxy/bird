@@ -39,7 +39,7 @@ pub(crate) async fn whoami(Extension(principal): Extension<Principal>) -> Json<W
 }
 
 /// List users, for admins
-#[utoipa::path(get, path = "/v1/users", tag = "users", responses((status = 200, description = "Every user", body = Vec<UserSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_users", path = "/v1/users", tag = "users", responses((status = 200, description = "Every user", body = Vec<UserSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -55,7 +55,7 @@ pub(crate) async fn list(
 }
 
 /// Create a user and a first token for them, for admins
-#[utoipa::path(post, path = "/v1/users", tag = "users", request_body = CreateUser, responses((status = 201, description = "The user and their first token, shown only this once", body = CreatedUser), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "create_user", path = "/v1/users", tag = "users", request_body = CreateUser, responses((status = 201, description = "The user and their first token, shown only this once", body = CreatedUser), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -71,7 +71,7 @@ pub(crate) async fn create(
 }
 
 /// Delete a user and their tokens, for admins
-#[utoipa::path(delete, path = "/v1/users/{user}", tag = "users", params(("user" = String, Path, description = "User name")), responses((status = 204, description = "User deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_user", path = "/v1/users/{user}", tag = "users", params(("user" = String, Path, description = "User name")), responses((status = 204, description = "User deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,

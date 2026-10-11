@@ -77,5 +77,11 @@ async fn restores_volume_data() {
     assert_eq!(purged.status, StatusCode::NO_CONTENT);
     let kept = birdd.get(&root, &format!("{service}/backups")).await.body;
     assert_eq!(kept.as_array().unwrap().len(), 3);
+    // the environment lists them too, so they can be found without knowing the service
+    let everything = birdd
+        .get(&root, &format!("{production}/backups"))
+        .await
+        .body;
+    assert_eq!(everything, kept);
     birdd.stop().await;
 }

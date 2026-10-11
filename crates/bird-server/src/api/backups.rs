@@ -5,12 +5,12 @@ use bird_api::{BackupInfo, BackupVolumeInfo, ErrorBody, RestoreRequest, RestoreR
 use bird_core::{Backup, BackupId, BackupSchedule};
 use serde::Deserialize;
 
-use super::scope::ServiceScope;
+use super::scope::{Scope, ServiceScope};
 use crate::state::AppState;
 use crate::{Result, backups};
 
 /// Back up a service's volumes
-#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 201, description = "Every volume copied while the machines were paused", body = BackupInfo), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody), (status = 409, description = "The service has no volumes, or another operation is in progress", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "create_backup", path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 201, description = "Every volume copied while the machines were paused", body = BackupInfo), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service not found", body = ErrorBody), (status = 409, description = "The service has no volumes, or another operation is in progress", body = ErrorBody)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -21,12 +21,22 @@ pub(crate) async fn create(
 }
 
 /// List backups of a service, newest first
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name, also of a removed service")), responses((status = 200, description = "Backups, newest first", body = Vec<BackupInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_backups", path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name, also of a removed service")), responses((status = 200, description = "Backups, newest first", body = Vec<BackupInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
 ) -> Result<Json<Vec<BackupInfo>>> {
     let backups = backups::list(&state, environment, &name).await?;
+    Ok(Json(backups.into_iter().map(info).collect()))
+}
+
+/// List every backup in an environment, newest first, also of services removed since
+#[utoipa::path(get, operation_id = "list_environment_backups", path = "/v1/projects/{project}/environments/{environment}/backups", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name")), responses((status = 200, description = "Backups of every service, newest first", body = Vec<BackupInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Project or environment not found", body = ErrorBody)))]
+pub(crate) async fn list_environment(
+    State(state): State<AppState>,
+    Scope(environment): Scope,
+) -> Result<Json<Vec<BackupInfo>>> {
+    let backups = backups::list_environment(&state, environment).await?;
     Ok(Json(backups.into_iter().map(info).collect()))
 }
 
@@ -49,7 +59,7 @@ pub(crate) async fn restore(
 }
 
 /// Delete a backup and its archives
-#[utoipa::path(delete, path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups/{id}", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("id" = String, Path, description = "Backup id")), responses((status = 204, description = "Backup deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Backup not found", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_backup", path = "/v1/projects/{project}/environments/{environment}/services/{name}/backups/{id}", tag = "backups", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("id" = String, Path, description = "Backup id")), responses((status = 204, description = "Backup deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Backup not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

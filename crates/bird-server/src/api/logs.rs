@@ -210,5 +210,6 @@ fn entry(machine: MachineId, line: LogLine) -> LogEntry {
             bird_podman::LogStream::Stderr => LogStream::Stderr,
         },
         text: line.text,
+        at: line.at,
     }
 }

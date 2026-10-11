@@ -12,7 +12,7 @@ use crate::state::AppState;
 use crate::{Result, deploy, stats};
 
 /// List services
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name")), responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_services", path = "/v1/projects/{project}/environments/{environment}/services", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name")), responses((status = 200, description = "Services in the default environment", body = Vec<ServiceSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Scope(environment_id): Scope,
@@ -39,7 +39,7 @@ pub(crate) struct GetQuery {
 }
 
 /// Show one service
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), GetQuery), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "get_service", path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), GetQuery), responses((status = 200, description = "The service, its active deployment and machines", body = ServiceSummary), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn get(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -90,7 +90,7 @@ pub(crate) struct RemoveQuery {
 }
 
 /// Remove a service and its machines
-#[utoipa::path(delete, path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), RemoveQuery), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_service", path = "/v1/projects/{project}/environments/{environment}/services/{name}", tag = "services", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), RemoveQuery), responses((status = 204, description = "Service and its machines removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -140,6 +140,8 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             cpus: service.cpus,
             health: service.health,
             health_timeout: service.health_timeout,
+            command: service.command,
+            release: service.release,
             domains,
             volumes,
             backup_schedule,
@@ -168,6 +170,8 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
         cpus: service.cpus,
         health: service.health,
         health_timeout: service.health_timeout,
+        command: service.command,
+        release: service.release,
         domains,
         volumes,
         backup_schedule,

@@ -76,6 +76,18 @@ impl Store {
         .collect()
     }
 
+    // every backup in an environment, also of services removed since
+    pub fn list_environment_backups(&self, environment_id: EnvironmentId) -> Result<Vec<Backup>> {
+        self.query_all(
+            &format!("{BACKUP_COLUMNS} WHERE environment_id = ?1 ORDER BY id DESC"),
+            [environment_id.to_string()],
+            rows::backup,
+        )?
+        .into_iter()
+        .map(|backup| self.with_volumes(backup))
+        .collect()
+    }
+
     pub fn delete_backup(&self, id: BackupId) -> Result<()> {
         let changed = self.execute("DELETE FROM backups WHERE id = ?1", [id.to_string()])?;
         expect_changed(changed, "backup")
@@ -149,6 +161,12 @@ mod tests {
         let (mut store, service) = setup();
         let kept = store.create_backup(backup(&service)).unwrap();
         store.delete_service(service.id).unwrap();
-        assert_eq!(store.backup(kept.id).unwrap(), Some(kept));
+        assert_eq!(store.backup(kept.id).unwrap(), Some(kept.clone()));
+        assert_eq!(
+            store
+                .list_environment_backups(service.environment_id)
+                .unwrap(),
+            vec![kept]
+        );
     }
 }

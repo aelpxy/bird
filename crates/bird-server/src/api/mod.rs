@@ -118,6 +118,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(templates::list))
         .routes(routes!(templates::deploy))
         .routes(routes!(backups::create, backups::list))
+        .routes(routes!(backups::list_environment))
         .routes(routes!(backups::restore))
         .routes(routes!(backups::remove))
         .routes(routes!(backups::set_schedule, backups::clear_schedule))

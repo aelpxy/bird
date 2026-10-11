@@ -12,7 +12,7 @@ use crate::state::AppState;
 use crate::{Error, Result, deploy, secrets};
 
 /// List variable names
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_variables", path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Variable names; values are never returned", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -22,7 +22,7 @@ pub(crate) async fn list(
 }
 
 /// Reveal one variable
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables/{key}", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("key" = String, Path, description = "Variable name")), responses((status = 200, description = "The stored value and what the running deployment received", body = VariableValue), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or variable not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "get_variable", path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables/{key}", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("key" = String, Path, description = "Variable name")), responses((status = 200, description = "The stored value and what the running deployment received", body = VariableValue), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or variable not found", body = ErrorBody)))]
 pub(crate) async fn get(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -55,7 +55,7 @@ pub(crate) async fn get(
 }
 
 /// Set or unset variables
-#[utoipa::path(patch, path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = UpdateVariables, responses((status = 200, description = "Variables updated, redeployed unless deploy is false", body = VariablesResponse), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
+#[utoipa::path(patch, operation_id = "update_variables", path = "/v1/projects/{project}/environments/{environment}/services/{name}/variables", tag = "variables", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = UpdateVariables, responses((status = 200, description = "Variables updated, redeployed unless deploy is false", body = VariablesResponse), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody), (status = 502, description = "The app did not become healthy; includes its last log lines", body = ErrorBody)))]
 pub(crate) async fn update(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

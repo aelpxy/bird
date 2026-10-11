@@ -12,7 +12,7 @@ use crate::state::AppState;
 use crate::{Error, Result, routing};
 
 /// List domains of a service
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Domains routed to the service", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_domains", path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Domains routed to the service", body = Vec<String>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -48,7 +48,7 @@ pub(crate) async fn add(
 }
 
 /// Stop routing a domain to a service
-#[utoipa::path(delete, path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains/{hostname}", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("hostname" = String, Path, description = "Domain to remove")), responses((status = 204, description = "Domain removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_domain", path = "/v1/projects/{project}/environments/{environment}/services/{name}/domains/{hostname}", tag = "domains", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name"), ("hostname" = String, Path, description = "Domain to remove")), responses((status = 204, description = "Domain removed"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

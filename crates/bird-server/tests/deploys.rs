@@ -32,6 +32,8 @@ async fn failed_deploys_keep_serving_and_rollbacks_restore() {
         .await;
     assert_eq!(marked.status, StatusCode::OK, "{:?}", marked.body);
     assert_eq!(page(&birdd, &production).await, "second\n");
+    let summary = birdd.get(&root, &service).await.body;
+    assert_eq!(summary["command"][0], "sh", "{summary}");
 
     // the image exits at once, so it never passes its health check
     let broken = birdd

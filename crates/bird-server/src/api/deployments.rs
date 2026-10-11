@@ -9,7 +9,7 @@ use crate::state::AppState;
 use crate::{Error, Result, deploy};
 
 /// List deployments
-#[utoipa::path(get, path = "/v1/projects/{project}/environments/{environment}/services/{name}/deployments", tag = "deployments", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Deployments, newest first", body = Vec<DeploymentInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_deployments", path = "/v1/projects/{project}/environments/{environment}/services/{name}/deployments", tag = "deployments", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), responses((status = 200, description = "Deployments, newest first", body = Vec<DeploymentInfo>), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

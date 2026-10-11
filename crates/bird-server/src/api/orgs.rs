@@ -24,7 +24,7 @@ pub(crate) struct MemberPath {
 }
 
 /// List your orgs, or every org for server admins
-#[utoipa::path(get, path = "/v1/orgs", tag = "orgs", responses((status = 200, description = "Orgs with your role in each", body = Vec<OrgSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
+#[utoipa::path(get, operation_id = "list_orgs", path = "/v1/orgs", tag = "orgs", responses((status = 200, description = "Orgs with your role in each", body = Vec<OrgSummary>), (status = 401, description = "Missing or invalid API token", body = ErrorBody)))]
 pub(crate) async fn list(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -56,7 +56,7 @@ pub(crate) async fn list(
 }
 
 /// Create an org, for server admins; a user who creates one becomes its owner
-#[utoipa::path(post, path = "/v1/orgs", tag = "orgs", request_body = CreateOrg, responses((status = 201, description = "Org created", body = OrgSummary), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "create_org", path = "/v1/orgs", tag = "orgs", request_body = CreateOrg, responses((status = 201, description = "Org created", body = OrgSummary), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,
@@ -76,7 +76,7 @@ pub(crate) async fn create(
 }
 
 /// Delete an org that owns no projects, for its owners
-#[utoipa::path(delete, path = "/v1/orgs/{org}", tag = "orgs", params(("org" = String, Path, description = "Org name")), responses((status = 204, description = "Org deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
+#[utoipa::path(delete, operation_id = "remove_org", path = "/v1/orgs/{org}", tag = "orgs", params(("org" = String, Path, description = "Org name")), responses((status = 204, description = "Org deleted"), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 403, description = "Not allowed for this user", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody), (status = 409, description = "Conflicting state or operation in progress", body = ErrorBody)))]
 pub(crate) async fn remove(
     State(state): State<AppState>,
     Extension(principal): Extension<Principal>,

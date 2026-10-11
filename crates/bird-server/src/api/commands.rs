@@ -17,7 +17,7 @@ use crate::{Result, commands};
 const STREAM_BUFFER: usize = 256;
 
 /// Run a command in a running machine
-#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/exec", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = ExecRequest, responses((status = 200, description = "Newline-delimited JSON stream of CommandEvent, ending with exited or failed", body = CommandEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "exec_command", path = "/v1/projects/{project}/environments/{environment}/services/{name}/exec", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = ExecRequest, responses((status = 200, description = "Newline-delimited JSON stream of CommandEvent, ending with exited or failed", body = CommandEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn exec(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,
@@ -33,7 +33,7 @@ pub(crate) async fn exec(
 }
 
 /// Run a command in a new container from the service's image
-#[utoipa::path(post, path = "/v1/projects/{project}/environments/{environment}/services/{name}/run", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = RunRequest, responses((status = 200, description = "Newline-delimited JSON stream of CommandEvent, ending with exited or failed", body = CommandEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
+#[utoipa::path(post, operation_id = "run_command", path = "/v1/projects/{project}/environments/{environment}/services/{name}/run", tag = "commands", params(("project" = String, Path, description = "Project name"), ("environment" = String, Path, description = "Environment name"), ("name" = String, Path, description = "Service name")), request_body = RunRequest, responses((status = 200, description = "Newline-delimited JSON stream of CommandEvent, ending with exited or failed", body = CommandEvent), (status = 400, description = "Invalid input", body = ErrorBody), (status = 401, description = "Missing or invalid API token", body = ErrorBody), (status = 404, description = "Service or resource not found", body = ErrorBody)))]
 pub(crate) async fn run(
     State(state): State<AppState>,
     ServiceScope { environment, name }: ServiceScope,

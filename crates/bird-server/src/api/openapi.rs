@@ -87,6 +87,21 @@ mod tests {
         );
     }
 
+    // generated clients name a function after each id, so two operations may not share one
+    #[test]
+    fn operation_ids_are_unique() {
+        let document: serde_json::Value = serde_json::from_str(&render(&spec())).unwrap();
+        let mut seen = std::collections::BTreeMap::new();
+        for (path, item) in document["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                let id = operation["operationId"].as_str().unwrap();
+                if let Some(earlier) = seen.insert(id.to_owned(), format!("{method} {path}")) {
+                    panic!("{id} names both {earlier} and {method} {path}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn documents_every_route_and_the_token() {
         let spec = spec();
@@ -109,6 +124,7 @@ mod tests {
             "/services/{name}/cron/{job}/runs",
             "/services/{name}/cron/{job}/runs/{id}",
             "/templates/{template}/deploy",
+            "/backups",
         ]
         .into_iter()
         .map(scoped)

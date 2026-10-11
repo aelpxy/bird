@@ -206,6 +206,8 @@ mod tests {
             cpus: bird_core::CpuLimit::DEFAULT,
             health: HealthCheck::Http,
             health_timeout: bird_core::HealthTimeout::DEFAULT,
+            command: None,
+            release: None,
             domains: vec!["web.localhost".parse().unwrap()],
             volumes: Vec::new(),
             backup_schedule: None,
