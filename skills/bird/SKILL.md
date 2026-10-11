@@ -69,9 +69,46 @@ bird deploy api --build --port 3000
 Rules that trip agents up:
 
 - The app must listen on `0.0.0.0` and the configured `port`, not `localhost`.
-- A Dockerfile is required for `[build]`; write one if the project has none, and add a `.dockerignore` for `node_modules`, `target`, `.git`.
+- A Dockerfile is required for `[build]`. Write one if the project has none, and add a `.dockerignore` for `node_modules`, `target` and `.git`.
+- Write every image in a Dockerfile with its registry: `FROM docker.io/library/node:22`, `FROM docker.io/lukemathwalker/cargo-chef:latest-rust-1`. The server builds with Podman, which may refuse short names like `node:22` or `lukemathwalker/cargo-chef`. Images given to `bird deploy` or `image =` are fine short, since bird adds `docker.io/` itself.
 - New traffic moves only once the new machines pass the health check, so a failed deploy leaves the old version serving.
 - Deploying only adds variables and domains; it never removes ones set elsewhere.
+
+### Variables on the first deploy
+
+`bird env set` needs the service to exist, so don't deploy a broken version just to create it. Pass the variables with the first deploy instead:
+
+```sh
+bird deploy -e DATABASE_URL='${{postgres.DATABASE_URL}}' -e 'SESSION_SECRET=${{secret}}'
+```
+
+Or put them under `[env]` in bird.toml. Keep real secrets out of the file: use `${{secret}}` for generated ones, or pass them with `-e` on the command line.
+
+### Variables the build needs
+
+Runtime variables (`[env]`, `bird env set`) don't exist while the image builds. Frameworks that bake values in at build time need them as build arguments. This includes Next.js `NEXT_PUBLIC_*`, Vite `VITE_*` and Create React App `REACT_APP_*`.
+
+```toml
+[build]
+args = { NEXT_PUBLIC_API_URL = "https://api.example.com" }
+```
+
+The Dockerfile must declare each one before the build step that reads it:
+
+```dockerfile
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN npm run build
+```
+
+`bird deploy --build-arg KEY=VALUE` does the same for one deploy. Build arguments stay readable in the image, so never put secrets in them.
+
+### Reaching a service without a domain
+
+A service without a domain is private, so it can't be reached from the internet. To test it:
+
+- From your machine: `bird connect -s api` forwards its port to `localhost`.
+- Publicly, before real DNS is ready: give it a domain from a wildcard DNS service that points at the server's IP, like `--domain api.203-0-113-7.sslip.io` for a server at `203.0.113.7`. Ask the user for the server's IP. birdd gets it a certificate like any other domain. Remove it with `bird domains remove` once the real domain works.
 
 ## 3. Databases and other services
 
