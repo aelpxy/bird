@@ -3,8 +3,10 @@ import type { Scope } from '@/lib/api/paths'
 import { followLogs, type LogEntry } from './api'
 
 const TAIL_LINES = 300
-// enough to scroll back through, few enough that rendering stays quick
-export const MAX_LINES = 2_000
+// birdd's cap per machine when reading back over a stretch of time
+const RANGE_LINES = 10_000
+// the list only renders what is on screen, so this bounds memory rather than drawing
+export const MAX_LINES = 50_000
 const FLUSH_MS = 100
 const RETRY_MS = [1_000, 2_000, 5_000, 10_000]
 
@@ -12,7 +14,8 @@ export type StreamState = 'connecting' | 'live' | 'reconnecting'
 export type LogLine = LogEntry & { id: number }
 
 // follows a service's logs, batching new lines so a chatty app does not re-render per line
-export function useLogStream({ project, environment }: Scope, service: string) {
+// minutes back to read before following, or the last few hundred lines when left out
+export function useLogStream({ project, environment }: Scope, service: string, minutes?: number) {
   const [lines, setLines] = useState<LogLine[]>([])
   const [state, setState] = useState<StreamState>('connecting')
   const pending = useRef<LogLine[]>([])
@@ -22,6 +25,8 @@ export function useLogStream({ project, environment }: Scope, service: string) {
     const controller = new AbortController()
     let attempt = 0
     let first = true
+    pending.current = []
+    const since = minutes === undefined ? undefined : Math.floor(Date.now() / 1000) - minutes * 60
     const flush = window.setInterval(() => {
       if (pending.current.length === 0) return
       const batch = pending.current
@@ -32,7 +37,7 @@ export function useLogStream({ project, environment }: Scope, service: string) {
     async function run() {
       while (!controller.signal.aborted) {
         // after a reconnect only new lines are wanted, the recent ones are already shown
-        const tail = first ? TAIL_LINES : 0
+        const tail = first ? (since === undefined ? TAIL_LINES : RANGE_LINES) : 0
         try {
           setState(first ? 'connecting' : 'reconnecting')
           let opened = false
@@ -40,6 +45,7 @@ export function useLogStream({ project, environment }: Scope, service: string) {
             { project, environment },
             service,
             tail,
+            first ? since : undefined,
             (entry) => {
               if (!opened) {
                 opened = true
@@ -67,7 +73,7 @@ export function useLogStream({ project, environment }: Scope, service: string) {
       controller.abort()
       window.clearInterval(flush)
     }
-  }, [project, environment, service])
+  }, [project, environment, service, minutes])
 
   return { lines, state, clear: () => setLines([]) }
 }

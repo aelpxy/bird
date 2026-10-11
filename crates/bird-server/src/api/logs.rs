@@ -34,6 +34,8 @@ pub(crate) struct LogsQuery {
     /// start later, like replacements from a deploy
     #[serde(default)]
     follow: bool,
+    /// Only lines written after this unix time in seconds; tail still caps how many
+    since: Option<u64>,
 }
 
 /// Read or follow logs
@@ -48,15 +50,22 @@ pub(crate) async fn logs(
     })
     .await?;
     let tail = query.tail.unwrap_or(DEFAULT_TAIL).min(MAX_TAIL);
+    let since = query
+        .since
+        .map(|secs| SystemTime::UNIX_EPOCH + Duration::from_secs(secs));
     if query.follow {
-        return Ok(follow(&state, environment, name, machines, tail));
+        let start = match since {
+            Some(since) => LogStart::Recent { since, lines: tail },
+            None => LogStart::Tail(tail),
+        };
+        return Ok(follow(&state, environment, name, machines, start));
     }
     if machines.is_empty() {
         return Err(Error::NoMachines(name));
     }
     let mut entries = Vec::new();
     for (machine, container) in machines {
-        let lines = state.podman.logs(&container, tail).await?;
+        let lines = state.podman.recent_logs(&container, tail, since).await?;
         entries.extend(lines.into_iter().map(|line| entry(machine, line)));
     }
     Ok(Json(entries).into_response())
@@ -92,7 +101,7 @@ fn follow(
     environment: EnvironmentId,
     name: Name,
     machines: Vec<(MachineId, String)>,
-    tail: u32,
+    start: LogStart,
 ) -> Response {
     let (lines, receiver) = mpsc::channel(STREAM_BUFFER);
     tokio::spawn(watch(
@@ -100,7 +109,7 @@ fn follow(
         environment,
         name,
         machines,
-        tail,
+        start,
         lines,
     ));
     (
@@ -116,7 +125,7 @@ async fn watch(
     environment: EnvironmentId,
     name: Name,
     machines: Vec<(MachineId, String)>,
-    tail: u32,
+    start: LogStart,
     lines: mpsc::Sender<Bytes>,
 ) {
     let mut following = JoinSet::new();
@@ -125,13 +134,7 @@ async fn watch(
     for (machine, container) in machines {
         active.insert(machine);
         let podman = state.podman.clone();
-        following.spawn(forward(
-            podman,
-            machine,
-            container,
-            LogStart::Tail(tail),
-            lines.clone(),
-        ));
+        following.spawn(forward(podman, machine, container, start, lines.clone()));
     }
     let mut poll = tokio::time::interval(MACHINE_POLL);
     let shutdown = state.shutdown.wait();

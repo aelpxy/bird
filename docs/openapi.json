@@ -3140,6 +3140,17 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only lines written after this unix time in seconds; tail still caps how many",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
           }
         ],
         "responses": {

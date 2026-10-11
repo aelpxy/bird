@@ -4,6 +4,7 @@ import { focusRing } from '@/components/ui/control-styles'
 import { IconButton } from '@/components/ui/icon-button'
 import type { LogLevel } from '../level'
 import type { LogFilters, StreamFilter } from '../filters'
+import { RANGES, type LogRange } from '../ranges'
 
 type Toggle = { on: boolean; set: (on: boolean) => void }
 
@@ -11,6 +12,7 @@ type LogToolbarProps = {
   searchRef: RefObject<HTMLInputElement | null>
   filters: LogFilters
   onFilters: (filters: LogFilters) => void
+  range: { value: LogRange; set: (range: LogRange) => void }
   machines: { id: string; color: string }[]
   matches: number | null
   error?: string
@@ -37,11 +39,12 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
   )
 }
 
-export function LogToolbar({ searchRef, filters, onFilters, machines, matches, error, paused, wrap, showTime, fullscreen, onClear, onDownload }: LogToolbarProps) {
+export function LogToolbar({ searchRef, filters, onFilters, range, machines, matches, error, paused, wrap, showTime, fullscreen, onClear, onDownload }: LogToolbarProps) {
   const set = (patch: Partial<LogFilters>) => onFilters({ ...filters, ...patch })
   return (
     <div className="flex flex-col border-b border-line">
       <div className="flex flex-wrap items-center gap-2 px-2 py-2">
+        <Segmented<LogRange> label="Time range" value={range.value} onChange={range.set} options={RANGES.map(({ value, label }) => ({ value, label }))} />
         <label className="relative min-w-52 flex-1">
           <span className="sr-only">Search the logs</span>
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-fg-faint" />
@@ -56,7 +59,7 @@ export function LogToolbar({ searchRef, filters, onFilters, machines, matches, e
                 event.currentTarget.blur()
               }
             }}
-            placeholder="Search  ( / )"
+            placeholder={filters.regex ? 'Regular expression  ( / )' : 'Search, or field:value  ( / )'}
             aria-invalid={error ? true : undefined}
             className="h-7 w-full border border-line bg-sunken pr-16 pl-8 font-mono text-xs text-fg placeholder:text-fg-faint focus:border-fg-muted focus:outline-none aria-invalid:border-bad"
           />

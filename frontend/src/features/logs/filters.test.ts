@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { filterLines, prepare, type LogFilters } from './filters'
 
-const line = (id: number, text: string, extra: { stream?: 'stdout' | 'stderr'; machine?: string } = {}) =>
-  prepare({ id, text, stream: extra.stream ?? 'stdout', machine: extra.machine ?? 'm1', at: 0 })
+const line = (id: number, text: string, extra: { stream?: 'stdout' | 'stderr'; machine?: string; at?: number } = {}) =>
+  prepare({ id, text, stream: extra.stream ?? 'stdout', machine: extra.machine ?? 'm1', at: extra.at ?? id * 1000 })
 
 const lines = [
   line(1, 'INFO started'),
@@ -29,5 +29,9 @@ describe('filterLines', () => {
     expect(ids({ stream: 'stderr' })).toEqual([2])
     expect(ids({ hiddenMachines: new Set(['m1']) })).toEqual([3])
     expect(ids({ minLevel: 'warn' })).toEqual([2, 3, 4])
+  })
+
+  it('keeps only lines inside a picked stretch of time', () => {
+    expect(ids({ window: { from: 2000, to: 3000 } })).toEqual([2, 3])
   })
 })

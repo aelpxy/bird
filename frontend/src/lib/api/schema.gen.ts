@@ -3748,6 +3748,8 @@ export interface operations {
                  *     start later, like replacements from a deploy
                  */
                 follow?: boolean;
+                /** @description Only lines written after this unix time in seconds; tail still caps how many */
+                since?: number;
             };
             header?: never;
             path: {

@@ -8,11 +8,12 @@ export function followLogs(
   scope: Scope,
   service: string,
   tail: number,
+  since: number | undefined,
   onEntry: (entry: LogEntry) => void,
   signal: AbortSignal,
 ) {
   return streamJsonLines<LogEntry>(
-    servicePath(scope, service, `/logs?follow=true&tail=${tail}`),
+    servicePath(scope, service, `/logs?follow=true&tail=${tail}${since === undefined ? '' : `&since=${since}`}`),
     onEntry,
     signal,
   )

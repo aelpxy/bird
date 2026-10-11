@@ -49,6 +49,21 @@ async fn wait_for_log(podman: &Podman, id: &str, text: &str) -> Vec<bird_podman:
     logs
 }
 
+// a time after every line leaves none, one before them all keeps them
+async fn assert_since_filters(podman: &Podman, id: &str) {
+    let future = std::time::SystemTime::now() + Duration::from_secs(3600);
+    let none_yet = podman
+        .recent_logs(id, 100, Some(future))
+        .await
+        .expect("logs stay readable");
+    assert!(none_yet.is_empty(), "{none_yet:?}");
+    let since_start = podman
+        .recent_logs(id, 100, Some(std::time::UNIX_EPOCH))
+        .await
+        .expect("logs stay readable");
+    assert!(since_start.iter().any(|l| l.text.contains("GET /")));
+}
+
 // every line carries when podman recorded it, and none still starts with podman's own prefix
 fn assert_timed(logs: &[bird_podman::LogLine]) {
     let now_ms = i64::try_from(
@@ -144,6 +159,7 @@ async fn container_lifecycle() {
         "{logs:?}"
     );
     assert_timed(&logs);
+    assert_since_filters(&podman, &id).await;
 
     podman.pause_container(&id).await.unwrap();
     assert_eq!(

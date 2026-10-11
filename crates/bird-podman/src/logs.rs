@@ -22,6 +22,8 @@ pub enum LogStream {
 pub enum LogStart {
     Tail(u32),
     Since(SystemTime),
+    // the newest lines written after a time, at most this many
+    Recent { since: SystemTime, lines: u32 },
     Beginning,
 }
 
@@ -35,8 +37,18 @@ pub struct LogLine {
 
 impl Podman {
     pub async fn logs(&self, id: &str, tail: u32) -> Result<Vec<LogLine>> {
+        self.recent_logs(id, tail, None).await
+    }
+
+    pub async fn recent_logs(
+        &self,
+        id: &str,
+        tail: u32,
+        since: Option<SystemTime>,
+    ) -> Result<Vec<LogLine>> {
+        let since = since.map(since_param).unwrap_or_default();
         let path = format!(
-            "/containers/{}/logs?stdout=true&stderr=true&timestamps=true&tail={tail}",
+            "/containers/{}/logs?stdout=true&stderr=true&timestamps=true&tail={tail}{since}",
             encode(id)
         );
         let response = self.get(&path).await?;
@@ -47,10 +59,8 @@ impl Podman {
     pub async fn follow_logs(&self, id: &str, from: LogStart) -> Result<LogFollower> {
         let from = match from {
             LogStart::Tail(lines) => format!("&tail={lines}"),
-            LogStart::Since(time) => {
-                let elapsed = time.duration_since(UNIX_EPOCH).unwrap_or_default();
-                format!("&since={}.{:09}", elapsed.as_secs(), elapsed.subsec_nanos())
-            }
+            LogStart::Since(time) => since_param(time),
+            LogStart::Recent { since, lines } => format!("&tail={lines}{}", since_param(since)),
             LogStart::Beginning => String::new(),
         };
         let path = format!(
@@ -111,6 +121,11 @@ pub(crate) fn next_frame(buf: &[u8]) -> Option<(LogStream, &[u8], &[u8])> {
     let len = usize::try_from(u32::from_be_bytes([a, b, c, d])).ok()?;
     let (payload, next) = body.split_at_checked(len)?;
     Some((stream, payload, next))
+}
+
+fn since_param(time: SystemTime) -> String {
+    let elapsed = time.duration_since(UNIX_EPOCH).unwrap_or_default();
+    format!("&since={}.{:09}", elapsed.as_secs(), elapsed.subsec_nanos())
 }
 
 #[cfg(test)]
