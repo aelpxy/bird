@@ -57,9 +57,16 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Machines otherwise run with podman's init as pid 1, so apps that ignore SIGTERM still stop.
 * A service's `state` is desired state: `stop` keeps its containers, and any deploy starts a stopped service.
 * Stats take two podman samples half a second apart, since podman's single-sample CPU is the average since start.
-* Logs: `bird_podman::Lines` rejoins long lines podman splits; `follow` tracks the service, not fixed machines.
+* Logs: `bird_podman::Lines` rejoins long lines podman splits; `follow` tracks the service, not fixed machines. Logs are read with `timestamps=true`: every piece of a split line carries its own time, so `Lines` strips each one and a joined line keeps its first piece's, sent as `LogEntry.at` in unix milliseconds.
 * The proxy sets `x-server: Bird` on every response (not configurable), caps request bodies and fails response bodies that go idle.
 * Templates in `crates/bird-server/templates/` are embedded `bird.toml` manifests; pin their images to a major tag.
+
+## Dashboard
+
+* `frontend/` is the web dashboard: Vite, React, TanStack Router and Query, Base UI, Tailwind 4. `pnpm build` (Vite, then `tsc -b`), `pnpm lint` (type-aware oxlint, deprecated APIs are errors) and `pnpm test` (Vitest) must pass.
+* It talks to birdd only through `/v1` with the session cookie; `src/lib/api/schema.gen.ts` is generated from `docs/openapi.json` with `pnpm gen:api`, so regenerate it when the spec changes.
+* Imports use the `@/` alias for `src/`; files are kebab-case, grouped by feature under `src/features`, shared pieces in `src/components` and `src/lib`.
+* Follow `frontend/DESIGN.md`: only the design tokens exist as colors, pages are built from `src/components/ui`, forms use TanStack Form with Zod schemas.
 
 ## Rust
 

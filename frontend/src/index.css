@@ -1,0 +1,155 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/*
+ * bird's design language, see DESIGN.md. Black and white, square corners, hairline borders and no
+ * shadows: on black, depth comes from borders and surfaces. Only these colors exist: Tailwind's palette is turned off,
+ * so a raw color class does nothing and stands out in review.
+ */
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-black: oklch(0 0 0);
+
+  /* black and white: surfaces step up from pure black, text steps down from pure white */
+  --color-sunken: oklch(0 0 0);
+  --color-canvas: oklch(0.09 0 0);
+  --color-surface: oklch(0.13 0 0);
+  --color-raised: oklch(0.18 0 0);
+  --color-line: oklch(0.24 0 0);
+  --color-line-strong: oklch(0.34 0 0);
+
+  /* text, strongest to faintest */
+  --color-fg: oklch(1 0 0);
+  --color-fg-muted: oklch(0.76 0 0);
+  --color-fg-faint: oklch(0.56 0 0);
+
+  /* status, used sparingly and always with a word, never color alone */
+  --color-ok: oklch(0.8 0.15 155);
+  --color-warn: oklch(0.83 0.14 80);
+  --color-bad: oklch(0.7 0.17 25);
+  --color-info: oklch(0.78 0.11 235);
+
+  /* the two terminal colors status does not already cover, for apps' colored logs */
+  --color-ansi-magenta: oklch(0.74 0.15 320);
+  --color-ansi-cyan: oklch(0.8 0.11 200);
+
+  /* sizes in rem, so the layout grows with the browser's text size setting */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --text-title: 0.9375rem;
+  --text-title--line-height: 1.3;
+
+  /* the default spring: critically damped, no overshoot */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* corners stay square; small controls get a hint of rounding */
+  --radius-xs: 1px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 3px;
+
+
+  --animate-pulse: pulse 1.6s ease-in-out infinite;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    font-feature-settings: "ss01", "cv11";
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-sm leading-normal text-fg antialiased;
+    font-optical-sizing: auto;
+  }
+
+  /* tracking tightens as type grows; small labels set their own, slightly open */
+  h1 {
+    @apply leading-[1.1] tracking-[-0.02em];
+  }
+
+  h2,
+  h3 {
+    @apply leading-tight tracking-[-0.01em];
+  }
+
+  ::selection {
+    @apply bg-fg text-canvas;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* a faint drafting grid, for empty, quiet backgrounds like the sign-in page */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* the user's accessibility settings win over the house style */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .material {
+    background-color: var(--color-canvas) !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --color-line: oklch(0.5 0 0);
+    --color-line-strong: oklch(0.7 0 0);
+    --color-fg-muted: oklch(0.88 0 0);
+    --color-fg-faint: oklch(0.76 0 0);
+  }
+}
+
+/* feedback on press, not on release */
+@utility pressable {
+  transition-property: transform, background-color, border-color, color, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: var(--ease-spring);
+
+  &:active:not(:disabled):not([data-disabled]) {
+    transform: scale(0.97);
+    transition-duration: 60ms;
+  }
+}
+
+/* a translucent layer that content scrolls under */
+@utility material {
+  background-color: oklch(0.09 0 0 / 0.72);
+  backdrop-filter: blur(20px) saturate(160%);
+}
