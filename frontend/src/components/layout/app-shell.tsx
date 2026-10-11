@@ -1,76 +1,67 @@
-import { Link } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { Dialog } from '@base-ui/react/dialog'
+import { Link, useRouterState } from '@tanstack/react-router'
+import { Menu, Search } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import type { Session } from '@/features/auth/api'
-import { UserMenu } from '@/features/auth/components/user-menu'
-import { CommandPalette } from '@/features/command/components/command-palette'
 import { focusRing } from '@/components/ui/control-styles'
+import { backdropClass } from '@/components/ui/overlay-styles'
+import type { Session } from '@/features/auth/api'
+import { CommandPalette } from '@/features/command/components/command-palette'
+import { Sidebar } from '@/features/navigation/components/sidebar'
 import { Logo } from './logo'
 
-const navLinkClass = `px-2.5 py-1.5 font-mono text-2xs leading-none font-medium tracking-[0.08em] text-fg-faint uppercase transition-colors hover:text-fg data-[status=active]:text-fg ${focusRing}`
+const drawerClass =
+  'fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] border-r border-line-strong bg-canvas transition-transform duration-200 ease-out data-ending-style:-translate-x-full data-starting-style:-translate-x-full'
 
 export function AppShell({ session, children }: { session: Session; children: ReactNode }) {
   const [searching, setSearching] = useState(false)
+  const path = useRouterState({ select: (state) => state.location.pathname })
+  // remembers where it was opened, so following a link in it closes it
+  const [drawerAt, setDrawerAt] = useState<string | null>(null)
+  const drawer = drawerAt === path
+  const setDrawer = (open: boolean) => setDrawerAt(open ? path : null)
+
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-fg focus:px-3 focus:py-2 focus:text-sm focus:text-canvas"
       >
         Skip to content
       </a>
-      <header className="material sticky top-0 z-20 border-b border-line">
-        <div className="mx-auto flex h-12 max-w-6xl items-center justify-between gap-4 px-4">
-          <div className="flex items-center gap-4">
-            <Link to="/" aria-label="bird, projects" className={focusRing}>
-              <Logo />
-            </Link>
-            <nav aria-label="Main" className="hidden sm:block">
-              <ul className="flex items-center">
-                <li>
-                  <Link to="/" activeOptions={{ exact: true }} className={navLinkClass}>
-                    Projects
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/orgs" className={navLinkClass}>
-                    Orgs
-                  </Link>
-                </li>
-                {session.role === 'admin' && (
-                  <>
-                    <li>
-                      <Link to="/registries" className={navLinkClass}>
-                        Registries
-                      </Link>
-                    </li>
-                    <li>
-                      <Link to="/admin/users" className={navLinkClass}>
-                        Users
-                      </Link>
-                    </li>
-                  </>
-                )}
-              </ul>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSearching(true)}
-              aria-label="Go to a service, project or page"
-              aria-keyshortcuts="Meta+K Control+K"
-              className={`pressable flex h-7 items-center gap-2 border border-line px-2 text-fg-faint transition-colors hover:border-line-strong hover:text-fg ${focusRing}`}
-            >
-              <Search aria-hidden className="size-3.5" />
-              <kbd className="hidden font-mono text-2xs sm:inline">⌘K</kbd>
-            </button>
-            <UserMenu session={session} />
-          </div>
+      <aside className="sticky top-0 hidden h-dvh border-r border-line lg:block">
+        <Sidebar session={session} onSearch={() => setSearching(true)} />
+      </aside>
+
+      <header className="material sticky top-0 z-20 flex h-12 items-center justify-between gap-3 border-b border-line px-4 lg:hidden">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setDrawer(true)} aria-label="Open navigation" className={`pressable grid size-8 place-items-center text-fg-muted hover:text-fg ${focusRing}`}>
+            <Menu aria-hidden className="size-4" />
+          </button>
+          <Link to="/" aria-label="bird, overview" className={focusRing}>
+            <Logo />
+          </Link>
         </div>
+        <button type="button" onClick={() => setSearching(true)} aria-label="Go to a service, project or page" className={`pressable grid size-8 place-items-center text-fg-muted hover:text-fg ${focusRing}`}>
+          <Search aria-hidden className="size-4" />
+        </button>
       </header>
+      <Dialog.Root open={drawer} onOpenChange={setDrawer}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className={backdropClass} />
+          <Dialog.Popup aria-label="Navigation" className={drawerClass}>
+            <Sidebar
+              session={session}
+              onSearch={() => {
+                setDrawer(false)
+                setSearching(true)
+              }}
+            />
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <CommandPalette session={session} open={searching} onOpenChange={setSearching} />
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main id="main" className="mx-auto w-full max-w-6xl min-w-0 px-4 py-8 lg:px-8">
         {children}
       </main>
     </div>

@@ -2,11 +2,9 @@ import { Link } from '@tanstack/react-router'
 import { ArrowUpRight } from 'lucide-react'
 import { focusRing } from '@/components/ui/control-styles'
 import { plural } from '@/lib/format'
-import { serviceStatus } from '@/features/services/status'
+import { serviceStatus, toneDots } from '@/features/services/status'
 import type { PlacedService } from '@/features/overview/use-overview'
 import { type Project, preferredEnvironment } from '../api'
-
-const dotTones = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', info: 'bg-info', neutral: 'bg-fg-faint' } as const
 
 // a project with its environments, each showing one square per service colored by its state
 export function ProjectCard({ project, services }: { project: Project; services: PlacedService[] }) {
@@ -32,7 +30,7 @@ export function ProjectCard({ project, services }: { project: Project; services:
               <span className="flex items-center gap-2">
                 <span className="flex flex-wrap justify-end gap-0.5" aria-label={`${plural(here.length, 'service')} in ${name}`}>
                   {here.map(({ service }) => (
-                    <span key={service.name} title={`${service.name}: ${serviceStatus(service).label}`} className={`size-2 ${dotTones[serviceStatus(service).tone]}`} />
+                    <span key={service.name} title={`${service.name}: ${serviceStatus(service).label}`} className={`size-2 ${toneDots[serviceStatus(service).tone]}`} />
                   ))}
                 </span>
                 <span className="tabular text-right font-mono text-2xs text-fg-faint">{here.length === 0 ? 'no services yet' : plural(here.length, 'service')}</span>

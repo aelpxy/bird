@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Plus, X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { useDialogForm } from '@/components/form/use-dialog-form'
 import { Button } from '@/components/ui/button'
 import { ChoiceCard, ChoiceGroup } from '@/components/ui/choice-card'
@@ -26,7 +26,7 @@ import { SourcePicker } from './new-service/source-picker'
 
 const titles: Record<Source, string> = { image: 'Deploy an image', source: 'Deploy from a folder', template: 'Add from a template' }
 
-export function NewServiceDialog({ scope }: { scope: Scope }) {
+export function NewServiceDialog({ scope, trigger }: { scope: Scope; trigger?: ReactElement }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const templates = useQuery(templatesQuery)
@@ -84,10 +84,12 @@ export function NewServiceDialog({ scope }: { scope: Scope }) {
         <FormDialog
           dialog={dialog}
           trigger={
-            <Button>
-              <Plus aria-hidden className="size-3.5" />
-              New service
-            </Button>
+            trigger ?? (
+              <Button>
+                <Plus aria-hidden className="size-3.5" />
+                New service
+              </Button>
+            )
           }
           size="lg"
           title={step === 'pick' ? 'New service' : titles[chosen]}

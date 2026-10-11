@@ -1,6 +1,5 @@
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { projectsQuery } from '@/features/projects/api'
-import { ScopeSwitcher } from '@/features/projects/components/scope-switcher'
 
 // checks the project and environment exist before any page under them asks birdd about services
 export const Route = createFileRoute('/_app/projects/$project/$environment')({
@@ -14,11 +13,5 @@ export const Route = createFileRoute('/_app/projects/$project/$environment')({
 })
 
 function EnvironmentLayout() {
-  const { scope } = Route.useRouteContext()
-  return (
-    <div className="flex flex-col gap-6">
-      <ScopeSwitcher scope={scope} />
-      <Outlet />
-    </div>
-  )
+  return <Outlet />
 }

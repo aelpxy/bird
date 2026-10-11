@@ -34,3 +34,5 @@ export const machineTones: Record<Machine['state'], Tone> = {
   failed: 'bad',
   destroyed: 'neutral',
 }
+
+export const toneDots: Record<Tone, string> = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', info: 'bg-info', neutral: 'bg-fg-faint' }

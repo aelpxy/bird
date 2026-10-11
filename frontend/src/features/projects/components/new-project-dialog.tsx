@@ -12,7 +12,9 @@ import { createProject, orgsQuery, projectsQuery } from '../api'
 const schema = z.object({ name: name('Enter a project name.'), org: z.string() })
 
 // with an org it creates the project there, otherwise it asks when there are several
-export function NewProjectDialog({ org }: { org?: string }) {
+type NewProjectDialogProps = { org?: string; open?: boolean; onOpenChange?: (open: boolean) => void }
+
+export function NewProjectDialog({ org, open, onOpenChange }: NewProjectDialogProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { data: orgs = [] } = useQuery(orgsQuery)
@@ -20,6 +22,8 @@ export function NewProjectDialog({ org }: { org?: string }) {
     schema,
     // empty means the first org, which the select shows first
     defaultValues: { name: '', org: org ?? '' },
+    open,
+    onOpenChange,
     onSubmit: async (values) => {
       const project = await createProject({ name: values.name, org: values.org || orgs[0]?.name })
       await queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey })
@@ -32,10 +36,12 @@ export function NewProjectDialog({ org }: { org?: string }) {
     <FormDialog
       dialog={dialog}
       trigger={
-        <Button>
-          <Plus aria-hidden className="size-3.5" />
-          New project
-        </Button>
+        open === undefined ? (
+          <Button>
+            <Plus aria-hidden className="size-3.5" />
+            New project
+          </Button>
+        ) : undefined
       }
       title="New project"
       description={`One product, like a shop: its app, database and workers are each added to it as a service. It starts with a production environment${org ? ` and belongs to ${org}.` : '.'}`}
