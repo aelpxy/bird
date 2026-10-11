@@ -16,13 +16,13 @@ use tokio::sync::OwnedSemaphorePermit;
 
 use crate::body::{ProxyBody, error_response};
 use crate::drain::Watch;
-use crate::headers::{set_forwarded, strip_hop_by_hop};
+use crate::headers::{self, set_forwarded, strip_hop_by_hop};
 use crate::host::{host_from_target, request_host};
 use crate::idle::IdleTimeout;
 use crate::policy::RoutePolicy;
 use crate::routes::{RouteError, Routes, Target};
 use crate::scheme::Scheme;
-use crate::{ProxyConfig, Tls, edge, upgrade};
+use crate::{ProxyConfig, Tls, cloudflare, edge, upgrade};
 
 const X_MACHINE_ID: HeaderName = HeaderName::from_static("x-machine-id");
 
@@ -112,13 +112,8 @@ impl Forwarder {
             return edge::https_redirect(&host, request.uri(), tls.https_port);
         }
         let dispatch = match control {
-            Some(control) => Dispatch {
-                upstream: control.upstream.clone(),
-                machine: None,
-                limits: control.limits,
-                policy: None,
-            },
-            None => match self.dispatch(&host, request.uri(), scheme, client_ip) {
+            Some(control) => control.dispatch(),
+            None => match self.dispatch(&host, &request, scheme, client_ip) {
                 Ok(dispatch) => dispatch,
                 Err(response) => return *response,
             },
@@ -128,7 +123,9 @@ impl Forwarder {
             machine,
             limits,
             policy,
+            visitor,
         } = dispatch;
+        let forwarded_for = visitor.map_or(forwarded_for, headers::forwarded_for);
 
         if usize::try_from(request.body().size_hint().lower())
             .map_or(true, |length| length > limits.max_body_bytes)
@@ -194,11 +191,24 @@ impl Forwarder {
     }
 }
 
+impl Control {
+    fn dispatch(&self) -> Dispatch {
+        Dispatch {
+            upstream: self.upstream.clone(),
+            machine: None,
+            limits: self.limits,
+            policy: None,
+            visitor: None,
+        }
+    }
+}
+
 struct Dispatch {
     upstream: Authority,
     machine: Option<HeaderValue>,
     limits: Limits,
     policy: Option<Arc<RoutePolicy>>,
+    visitor: Option<IpAddr>,
 }
 
 impl Forwarder {
@@ -206,10 +216,11 @@ impl Forwarder {
     fn dispatch(
         &self,
         host: &str,
-        uri: &Uri,
+        request: &Request<Incoming>,
         scheme: Scheme,
         client_ip: IpAddr,
     ) -> Result<Dispatch, Box<Response<ProxyBody>>> {
+        let uri = request.uri();
         let (upstream, machine, policy) = match self.routes.pick(host) {
             Ok(Target::Upstream {
                 authority,
@@ -237,14 +248,18 @@ impl Forwarder {
             }
         };
         let mut limits = self.limits;
+        let mut visitor = None;
         if let Some(policy) = &policy {
             if policy.maintenance {
                 return Err(Box::new(edge::maintenance()));
             }
+            if policy.cloudflare {
+                visitor = cloudflare::visitor(client_ip, request.headers());
+            }
             if let Some(Err(wait)) = policy
                 .rate_limit
                 .as_ref()
-                .map(|limit| limit.check(client_ip))
+                .map(|limit| limit.check(visitor.unwrap_or(client_ip)))
             {
                 return Err(Box::new(edge::too_many_requests(wait)));
             }
@@ -256,6 +271,7 @@ impl Forwarder {
             machine,
             limits,
             policy,
+            visitor,
         })
     }
 }

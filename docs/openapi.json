@@ -6879,6 +6879,11 @@
         "type": "object",
         "description": "How bird's proxy treats one service's requests; the default changes nothing",
         "properties": {
+          "cloudflare": {
+            "type": "boolean",
+            "description": "Take the visitor from `CF-Connecting-IP` on requests from Cloudflare's addresses, for\nrate limits and `X-Forwarded-For`",
+            "default": false
+          },
           "headers": {
             "$ref": "#/components/schemas/ResponseHeaders",
             "description": "Response headers set on every answer, replacing the app's",

@@ -28,6 +28,7 @@ pub struct RoutePolicy {
     pub(crate) max_body_bytes: Option<usize>,
     pub(crate) response_timeout: Option<Duration>,
     pub(crate) maintenance: bool,
+    pub(crate) cloudflare: bool,
     security_headers: bool,
     headers: Vec<(HeaderName, HeaderValue)>,
 }
@@ -48,6 +49,7 @@ impl RoutePolicy {
                 .timeout_secs
                 .map(|secs| Duration::from_secs(u64::from(secs.get()))),
             maintenance: settings.maintenance,
+            cloudflare: settings.cloudflare,
             security_headers: settings.security_headers,
             // the settings were validated when saved, so nothing is dropped here in practice
             headers: settings

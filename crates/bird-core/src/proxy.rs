@@ -39,6 +39,9 @@ pub struct ProxySettings {
     pub headers: ResponseHeaders,
     /// Answer 503 instead of passing requests to the app
     pub maintenance: bool,
+    /// Take the visitor from `CF-Connecting-IP` on requests from Cloudflare's addresses, for
+    /// rate limits and `X-Forwarded-For`
+    pub cloudflare: bool,
 }
 
 impl ProxySettings {
@@ -197,7 +200,8 @@ mod tests {
     fn reads_every_setting() {
         let settings: ProxySettings = serde_json::from_str(
             r#"{"rate_limit":{"per_second":10,"burst":20},"max_body_mb":5,"timeout_secs":300,
-                "security_headers":true,"headers":{"Cache-Control":"no-store"},"maintenance":true}"#,
+                "security_headers":true,"headers":{"Cache-Control":"no-store"},"maintenance":true,
+                "cloudflare":true}"#,
         )
         .unwrap();
         let limit = settings.rate_limit.unwrap();
@@ -208,7 +212,7 @@ mod tests {
             settings.headers.iter().collect::<Vec<_>>(),
             [("cache-control", "no-store")]
         );
-        assert!(settings.security_headers && settings.maintenance);
+        assert!(settings.security_headers && settings.maintenance && settings.cloudflare);
     }
 
     #[test]

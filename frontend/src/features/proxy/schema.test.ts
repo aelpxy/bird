@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ProxySettings } from './api'
 import { DEFAULT_MAX_BODY_MB, parseHeaders, proxySchema, toForm, toSettings } from './schema'
 
-const unset: ProxySettings = { rate_limit: null, max_body_mb: null, timeout_secs: null, security_headers: false, headers: {}, maintenance: false }
+const unset: ProxySettings = { rate_limit: null, max_body_mb: null, timeout_secs: null, security_headers: false, headers: {}, maintenance: false, cloudflare: false }
 
 describe('proxy settings form', () => {
   it('reads headers one per line and lowercases their names', () => {
@@ -13,7 +13,7 @@ describe('proxy settings form', () => {
   })
 
   it('round-trips settings and sends defaults back as unset', () => {
-    const form = toForm({ ...unset, rate_limit: { per_second: 5, burst: 9 }, timeout_secs: 300, headers: { a: 'b' } })
+    const form = toForm({ ...unset, cloudflare: true, rate_limit: { per_second: 5, burst: 9 }, timeout_secs: 300, headers: { a: 'b' } })
     expect(form.maxBodyMb).toBe(DEFAULT_MAX_BODY_MB)
     expect(toSettings(form, true)).toEqual({
       rate_limit: { per_second: 5, burst: 9 },
@@ -22,6 +22,7 @@ describe('proxy settings form', () => {
       security_headers: false,
       headers: { a: 'b' },
       maintenance: true,
+      cloudflare: true,
     })
   })
 

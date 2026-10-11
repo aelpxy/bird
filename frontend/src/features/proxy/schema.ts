@@ -35,6 +35,7 @@ export const proxySchema = z.object({
   burst: wholeNumber(1, 100_000, 'the burst'),
   maxBodyMb: wholeNumber(1, 10_240, 'the body limit'),
   timeoutSecs: wholeNumber(1, 3_600, 'the timeout'),
+  cloudflare: z.boolean(),
   securityHeaders: z.boolean(),
   headers: z.string().refine((text) => 'headers' in parseHeaders(text), {
     error: (issue) => {
@@ -53,6 +54,7 @@ export function toForm(settings: ProxySettings): ProxyForm {
     burst: settings.rate_limit?.burst ?? SUGGESTED_BURST,
     maxBodyMb: settings.max_body_mb ?? DEFAULT_MAX_BODY_MB,
     timeoutSecs: settings.timeout_secs ?? DEFAULT_TIMEOUT_SECS,
+    cloudflare: settings.cloudflare ?? false,
     securityHeaders: settings.security_headers ?? false,
     headers: formatHeaders(settings.headers),
   }
@@ -68,5 +70,6 @@ export function toSettings(form: ProxyForm, maintenance: boolean): ProxySettings
     security_headers: form.securityHeaders,
     headers: 'headers' in parsed ? parsed.headers : {},
     maintenance,
+    cloudflare: form.cloudflare,
   }
 }

@@ -55,6 +55,20 @@ export function ProxyForm({ scope, service, settings }: { scope: Scope; service:
 
         <fieldset className="flex flex-col gap-4">
           <Eyebrow as="legend" className="mb-3">
+            Cloudflare
+          </Eyebrow>
+          <form.AppField name="cloudflare">
+            {(field) => (
+              <field.CheckboxField
+                label="The domains are proxied by Cloudflare"
+                description="Takes each visitor's address from CF-Connecting-IP on requests that come from Cloudflare's network, for rate limits and X-Forwarded-For. Requests from anywhere else keep their own address."
+              />
+            )}
+          </form.AppField>
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-4">
+          <Eyebrow as="legend" className="mb-3">
             Limits
           </Eyebrow>
           <div className="grid gap-4 sm:grid-cols-2">

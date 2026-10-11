@@ -68,7 +68,7 @@ To deploy on every push, use the [GitHub Action](docs/github-actions.md). For AI
 ## How it works
 
 - Deploys start new machines and move traffic only once they pass a health check; a failed deploy keeps the old ones serving.
-- The proxy routes by hostname and gets Let's Encrypt certificates for your domains with `--acme-email`. Per app, the dashboard sets rate limits, body and timeout limits, security and custom headers, domain redirects and a maintenance page; every answer names the machine that served it in `x-machine-id`.
+- The proxy routes by hostname and gets Let's Encrypt certificates for your domains with `--acme-email`. Per app, the dashboard sets rate limits (by the real visitor behind Cloudflare too), body and timeout limits, security and custom headers, domain redirects and a maintenance page; every answer names the machine that served it in `x-machine-id`.
 - Each environment has its own private network; services find each other by name.
 - A supervisor restarts stopped machines and replaces unhealthy ones.
 

@@ -1389,6 +1389,12 @@ export interface components {
         /** @description How bird's proxy treats one service's requests; the default changes nothing */
         ProxySettings: {
             /**
+             * @description Take the visitor from `CF-Connecting-IP` on requests from Cloudflare's addresses, for
+             *     rate limits and `X-Forwarded-For`
+             * @default false
+             */
+            cloudflare: boolean;
+            /**
              * @description Response headers set on every answer, replacing the app's
              * @default {}
              */
