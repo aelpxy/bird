@@ -59,7 +59,8 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 * Stats take two podman samples half a second apart, since podman's single-sample CPU is the average since start.
 * Logs: `bird_podman::Lines` rejoins long lines podman splits; `follow` tracks the service, not fixed machines. Logs are read with `timestamps=true`: every piece of a split line carries its own time, so `Lines` strips each one and a joined line keeps its first piece's, sent as `LogEntry.at` in unix milliseconds.
 * The proxy sets `x-server: Bird` on every response (not configurable), caps request bodies and fails response bodies that go idle.
-* Templates in `crates/bird-server/templates/` are embedded `bird.toml` manifests; pin their images to a major tag.
+* Templates in `crates/bird-server/templates/` are embedded `bird.toml` manifests; pin their images to a major tag (or the LTS line, or an exact version when the image publishes no moving tag), and deploy each new one and connect with its own client before adding it.
+* A fresh server is seeded with org `default`, project `default` and environment `production`, only while no org exists, so deleting them sticks. Projects created without an org go to the server's only org, else `default` while it exists, else the request must name one.
 
 ## Dashboard
 

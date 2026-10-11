@@ -109,3 +109,60 @@ async fn last_owners_stay_until_their_org_is_empty() {
     );
     birdd.stop().await;
 }
+
+// a deleted starting org stays deleted across restarts, and projects go to the only org left
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires a running podman socket"]
+async fn the_starting_org_is_only_created_on_an_empty_server() {
+    let mut birdd = Birdd::start().await;
+    let root = birdd.root.clone();
+    let acme = birdd.project("acme");
+    for path in ["/v1/projects/default", "/v1/orgs/default"] {
+        let removed = birdd.delete(&root, path).await;
+        assert_eq!(
+            removed.status,
+            StatusCode::NO_CONTENT,
+            "{path}: {:?}",
+            removed.body
+        );
+    }
+    let created = birdd.post(&root, "/v1/orgs", json!({ "name": acme })).await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.body);
+
+    birdd.restart().await;
+    let orgs = birdd.get(&root, "/v1/orgs").await.body;
+    assert_eq!(orgs.as_array().unwrap().len(), 1, "{orgs}");
+    assert_eq!(orgs[0]["name"], acme.as_str());
+
+    let shop = birdd.project("shop");
+    let placed = birdd
+        .post(&root, "/v1/projects", json!({ "name": shop }))
+        .await;
+    assert_eq!(placed.status, StatusCode::CREATED, "{:?}", placed.body);
+    assert_eq!(placed.body["org"], acme.as_str());
+
+    let beta = birdd.project("beta");
+    birdd.post(&root, "/v1/orgs", json!({ "name": beta })).await;
+    let unclear = birdd
+        .post(
+            &root,
+            "/v1/projects",
+            json!({ "name": birdd.project("blog") }),
+        )
+        .await;
+    assert_eq!(
+        unclear.status,
+        StatusCode::BAD_REQUEST,
+        "{:?}",
+        unclear.body
+    );
+    assert!(
+        unclear.body["error"]
+            .as_str()
+            .unwrap()
+            .contains("name one with --org"),
+        "{:?}",
+        unclear.body
+    );
+    birdd.stop().await;
+}

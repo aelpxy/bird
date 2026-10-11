@@ -134,7 +134,7 @@ async fn joined_orgs(
     }
 }
 
-// the org named, else the only one the user administers, else `default` for server admins
+// the org named, else the only one a member administers; server admins get `fallback_org`
 async fn owning_org(state: &AppState, principal: &Principal, named: Option<&Name>) -> Result<Org> {
     if let Some(name) = named {
         return orgs::find(state, name).await;
@@ -142,7 +142,8 @@ async fn owning_org(state: &AppState, principal: &Principal, named: Option<&Name
     let user = match principal {
         Principal::User(user) if user.role == UserRole::Member => user,
         Principal::Root | Principal::User(_) => {
-            return orgs::find(state, &DEFAULT_ORG.parse()?).await;
+            let all = state.db.call(|store| store.list_orgs()).await?;
+            return fallback_org(all);
         }
     };
     let user_id = user.id;
@@ -165,10 +166,65 @@ async fn owning_org(state: &AppState, principal: &Principal, named: Option<&Name
     }
 }
 
+// the server's only org, else the starting `default` one while it exists, else they must say which
+fn fallback_org(mut orgs: Vec<Org>) -> Result<Org> {
+    if orgs.len() == 1 {
+        return orgs.pop().ok_or_else(|| Error::PickOrg(String::new()));
+    }
+    if let Some(index) = orgs.iter().position(|org| org.name.as_str() == DEFAULT_ORG) {
+        return Ok(orgs.swap_remove(index));
+    }
+    if orgs.is_empty() {
+        return Err(Error::PickOrg(
+            "there is no org yet, create one with `bird org create`".to_owned(),
+        ));
+    }
+    let names: Vec<&str> = orgs.iter().map(|org| org.name.as_str()).collect();
+    Err(Error::PickOrg(format!(
+        "this server has several orgs, name one with --org: {}",
+        names.join(", ")
+    )))
+}
+
 fn summary(project: Project, org: Name, environments: Vec<Environment>) -> ProjectSummary {
     ProjectSummary {
         name: project.name,
         org,
         environments: environments.into_iter().map(|env| env.name).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bird_core::OrgId;
+
+    use super::*;
+
+    fn org(name: &str) -> Org {
+        Org {
+            id: OrgId::generate(),
+            name: name.parse().unwrap(),
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn falls_back_to_the_only_org_then_to_default() {
+        assert_eq!(
+            fallback_org(vec![org("acme")]).unwrap().name.as_str(),
+            "acme"
+        );
+        let both = vec![org("acme"), org("default")];
+        assert_eq!(fallback_org(both).unwrap().name.as_str(), "default");
+    }
+
+    #[test]
+    fn asks_which_org_when_it_cannot_tell() {
+        let err = fallback_org(vec![org("acme"), org("beta")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "this server has several orgs, name one with --org: acme, beta"
+        );
+        assert!(matches!(fallback_org(Vec::new()), Err(Error::PickOrg(_))));
     }
 }

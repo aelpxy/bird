@@ -47,7 +47,7 @@ pub async fn run_until(
     let org: Name = DEFAULT_ORG.parse()?;
     let project: Name = DEFAULT_PROJECT.parse()?;
     let environment: Name = environments::FIRST_ENVIRONMENT.parse()?;
-    db.call(move |store| ensure_environment(store, &org, &project, &environment))
+    db.call(move |store| seed_empty_server(store, &org, &project, &environment))
         .await?;
 
     let podman = Podman::new(config.podman_socket.clone().unwrap_or_else(default_socket));
@@ -180,26 +180,23 @@ async fn backup_storage(config: &Config, data_dir: &Path) -> Result<BackupStorag
 
 // the network birdd was started with serves it, as it did before environments had their own;
 // projects from before orgs join the default org
-fn ensure_environment(
+// a fresh server gets an org, project and environment to start in; once any org exists they are
+// the users' to delete, so a restart never brings them back
+fn seed_empty_server(
     store: &mut Store,
     org: &Name,
     project: &Name,
     environment: &Name,
 ) -> bird_store::Result<()> {
     store.transaction(|store| {
-        let org = match store.org_by_name(org)? {
-            Some(existing) => existing,
-            None => store.create_org(org)?,
-        };
-        store.adopt_projects(org.id)?;
-        let project = match store.project_by_name(project)? {
-            Some(existing) => existing,
-            None => store.create_project(org.id, project)?,
-        };
-        if store
-            .environment_by_name(project.id, environment)?
-            .is_none()
-        {
+        if !store.list_orgs()?.is_empty() {
+            return Ok(());
+        }
+        let org = store.create_org(org)?;
+        // projects from before orgs existed belong to the first org
+        let adopted = store.adopt_projects(org.id)?;
+        if adopted == 0 && store.list_projects()?.is_empty() {
+            let project = store.create_project(org.id, project)?;
             store.create_environment(project.id, environment, None)?;
         }
         Ok(())
