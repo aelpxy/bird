@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
 
 concurrency:
@@ -16,11 +17,37 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  frontend:
+    name: dashboard lint, tests, build
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dashboard
+          path: frontend/dist
+          if-no-files-found: error
+
   check:
     name: fmt, clippy, unit tests
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -31,6 +58,7 @@ jobs:
 
   podman:
     name: integration tests with podman
+    needs: frontend
     runs-on: ubuntu-24.04
     # ubuntu's podman is 4.x and bird needs 5; podman keeps its storage on a volume, as overlay
     # cannot sit on the container's own overlay filesystem
@@ -45,7 +73,11 @@ jobs:
           mkdir -p /etc/containers/containers.conf.d
           printf '[containers]\nlog_driver = "k8s-file"\n\n[engine]\nevents_logger = "file"\n' \
             > /etc/containers/containers.conf.d/ci.conf
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: dashboard
+          path: frontend/dist
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # the api is started in the same step, a background process may not outlive its step
@@ -55,3 +87,87 @@ jobs:
           podman system service --time=0 unix:///run/podman/podman.sock &
           for _ in $(seq 1 50); do [ -S /run/podman/podman.sock ] && break; sleep 0.2; done
           cargo test --no-fail-fast -- --include-ignored
+
+  build:
+    name: build ${{ matrix.arch }}
+    if: github.event_name == 'push'
+    needs: [frontend, check, podman]
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      TARGET: ${{ matrix.arch }}-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: dashboard
+          path: frontend/dist
+      # static musl binaries run on any distro with podman 5, whatever its glibc
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.TARGET }}
+      - run: |
+          export "CC_${TARGET//-/_}=musl-gcc"
+          cargo build --release --locked --target "$TARGET"
+      - name: Package
+        run: |
+          dir="bird-${{ matrix.arch }}-linux"
+          mkdir "$dir"
+          cp "target/$TARGET/release/birdd" "target/$TARGET/release/bird" README.md contrib/systemd/birdd.service "$dir/"
+          tar -czf "$dir.tar.gz" "$dir"
+          sha256sum "$dir.tar.gz" > "$dir.tar.gz.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bird-${{ matrix.arch }}-linux
+          path: bird-${{ matrix.arch }}-linux.tar.gz*
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bird-*-linux
+          path: dist
+          merge-multiple: true
+      # every commit on main replaces the edge prerelease; a version tag gets a release of its own
+      - name: Move the edge tag to this commit
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git tag -f edge "$GITHUB_SHA"
+          git push -f origin refs/tags/edge
+      - uses: softprops/action-gh-release@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: edge
+          name: edge
+          body: |
+            Prebuilt from ${{ github.sha }} on main, replaced by every commit. Not a stable release.
+
+            Static Linux binaries of `birdd` and `bird` with the dashboard built in; birdd needs Podman 5 or newer.
+          prerelease: true
+          make_latest: false
+          files: dist/*
+          fail_on_unmatched_files: true
+      - uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          generate_release_notes: true
+          make_latest: true
+          files: dist/*
+          fail_on_unmatched_files: true

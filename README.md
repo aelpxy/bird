@@ -41,12 +41,15 @@ We plan a common runtime interface with adapters for Podman, Firecracker, [conta
 
 ## Quick start
 
+Prebuilt static Linux binaries of every commit on `main` are on the [edge release](https://github.com/aelpxy/bird/releases/tag/edge). To build it yourself:
+
 ```sh
+pnpm --dir frontend install && pnpm --dir frontend build   # the dashboard, embedded into birdd
 cargo build --release
 ./target/release/birdd --data-dir ./data --proxy-addr 0.0.0.0:8080
 ```
 
-The API listens on `127.0.0.1:7070` and the proxy on `0.0.0.0:8080` (`:80` by default). The daemon puts its database and an API token in `./data`. In another terminal:
+The API and the dashboard listen on `127.0.0.1:7070` and the proxy on `0.0.0.0:8080` (`:80` by default). The daemon puts its database and an API token in `./data`. In another terminal:
 
 ```sh
 ./target/release/bird login 127.0.0.1:7070 < ./data/api-token

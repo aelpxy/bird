@@ -6,6 +6,7 @@ mod commands;
 mod cookies;
 mod credentials;
 mod cron;
+mod dashboard;
 mod deploy;
 mod deployments;
 mod docs;
@@ -64,6 +65,7 @@ pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
                 async move { ([(CONTENT_TYPE, "application/json")], spec.to_string()) }
             }),
         )
+        .fallback(dashboard::serve)
         .with_state(state)
 }
 

@@ -87,8 +87,16 @@ if ! command -v cargo >/dev/null; then
     PATH="$HOME/.cargo/bin:$PATH"
 fi
 ok "podman $podman_version, $(cargo --version)"
+build_dashboard=true
+if ! command -v pnpm >/dev/null; then
+    warn "pnpm is not installed, so birdd is built without its dashboard (https://pnpm.io/installation)"
+    build_dashboard=false
+fi
 
 step "building bird"
+if $build_dashboard; then
+    (cd "$repo/frontend" && pnpm install --frozen-lockfile --silent && pnpm build >/dev/null)
+fi
 (cd "$repo" && cargo build --release --quiet)
 install -Dm755 "$repo/target/release/birdd" "$repo/target/release/bird" -t "$bin_dir"
 ok "installed birdd and bird to $bin_dir"
@@ -161,6 +169,7 @@ $high_ports && proxy_port=8080
 cat <<EOF
 
 ${bold}bird is ready.${reset}
+  dashboard:         http://$api (bird user create <name> --admin, then bird user passwd --user <name>)
   deploy something:  bird deploy web docker.io/library/nginx:alpine --domain web.localhost
   try it:            curl -H 'Host: web.localhost' http://127.0.0.1:$proxy_port
   logs:              journalctl --user -u birdd -f
