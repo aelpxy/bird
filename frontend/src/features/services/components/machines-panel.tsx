@@ -1,20 +1,24 @@
 import { ChevronRight, Server } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { focusRing } from '@/components/ui/control-styles'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableCell } from '@/components/ui/table'
 import { tableRowClass } from '@/components/ui/table-styles'
+import type { Scope } from '@/lib/api/paths'
 import { bytes, timeAgo } from '@/lib/format'
 import type { Machine, Service } from '@/features/services/api'
 import { machineTones } from '@/features/services/status'
-import { UsageChart } from './usage-chart'
+import { UsageCharts } from '@/features/metrics/components/usage-panel'
+import { metricsQuery } from '@/features/metrics/api'
 
 const LAYOUT = 'sm:grid-cols-[9.5rem_6.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]'
 const COLUMNS = [{ label: 'Machine' }, { label: 'State' }, { label: 'CPU' }, { label: 'Memory' }, { label: 'Network' }]
 const SAMPLE_SECONDS = 30
 
-export function MachinesPanel({ service }: { service: Service }) {
+export function MachinesPanel({ scope, service }: { scope: Scope; service: Service }) {
   const [open, setOpen] = useState<string | null>(null)
   const machines = service.deployment?.machines ?? []
   if (machines.length === 0) {
@@ -29,15 +33,15 @@ export function MachinesPanel({ service }: { service: Service }) {
   return (
     <Table label="Machines" columns={COLUMNS} layout={LAYOUT}>
       {machines.map((machine) => (
-        <MachineRow key={machine.id} machine={machine} service={service} open={open === machine.id} onToggle={() => setOpen(open === machine.id ? null : machine.id)} />
+        <MachineRow key={machine.id} scope={scope} machine={machine} service={service} open={open === machine.id} onToggle={() => setOpen(open === machine.id ? null : machine.id)} />
       ))}
     </Table>
   )
 }
 
-type RowProps = { machine: Machine; service: Service; open: boolean; onToggle: () => void }
+type RowProps = { scope: Scope; machine: Machine; service: Service; open: boolean; onToggle: () => void }
 
-function MachineRow({ machine, service, open, onToggle }: RowProps) {
+function MachineRow({ scope, machine, service, open, onToggle }: RowProps) {
   const stats = machine.stats
   const memoryLimit = service.memory * 1024 * 1024
   const chartsId = `charts-${machine.id}`
@@ -92,7 +96,7 @@ function MachineRow({ machine, service, open, onToggle }: RowProps) {
       {open && (
         <div id={chartsId} role="row" className="border-t border-line bg-sunken">
           <div role="cell" className="px-4 py-4">
-            <MachineCharts machine={machine} service={service} />
+            <MachineCharts scope={scope} machine={machine} service={service} />
           </div>
         </div>
       )}
@@ -100,30 +104,15 @@ function MachineRow({ machine, service, open, onToggle }: RowProps) {
   )
 }
 
-// birdd samples every running machine twice a minute and keeps an hour, in memory only
-function MachineCharts({ machine, service }: { machine: Machine; service: Service }) {
-  const history = machine.history ?? []
-  if (history.length < 2) {
-    return (
-      <p className="text-xs text-fg-faint">
-        {machine.state === 'running'
-          ? `Collecting usage. The charts fill in every ${SAMPLE_SECONDS} seconds and keep the last hour.`
-          : 'Usage is only kept while the machine runs.'}
-      </p>
-    )
+// the last hour of this machine alone, from the history birdd keeps for the service
+function MachineCharts({ scope, machine, service }: { scope: Scope; machine: Machine; service: Service }) {
+  const metrics = useQuery(metricsQuery(scope, service.name, '1h', machine.id))
+  if (metrics.isPending) return <Skeleton className="h-36 w-full" />
+  if (metrics.isError) return <p className="text-xs text-fg-faint">Couldn&apos;t load usage.</p>
+  if (metrics.data.points.length < 2) {
+    return <p className="text-xs text-fg-faint">Collecting usage. The charts fill in every {SAMPLE_SECONDS} seconds.</p>
   }
-  const memoryLimit = service.memory * 1024 * 1024
-  return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <UsageChart
-        title="CPU"
-        points={history.map((point) => ({ at: point.at, value: point.cpu_millicores }))}
-        limit={service.cpus}
-        format={(millicores) => `${(millicores / 1000).toFixed(2)} cores`}
-      />
-      <UsageChart title="Memory" points={history.map((point) => ({ at: point.at, value: point.memory_bytes }))} limit={memoryLimit} format={bytes} />
-    </div>
-  )
+  return <UsageCharts data={metrics.data} now={metrics.dataUpdatedAt} range="1h" cpuLimit={service.cpus} memoryLimit={service.memory * 1024 * 1024} traffic={false} />
 }
 
 function Meter({ label, value, limit, ratio }: { label: string; value: string; limit: string; ratio: number }) {

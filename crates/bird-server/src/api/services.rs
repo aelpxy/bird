@@ -71,7 +71,6 @@ async fn add_stats(state: &AppState, summary: &mut ServiceSummary) -> Result<()>
     let mut sampled = stats::sample(state, &containers).await;
     for machine in &mut deployment.machines {
         machine.stats = sampled.remove(&machine.id);
-        machine.history = state.metrics.history(machine.id);
     }
     Ok(())
 }
@@ -164,7 +163,6 @@ fn summarize(store: &Store, service: bird_core::Service) -> bird_store::Result<S
             state: m.state,
             updated_at: m.updated_at,
             stats: None,
-            history: Vec::new(),
         })
         .collect();
     Ok(ServiceSummary {

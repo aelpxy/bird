@@ -1,6 +1,7 @@
 use bird_core::{
     BackupSchedule, Command, CpuLimit, DeploymentId, DeploymentStatus, HealthCheck, HealthTimeout,
-    Hostname, ImageRef, MachineId, MachineState, MemoryLimit, Name, Port, Replicas, ServiceState,
+    Hostname, ImageRef, MachineId, MachineState, MemoryLimit, MetricPoint, MetricsRange, Name,
+    Port, Replicas, ServiceState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -63,20 +64,17 @@ pub struct MachineSummary {
     /// Only sampled when asked for, and only for running machines
     #[serde(default)]
     pub stats: Option<MachineStats>,
-    /// CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only
-    /// sent with stats
-    #[serde(default)]
-    pub history: Vec<MetricPoint>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// A service's usage over a range, from samples birdd takes every 30 seconds
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct MetricPoint {
-    /// Unix seconds
-    pub at: i64,
-    /// Thousandths of a core in use, averaged since the point before
-    pub cpu_millicores: u64,
-    pub memory_bytes: u64,
+pub struct ServiceMetrics {
+    pub range: MetricsRange,
+    /// Seconds each point covers
+    pub step_secs: i64,
+    /// Oldest first; steps with no running machine are left out
+    pub points: Vec<MetricPoint>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

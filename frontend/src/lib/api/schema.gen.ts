@@ -557,6 +557,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{project}/environments/{environment}/services/{name}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show a service's cpu, memory and traffic over time */
+        get: operations["get_service_metrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}/environments/{environment}/services/{name}/proxy": {
         parameters: {
             query?: never;
@@ -1356,11 +1373,6 @@ export interface components {
             processes: number;
         };
         MachineSummary: {
-            /**
-             * @description CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only
-             *     sent with stats
-             */
-            history?: components["schemas"]["MetricPoint"][];
             id: components["schemas"]["MachineId"];
             state: components["schemas"]["MachineState"];
             stats?: components["schemas"]["MachineStats"] | null;
@@ -1372,20 +1384,36 @@ export interface components {
         };
         /** Format: int32 */
         MemoryLimit: number;
+        /** @description A service's usage over one step: averages and peaks summed over its machines, traffic in total */
         MetricPoint: {
             /**
              * Format: int64
-             * @description Unix seconds
+             * @description Start of the step, in unix seconds
              */
             at: number;
-            /**
-             * Format: int64
-             * @description Thousandths of a core in use, averaged since the point before
-             */
+            /** Format: int64 */
             cpu_millicores: number;
             /** Format: int64 */
+            cpu_peak_millicores: number;
+            /**
+             * Format: int32
+             * @description Machines that reported during the step
+             */
+            machines: number;
+            /** Format: int64 */
             memory_bytes: number;
+            /** Format: int64 */
+            memory_peak_bytes: number;
+            /** Format: int64 */
+            net_rx_bytes: number;
+            /** Format: int64 */
+            net_tx_bytes: number;
         };
+        /**
+         * @description A stretch of usage history to read
+         * @enum {string}
+         */
+        MetricsRange: "1h" | "6h" | "7d" | "30d";
         MountPath: string;
         Name: string;
         OrgMember: {
@@ -1497,6 +1525,17 @@ export interface components {
         };
         ScaleRequest: {
             replicas: components["schemas"]["Replicas"];
+        };
+        /** @description A service's usage over a range, from samples birdd takes every 30 seconds */
+        ServiceMetrics: {
+            /** @description Oldest first; steps with no running machine are left out */
+            points: components["schemas"]["MetricPoint"][];
+            range: components["schemas"]["MetricsRange"];
+            /**
+             * Format: int64
+             * @description Seconds each point covers
+             */
+            step_secs: number;
         };
         /** @enum {string} */
         ServiceState: "running" | "stopped";
@@ -3771,6 +3810,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LogEntry"][];
+                };
+            };
+            /** @description Missing or invalid API token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service or resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_service_metrics: {
+        parameters: {
+            query?: {
+                /** @description How far back: 1h, 6h, 7d or 30d, default 1h */
+                range?: string;
+                /** @description Only this machine instead of the whole service */
+                machine?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Project name */
+                project: string;
+                /** @description Environment name */
+                environment: string;
+                /** @description Service name */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usage in even steps, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceMetrics"];
                 };
             };
             /** @description Missing or invalid API token */

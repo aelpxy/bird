@@ -7,6 +7,7 @@ mod cron;
 mod health;
 mod id;
 mod image;
+mod metrics;
 mod model;
 mod proxy;
 pub mod reference;
@@ -26,6 +27,7 @@ pub use id::{
 };
 pub use id::{CronJobId, CronRunId};
 pub use image::ImageLineage;
+pub use metrics::{MetricPoint, MetricSample, MetricsRange, Resolution};
 pub use model::{
     ApiToken, Backup, BackupTrigger, BackupVolume, Certificate, Deployment, DeploymentStatus,
     Domain, Environment, Machine, MachineState, Org, OrgRole, Project, Registry, Service,

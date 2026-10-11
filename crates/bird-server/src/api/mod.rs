@@ -16,6 +16,7 @@ mod domains;
 mod error;
 mod login;
 mod logs;
+mod metrics;
 mod openapi;
 mod orgs;
 mod power;
@@ -118,6 +119,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(deployments::rollback))
         .routes(routes!(deployment_logs::get))
         .routes(routes!(logs::logs))
+        .routes(routes!(metrics::get))
         .routes(routes!(scale::update))
         .routes(routes!(variables::list, variables::update))
         .routes(routes!(variables::get))

@@ -116,6 +116,15 @@ async fn environments_are_isolated() {
         .get(&root, &format!("{production}/services/probe"))
         .await;
     assert_eq!(probe.body["references"], json!(["only-here"]));
+    let usage = birdd
+        .get(
+            &root,
+            &format!("{production}/services/probe/metrics?range=7d"),
+        )
+        .await;
+    assert_eq!(usage.status, StatusCode::OK, "{:?}", usage.body);
+    assert_eq!(usage.body["step_secs"], json!(3600));
+    assert!(usage.body["points"].is_array());
 
     // an environment with services is not deleted, an empty one takes its network with it
     let refused = birdd

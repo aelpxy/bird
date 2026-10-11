@@ -9,6 +9,7 @@ mod environments;
 mod error;
 mod logins;
 mod machines;
+mod metrics;
 mod migrate;
 mod orgs;
 mod projects;

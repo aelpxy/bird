@@ -118,6 +118,7 @@ mod tests {
             "/services/{name}/deployments",
             "/services/{name}/rollback",
             "/services/{name}/logs",
+            "/services/{name}/metrics",
             "/services/{name}/scale",
             "/services/{name}/variables",
             "/services/{name}/variables/{key}",

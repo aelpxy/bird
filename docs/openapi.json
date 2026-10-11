@@ -3190,6 +3190,94 @@
         }
       }
     },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/metrics": {
+      "get": {
+        "tags": [
+          "services"
+        ],
+        "summary": "Show a service's cpu, memory and traffic over time",
+        "operationId": "get_service_metrics",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "description": "How far back: 1h, 6h, 7d or 30d, default 1h",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "machine",
+            "in": "query",
+            "description": "Only this machine instead of the whole service",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage in even steps, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceMetrics"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{project}/environments/{environment}/services/{name}/proxy": {
       "get": {
         "tags": [
@@ -6778,13 +6866,6 @@
           "updated_at"
         ],
         "properties": {
-          "history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MetricPoint"
-            },
-            "description": "CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only\nsent with stats"
-          },
           "id": {
             "$ref": "#/components/schemas/MachineId"
           },
@@ -6817,29 +6898,70 @@
       },
       "MetricPoint": {
         "type": "object",
+        "description": "A service's usage over one step: averages and peaks summed over its machines, traffic in total",
         "required": [
           "at",
           "cpu_millicores",
-          "memory_bytes"
+          "cpu_peak_millicores",
+          "memory_bytes",
+          "memory_peak_bytes",
+          "net_rx_bytes",
+          "net_tx_bytes",
+          "machines"
         ],
         "properties": {
           "at": {
             "type": "integer",
             "format": "int64",
-            "description": "Unix seconds"
+            "description": "Start of the step, in unix seconds"
           },
           "cpu_millicores": {
             "type": "integer",
             "format": "int64",
-            "description": "Thousandths of a core in use, averaged since the point before",
+            "minimum": 0
+          },
+          "cpu_peak_millicores": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "machines": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Machines that reported during the step",
             "minimum": 0
           },
           "memory_bytes": {
             "type": "integer",
             "format": "int64",
             "minimum": 0
+          },
+          "memory_peak_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "net_rx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "net_tx_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         }
+      },
+      "MetricsRange": {
+        "type": "string",
+        "description": "A stretch of usage history to read",
+        "enum": [
+          "1h",
+          "6h",
+          "7d",
+          "30d"
+        ]
       },
       "MountPath": {
         "type": "string"
@@ -7153,6 +7275,32 @@
         "properties": {
           "replicas": {
             "$ref": "#/components/schemas/Replicas"
+          }
+        }
+      },
+      "ServiceMetrics": {
+        "type": "object",
+        "description": "A service's usage over a range, from samples birdd takes every 30 seconds",
+        "required": [
+          "range",
+          "step_secs",
+          "points"
+        ],
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricPoint"
+            },
+            "description": "Oldest first; steps with no running machine are left out"
+          },
+          "range": {
+            "$ref": "#/components/schemas/MetricsRange"
+          },
+          "step_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds each point covers"
           }
         }
       },

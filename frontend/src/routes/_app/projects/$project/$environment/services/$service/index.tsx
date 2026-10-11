@@ -5,6 +5,7 @@ import { Section } from '@/components/ui/section'
 import { Skeleton } from '@/components/ui/skeleton'
 import { dateTime } from '@/lib/format'
 import { serviceQuery } from '@/features/services/api'
+import { UsagePanel } from '@/features/metrics/components/usage-panel'
 import { MachinesPanel } from '@/features/services/components/machines-panel'
 import { ServiceConfig } from '@/features/services/components/service-config'
 import { useServiceScope } from '@/features/services/use-service-scope'
@@ -22,15 +23,20 @@ function Overview() {
   if (!data) return <Skeleton className="h-48 w-full" />
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-      <Section title="Machines">
-        {data.failed_deploy && (
-          <Alert>
-            The deploy on {dateTime(data.failed_deploy.created_at)} failed, so the previous deployment is still
-            running. See Deployments and Logs for why.
-          </Alert>
-        )}
-        <MachinesPanel service={data} />
-      </Section>
+      <div className="flex min-w-0 flex-col gap-8">
+        <Section title="Machines">
+          {data.failed_deploy && (
+            <Alert>
+              The deploy on {dateTime(data.failed_deploy.created_at)} failed, so the previous deployment is still
+              running. See Deployments and Logs for why.
+            </Alert>
+          )}
+          <MachinesPanel scope={scope} service={data} />
+        </Section>
+        <Section title="Usage">
+          <UsagePanel scope={scope} service={data} />
+        </Section>
+      </div>
       <Section title="Configuration">
         <ServiceConfig scope={scope} service={data} />
       </Section>

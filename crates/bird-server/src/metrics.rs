@@ -1,10 +1,9 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
-use bird_api::MetricPoint;
-use bird_core::MachineId;
+use bird_core::{MachineId, MetricSample, ServiceId};
 use bird_podman::ContainerStats;
 use tokio::time::{MissedTickBehavior, interval};
 
@@ -13,54 +12,47 @@ use crate::state::AppState;
 use crate::stats;
 
 const SAMPLE_EVERY: Duration = Duration::from_secs(30);
-// an hour of samples
-const KEEP_POINTS: usize = 120;
+// rolling up every ten samples keeps the half-minute rows from piling up past their six hours
+const ROLL_UP_EVERY_TICKS: u32 = 10;
 
-/// Recent cpu and memory of every running machine, kept in memory only
+/// Each running machine's previous reading, since cpu and traffic are counted between two
 #[derive(Default)]
-pub(crate) struct Metrics(Mutex<HashMap<MachineId, History>>);
-
-struct History {
-    last: ContainerStats,
-    points: VecDeque<MetricPoint>,
-}
+pub(crate) struct Metrics(Mutex<HashMap<MachineId, ContainerStats>>);
 
 impl Metrics {
-    pub(crate) fn history(&self, machine: MachineId) -> Vec<MetricPoint> {
-        let machines = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        machines
-            .get(&machine)
-            .map(|history| history.points.iter().copied().collect())
-            .unwrap_or_default()
-    }
-
-    // machines missing from a sample have stopped, so their history goes with them
-    fn record(&self, sampled: HashMap<MachineId, ContainerStats>, at: i64) {
-        let mut machines = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        machines.retain(|machine, _| sampled.contains_key(machine));
-        for (machine, now) in sampled {
-            let Some(history) = machines.get_mut(&machine) else {
-                machines.insert(
-                    machine,
-                    History {
-                        last: now,
-                        points: VecDeque::with_capacity(KEEP_POINTS),
+    // machines missing from a round have stopped, so their reading goes with them
+    fn advance(
+        &self,
+        readings: Vec<(ServiceId, MachineId, ContainerStats)>,
+    ) -> Vec<(ServiceId, MetricSample)> {
+        let mut last = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut next = HashMap::with_capacity(readings.len());
+        let samples = readings
+            .into_iter()
+            .filter_map(|(service, machine, now)| {
+                next.insert(machine, now);
+                let before = last.get(&machine)?;
+                Some((
+                    service,
+                    MetricSample {
+                        machine,
+                        cpu_millicores: now.cpu_millicores_since(before)?,
+                        memory_bytes: now.memory_bytes,
+                        // a restarted container counts from zero again
+                        net_rx_bytes: now
+                            .net_rx_bytes
+                            .checked_sub(before.net_rx_bytes)
+                            .unwrap_or(now.net_rx_bytes),
+                        net_tx_bytes: now
+                            .net_tx_bytes
+                            .checked_sub(before.net_tx_bytes)
+                            .unwrap_or(now.net_tx_bytes),
                     },
-                );
-                continue;
-            };
-            if let Some(cpu_millicores) = now.cpu_millicores_since(&history.last) {
-                if history.points.len() == KEEP_POINTS {
-                    history.points.pop_front();
-                }
-                history.points.push_back(MetricPoint {
-                    at,
-                    cpu_millicores,
-                    memory_bytes: now.memory_bytes,
-                });
-            }
-            history.last = now;
-        }
+                ))
+            })
+            .collect();
+        *last = next;
+        samples
     }
 }
 
@@ -68,6 +60,7 @@ pub(crate) async fn run(state: AppState, shutdown: impl Future<Output = ()>) {
     let mut ticker = interval(SAMPLE_EVERY);
     ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
     tokio::pin!(shutdown);
+    let mut ticks = 0_u32;
     loop {
         tokio::select! {
             () = &mut shutdown => break,
@@ -76,6 +69,13 @@ pub(crate) async fn run(state: AppState, shutdown: impl Future<Output = ()>) {
         tokio::select! {
             () = &mut shutdown => break,
             () = sample(&state) => {}
+        }
+        ticks = ticks.wrapping_add(1);
+        if ticks.is_multiple_of(ROLL_UP_EVERY_TICKS) {
+            let now = unix_now();
+            if let Err(err) = state.db.call(move |store| store.roll_up_metrics(now)).await {
+                tracing::warn!(error = %err, "could not roll up usage history");
+            }
         }
     }
     tracing::info!("metrics sampler stopped");
@@ -89,73 +89,93 @@ async fn sample(state: &AppState) {
             return;
         }
     };
-    let containers: Vec<(MachineId, String)> = machines
+    let found: Vec<(ServiceId, MachineId, String)> = machines
         .into_iter()
-        .filter_map(|machine| Some((machine.id, machine.container_id?)))
+        .filter_map(|(service, machine)| Some((service, machine.id, machine.container_id?)))
+        .collect();
+    let containers: Vec<(MachineId, String)> = found
+        .iter()
+        .map(|(_, machine, container)| (*machine, container.clone()))
         .collect();
     let mut snapshot = stats::snapshot(state, &containers).await;
-    let sampled = containers
+    let readings = found
         .into_iter()
-        .filter_map(|(machine, container)| Some((machine, snapshot.remove(&container)?)))
+        .filter_map(|(service, machine, container)| {
+            Some((service, machine, snapshot.remove(&container)?))
+        })
         .collect();
-    state.metrics.record(sampled, unix_now());
+    let samples = state.metrics.advance(readings);
+    if samples.is_empty() {
+        return;
+    }
+    let at = unix_now();
+    if let Err(err) = state
+        .db
+        .call(move |store| store.record_metrics(at, &samples))
+        .await
+    {
+        tracing::warn!(error = %err, "could not save usage samples");
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn stats(cpu_nanos: u64, sampled_at_nanos: u64, memory_bytes: u64) -> ContainerStats {
+    fn stats(cpu_nanos: u64, sampled_at_nanos: u64, net_rx_bytes: u64) -> ContainerStats {
         ContainerStats {
             cpu_nanos,
             sampled_at_nanos,
-            memory_bytes,
-            net_rx_bytes: 0,
+            memory_bytes: 20,
+            net_rx_bytes,
             net_tx_bytes: 0,
             processes: 1,
         }
     }
 
     #[test]
-    fn keeps_points_from_the_second_sample_and_forgets_stopped_machines() {
+    fn counts_cpu_and_traffic_between_readings_and_forgets_stopped_machines() {
         let metrics = Metrics::default();
-        let web = MachineId::generate();
-        let worker = MachineId::generate();
-        metrics.record(
-            HashMap::from([(web, stats(0, 0, 10)), (worker, stats(0, 0, 5))]),
-            0,
+        let (service, web, worker) = (
+            ServiceId::generate(),
+            MachineId::generate(),
+            MachineId::generate(),
         );
-        assert_eq!(metrics.history(web), []);
+        let first = metrics.advance(vec![
+            (service, web, stats(0, 0, 100)),
+            (service, worker, stats(0, 0, 0)),
+        ]);
+        assert_eq!(first, []);
 
         let half_a_core_for_30s = 15_000_000_000;
-        metrics.record(
-            HashMap::from([(web, stats(half_a_core_for_30s, 30_000_000_000, 20))]),
-            30,
-        );
+        let second = metrics.advance(vec![(
+            service,
+            web,
+            stats(half_a_core_for_30s, 30_000_000_000, 150),
+        )]);
         assert_eq!(
-            metrics.history(web),
-            [MetricPoint {
-                at: 30,
-                cpu_millicores: 500,
-                memory_bytes: 20
-            }]
+            second,
+            [(
+                service,
+                MetricSample {
+                    machine: web,
+                    cpu_millicores: 500,
+                    memory_bytes: 20,
+                    net_rx_bytes: 50,
+                    net_tx_bytes: 0
+                }
+            )]
         );
-        assert_eq!(metrics.history(worker), []);
+        let back = metrics.advance(vec![(service, worker, stats(0, 30_000_000_000, 0))]);
+        assert_eq!(back, [], "a machine that missed a round starts over");
     }
 
     #[test]
-    fn keeps_an_hour() {
+    fn a_restarted_counter_counts_from_zero() {
         let metrics = Metrics::default();
-        let web = MachineId::generate();
-        for tick in 0..=200_u64 {
-            let at = tick * 30_000_000_000;
-            metrics.record(
-                HashMap::from([(web, stats(0, at, 1))]),
-                i64::try_from(tick).unwrap(),
-            );
-        }
-        let history = metrics.history(web);
-        assert_eq!(history.len(), KEEP_POINTS);
-        assert_eq!(history.last().unwrap().at, 200);
+        let (service, web) = (ServiceId::generate(), MachineId::generate());
+        metrics.advance(vec![(service, web, stats(0, 0, 900))]);
+        let after = metrics.advance(vec![(service, web, stats(1, 30_000_000_000, 40))]);
+        assert_eq!(after[0].1.net_rx_bytes, 40);
     }
 }
