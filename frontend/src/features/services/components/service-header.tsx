@@ -2,6 +2,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { focusRing } from '@/components/ui/control-styles'
 import { Eyebrow } from '@/components/ui/eyebrow'
 import type { Scope } from '@/lib/api/paths'
+import { dateTime, timeAgo } from '@/lib/format'
 import { domainUrl } from '@/features/domains/api'
 import type { Service } from '@/features/services/api'
 import { ServiceActions } from './service-actions'
@@ -20,6 +21,9 @@ export function ServiceHeader({ scope, service }: { scope: Scope; service: Servi
           <span className="truncate" title={service.image}>
             {service.image}
           </span>
+          {service.deployment && (
+            <span title={dateTime(service.deployment.created_at)}>deployed {timeAgo(service.deployment.created_at)}</span>
+          )}
           {service.domains.map((domain) => (
             <a
               key={domain}
