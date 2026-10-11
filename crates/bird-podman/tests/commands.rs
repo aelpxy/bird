@@ -269,6 +269,10 @@ async fn output_is_kept_as_written() {
 #[ignore = "requires a running podman socket"]
 async fn a_missing_program_fails_at_start() {
     let podman = podman();
+    podman
+        .pull_image(&IMAGE.parse().unwrap(), None)
+        .await
+        .unwrap();
     let name = &format!("bird-test-missing-program-{}", std::process::id());
     let _ = podman.remove_container(name).await;
     let missing = ContainerSpec {
