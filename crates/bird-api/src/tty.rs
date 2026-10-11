@@ -2,6 +2,8 @@ use std::fmt;
 
 // the protocol name in the Upgrade header of `GET /v1/services/{name}/exec/tty`
 pub const TTY_UPGRADE: &str = "bird-tty";
+/// Raw bytes to and from a service's port, as `bird connect` opens it
+pub const TCP_UPGRADE: &str = "bird-tcp";
 
 const HEADER_LEN: usize = 5;
 // a terminal moves small chunks, a larger frame means a broken or hostile peer

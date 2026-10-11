@@ -46,7 +46,13 @@ pub(crate) async fn deploy(
     }
     // run detached so a disconnecting client cannot abort the deploy halfway through
     let task = tokio::spawn(async move {
-        let deployment = deploy::deploy(&state, environment_id, template.request(&name)).await?;
+        let deployment = deploy::deploy(
+            &state,
+            environment_id,
+            template.request(&name),
+            &deploy::DeployLog::new(),
+        )
+        .await?;
         Ok(TemplateDeployResponse {
             deployment,
             connection: template.connection().cloned(),

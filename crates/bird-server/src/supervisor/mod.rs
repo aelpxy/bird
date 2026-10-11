@@ -199,7 +199,16 @@ impl Supervisor {
 
         for _ in 0..missing {
             tracing::info!(service = %service.name, deployment = %deployment.id, "launching machine");
-            match deploy::launch(&self.state, service, deployment, env.clone()).await {
+            let launched = deploy::launch(
+                &self.state,
+                service,
+                deployment,
+                env.clone(),
+                deploy::Pull::Needed,
+                &deploy::DeployLog::discard(),
+            )
+            .await;
+            match launched {
                 Ok(()) => {
                     backoff.reset();
                     tracing::info!(service = %service.name, "machine launched");

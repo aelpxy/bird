@@ -6,7 +6,7 @@ use bird_core::{
 use super::create::snapshot;
 use super::storage::Adapter;
 use super::{ensure_reachable, find};
-use crate::deploy::{OPERATION_PATIENCE, destroy_container, launch, set_state};
+use crate::deploy::{DeployLog, OPERATION_PATIENCE, Pull, destroy_container, launch, set_state};
 use crate::state::AppState;
 use crate::{Error, Result, labels, routing};
 
@@ -208,7 +208,15 @@ async fn relaunch(state: &AppState, service: &Service, active: Option<Deployment
         .call(move |store| store.deployment_variables(deployment_id))
         .await?;
     for _ in 0..service.replicas.get() {
-        launch(state, service, &deployment, env.clone()).await?;
+        launch(
+            state,
+            service,
+            &deployment,
+            env.clone(),
+            Pull::Needed,
+            &DeployLog::discard(),
+        )
+        .await?;
     }
     routing::refresh(state).await
 }

@@ -2,6 +2,7 @@ mod backup_schedules;
 mod backups;
 mod certificates;
 mod cron;
+mod deployment_logs;
 mod deployments;
 mod domains;
 mod environments;

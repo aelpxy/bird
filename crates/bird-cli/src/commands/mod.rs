@@ -2,6 +2,7 @@ mod account;
 mod backup;
 mod build;
 mod completions;
+mod connect;
 mod cron;
 mod deploy;
 mod domains;
@@ -85,6 +86,13 @@ pub(crate) async fn run(args: Args) -> Result<()> {
             }
             let place = tty::Place::Machine(machine.as_deref());
             attach(&client, &name, place, no_tty, command).await
+        }
+        Command::Connect {
+            local_port,
+            machine,
+        } => {
+            let (client, name) = (connect(api)?, target()?);
+            connect::run(client, &name, local_port, machine.as_deref()).await
         }
         Command::Run {
             no_tty,

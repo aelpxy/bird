@@ -72,7 +72,7 @@ export async function streamJsonLines<T>(
   path: string,
   onItem: (item: T) => void,
   signal: AbortSignal,
-  init: { method?: 'GET' | 'POST'; body?: BodyInit; contentType?: string } = {},
+  init: { method?: 'GET' | 'POST'; body?: BodyInit; contentType?: string; accept?: string } = {},
 ): Promise<void> {
   let response: Response
   try {
@@ -81,7 +81,10 @@ export async function streamJsonLines<T>(
       credentials: 'same-origin',
       method: init.method ?? 'GET',
       body: init.body,
-      headers: init.contentType ? { 'Content-Type': init.contentType } : undefined,
+      headers: {
+        ...(init.contentType ? { 'Content-Type': init.contentType } : {}),
+        ...(init.accept ? { Accept: init.accept } : {}),
+      },
     })
   } catch (cause) {
     if (signal.aborted) return

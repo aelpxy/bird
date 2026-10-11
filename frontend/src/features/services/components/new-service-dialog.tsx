@@ -13,6 +13,7 @@ import { notifySuccess } from '@/lib/toast'
 import { NAME_HINT, optionalHostname } from '@/lib/validation'
 import { buildArgs } from '@/features/builds/schemas'
 import { BuildProgress } from '@/features/builds/components/build-progress'
+import { LiveDeployLog } from '@/features/deployments/components/live-deploy-panel'
 import { FolderPicker } from '@/features/builds/components/folder-picker'
 import { useSourceDeploy } from '@/features/builds/use-source-deploy'
 import { domainUrl } from '@/features/domains/api'
@@ -120,7 +121,14 @@ export function NewServiceDialog({ scope }: { scope: Scope }) {
   // render functions, not components: a component declared in here would remount its fields on every keystroke
   function renderDetails() {
     if (dialog.pending) {
-      return source.progress ? <BuildProgress progress={source.progress} /> : <DeployStatus label="Pulling the image and waiting for it to pass its health check…" />
+      const { source: chosen, name } = form.state.values
+      if (chosen === 'template') return <DeployStatus label="Pulling the image and waiting for it to pass its health check…" />
+      return (
+        <div className="flex flex-col gap-4">
+          {source.progress && <BuildProgress progress={source.progress} />}
+          {(chosen === 'image' || source.progress?.phase === 'deploying') && <LiveDeployLog scope={scope} service={name.trim()} />}
+        </div>
+      )
     }
     return (
       <form.Subscribe selector={(state) => state.values.source}>

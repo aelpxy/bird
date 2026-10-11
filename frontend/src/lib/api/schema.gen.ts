@@ -419,6 +419,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{project}/environments/{environment}/services/{name}/deployments/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What a deploy did: build output, birdd's steps, the release command and new machines' output */
+        get: operations["get_deployment_log"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}/environments/{environment}/services/{name}/domains": {
         parameters: {
             query?: never;
@@ -1107,6 +1124,40 @@ export interface components {
         CronTimeout: number;
         /** @enum {string} */
         CronTrigger: "schedule" | "manual";
+        /**
+         * @description One line of the newline-delimited json a deploy answers with when asked for
+         *     `application/x-ndjson`; it ends with deployed or failed
+         */
+        DeployEvent: (components["schemas"]["DeployLogLine"] & {
+            /** @enum {string} */
+            type: "log";
+        }) | (components["schemas"]["DeployResponse"] & {
+            /** @enum {string} */
+            type: "deployed";
+        }) | (components["schemas"]["ErrorBody"] & {
+            /** @enum {string} */
+            type: "failed";
+        });
+        /**
+         * @description Where a line of a deploy's log came from
+         * @enum {string}
+         */
+        DeployLogKind: "bird" | "build" | "release" | "app";
+        DeployLogLine: {
+            /**
+             * Format: int64
+             * @description Unix milliseconds
+             */
+            at: number;
+            kind: components["schemas"]["DeployLogKind"];
+            machine?: components["schemas"]["MachineId"] | null;
+            /**
+             * Format: int32
+             * @description Counts from 0 within the deploy, so a follower can tell what it has seen
+             */
+            seq: number;
+            text: string;
+        };
         DeployRequest: {
             allow_image_change?: boolean;
             backup?: components["schemas"]["BackupSchedule"] | null;
@@ -1148,6 +1199,11 @@ export interface components {
             port: components["schemas"]["Port"];
             status: components["schemas"]["DeploymentStatus"];
             variables: number;
+        };
+        DeploymentLog: {
+            /** @description False while the deploy is still running */
+            done: boolean;
+            lines: components["schemas"]["DeployLogLine"][];
         };
         /** @enum {string} */
         DeploymentStatus: "pending" | "deploying" | "active" | "superseded" | "failed";
@@ -2295,7 +2351,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Deployed and serving traffic */
+            /** @description Deployed and serving traffic; with `Accept: application/x-ndjson` a newline-delimited JSON stream of DeployEvent instead, ending with deployed or failed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3079,6 +3135,55 @@ export interface operations {
                 };
             };
             /** @description Service or resource not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_deployment_log: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Project name */
+                project: string;
+                /** @description Environment name */
+                environment: string;
+                /** @description Service name */
+                name: string;
+                /** @description Deployment id */
+                id: string;
+                /** @description Keep the response open and send new lines while the deploy runs */
+                follow: boolean;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The log; with follow=true a newline-delimited JSON stream of DeployLogLine that ends with the deploy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeploymentLog"];
+                };
+            };
+            /** @description Missing or invalid API token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service or deployment not found */
             404: {
                 headers: {
                     [name: string]: unknown;

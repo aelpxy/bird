@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Result, bail};
-use bird_api::{DeployResponse, MANIFEST_FILE, Manifest};
+use anyhow::{Context, Result, anyhow, bail};
+use bird_api::{
+    DeployEvent, DeployLogKind, DeployLogLine, DeployResponse, MANIFEST_FILE, Manifest,
+};
 use bird_core::{BuildFile, Command, EnvKey, ImageRef, Name};
 
 use super::build;
@@ -11,7 +13,7 @@ use crate::args::DeployArgs;
 use crate::client::ApiClient;
 use crate::manifest::{self, Loaded};
 use crate::ui::style::{self, Paint};
-use crate::ui::{Output, Spinner, duration};
+use crate::ui::{Output, duration};
 
 // covers a slow image pull plus the app's startup window on the server
 pub(crate) const DEPLOY_TIMEOUT: Duration = Duration::from_mins(15);
@@ -54,12 +56,47 @@ pub(crate) async fn run(
         request.release = None;
         request.no_release = true;
     }
-    let spinner = Spinner::start(format!("deploying {} ({})", request.name, request.image));
-    let response: DeployResponse = client
-        .post(&client.scoped("deploy"), &request, DEPLOY_TIMEOUT)
+    eprintln!(
+        "{} deploying {} ({})",
+        style::err(Paint::Cyan, "›"),
+        style::err(Paint::Bold, &request.name),
+        request.image
+    );
+    let mut outcome = None;
+    client
+        .post_lines(&client.scoped("deploy"), &request, DEPLOY_TIMEOUT, |line| {
+            let event: DeployEvent =
+                serde_json::from_str(line).context("birdd sent an unexpected deploy event")?;
+            match event {
+                DeployEvent::Log(line) => print_log_line(&line),
+                DeployEvent::Deployed(response) => outcome = Some(Ok(response)),
+                DeployEvent::Failed(error) => outcome = Some(Err(anyhow!(error.error))),
+            }
+            Ok(())
+        })
         .await?;
-    drop(spinner);
+    let response =
+        outcome.unwrap_or_else(|| Err(anyhow!("birdd ended the deploy without a result")))?;
     print_deployed(&response, started.elapsed(), out)
+}
+
+// progress goes to stderr; build lines are left out since this command printed the build itself
+fn print_log_line(line: &DeployLogLine) {
+    let label = match (line.kind, line.machine) {
+        (DeployLogKind::Build, _) => return,
+        (DeployLogKind::Bird, _) => {
+            eprintln!("{} {}", style::err(Paint::Cyan, "›"), line.text);
+            return;
+        }
+        (DeployLogKind::Release, _) => "release".to_owned(),
+        (DeployLogKind::App, Some(machine)) => machine.to_string().chars().take(8).collect(),
+        (DeployLogKind::App, None) => "app".to_owned(),
+    };
+    eprintln!(
+        "  {} {}",
+        style::err(Paint::Dim, format!("{label:>8} │")),
+        line.text
+    );
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -13,7 +13,8 @@ pub(super) async fn execute(
     id: CronRunId,
 ) {
     let (result, mut output) =
-        commands::run_collecting(state, &target, &job.command, job.timeout.duration()).await;
+        commands::run_collecting(state, &target, &job.command, job.timeout.duration(), |_| {})
+            .await;
     let (status, exit_code) = match result {
         Ok(Some(0)) => (CronRunStatus::Succeeded, Some(0)),
         Ok(Some(code)) => (CronRunStatus::Failed, Some(code)),

@@ -3,11 +3,13 @@ mod auth;
 mod backups;
 mod builds;
 mod commands;
+mod connect;
 mod cookies;
 mod credentials;
 mod cron;
 mod dashboard;
 mod deploy;
+mod deployment_logs;
 mod deployments;
 mod docs;
 mod domains;
@@ -44,6 +46,7 @@ use crate::state::AppState;
 use crate::token::ApiToken;
 
 const MAX_BODY_BYTES: usize = 64 * 1024;
+pub(crate) use connect::MAX_TUNNELS;
 
 pub(crate) fn router(state: AppState, token: ApiToken) -> Router {
     let (protected, mut spec) = documented_routes().split_for_parts();
@@ -113,6 +116,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(proxy::get, proxy::set))
         .routes(routes!(deployments::list))
         .routes(routes!(deployments::rollback))
+        .routes(routes!(deployment_logs::get))
         .routes(routes!(logs::logs))
         .routes(routes!(scale::update))
         .routes(routes!(variables::list, variables::update))
@@ -135,6 +139,7 @@ fn documented_routes() -> OpenApiRouter<AppState> {
         .routes(routes!(terminals::run))
         .routes(routes!(terminals::exec_pipe))
         .routes(routes!(terminals::run_pipe))
+        .routes(routes!(connect::connect))
         .routes(routes!(power::stop))
         .routes(routes!(power::start))
         .routes(routes!(power::restart))

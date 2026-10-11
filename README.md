@@ -41,6 +41,7 @@ bird logs -f
 bird scale 3
 bird rollback
 bird exec                              # a shell in a running machine
+bird connect -s postgres               # its port on localhost, for psql or a GUI
 
 bird add postgres                      # templates: postgres, mysql, valkey and more
 bird env set DATABASE_URL='${{postgres.DATABASE_URL}}'

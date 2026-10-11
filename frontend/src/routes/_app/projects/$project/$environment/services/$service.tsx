@@ -6,6 +6,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api/client'
 import { serviceQuery } from '@/features/services/api'
+import { LiveDeployPanel } from '@/features/deployments/components/live-deploy-panel'
 import { ServiceHeader } from '@/features/services/components/service-header'
 import { ServiceTabs } from '@/features/services/components/service-tabs'
 
@@ -52,6 +53,7 @@ function ServiceLayout() {
   return (
     <div className="flex flex-col gap-6">
       <ServiceHeader scope={scope} service={service.data} />
+      <LiveDeployPanel scope={scope} service={name} />
       <ServiceTabs scope={scope} service={name} hasVolumes={service.data.volumes.length > 0} />
       <Outlet />
     </div>

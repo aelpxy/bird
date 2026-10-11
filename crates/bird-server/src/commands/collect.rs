@@ -19,6 +19,7 @@ pub(crate) async fn run_collecting(
     target: &RunTarget,
     command: &Command,
     limit: Duration,
+    mut on_output: impl FnMut(&str),
 ) -> (Result<Option<i32>>, String) {
     let (events, mut receiver) = mpsc::channel::<Bytes>(EVENT_BUFFER);
     // owns the sender, so collecting ends when the command does
@@ -27,6 +28,7 @@ pub(crate) async fn run_collecting(
         let mut output = Tail::default();
         while let Some(line) = receiver.recv().await {
             if let Ok(CommandEvent::Output { text, .. }) = serde_json::from_slice(&line) {
+                on_output(&text);
                 output.push(&text);
             }
         }

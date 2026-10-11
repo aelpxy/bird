@@ -6,7 +6,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SourceDeployDialog } from '@/features/builds/components/source-deploy-dialog'
 import { deploymentsQuery } from '@/features/deployments/api'
-import { DeploymentsList } from '@/features/deployments/components/deployments-list'
+import { DeploymentsView } from '@/features/deployments/components/deployments-view'
 import { serviceQuery } from '@/features/services/api'
 import { useServiceScope } from '@/features/services/use-service-scope'
 
@@ -20,11 +20,11 @@ function Deployments() {
   const { data: summary } = useQuery(serviceQuery(scope, service))
   const header = summary && (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-fg-muted">Every deploy, newest first. Earlier working ones can be rolled back to.</p>
+      <p className="text-sm text-fg-muted">Every deploy with its log, newest first. Earlier working ones can be rolled back to.</p>
       <SourceDeployDialog scope={scope} service={summary} />
     </div>
   )
-  if (deployments.isPending) return <Skeleton className="h-40 w-full rounded-xl" />
+  if (deployments.isPending) return <Skeleton className="h-96 w-full" />
   if (deployments.isError) {
     return <ErrorState error={deployments.error} onRetry={() => void deployments.refetch()} />
   }
@@ -34,7 +34,7 @@ function Deployments() {
   return (
     <div className="flex flex-col gap-4">
       {header}
-      <DeploymentsList scope={scope} service={service} deployments={deployments.data} />
+      <DeploymentsView scope={scope} service={service} deployments={deployments.data} />
     </div>
   )
 }

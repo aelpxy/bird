@@ -1,5 +1,7 @@
 mod guard;
+mod log;
 mod machine;
+mod output;
 mod power;
 mod recreate;
 pub(crate) mod references;
@@ -10,14 +12,16 @@ mod volumes;
 
 use std::collections::BTreeMap;
 
-use bird_api::{DeployRequest, DeployResponse};
+use bird_api::{DeployLogKind, DeployRequest, DeployResponse};
 use bird_core::{
-    Deployment, DeploymentStatus, EnvKey, EnvironmentId, ImageRef, Name, Port, Service,
+    CronJobSpec, Deployment, DeploymentStatus, EnvKey, EnvironmentId, Hostname, ImageRef, Name,
+    Port, Service, Volume,
 };
 use tokio::task::JoinSet;
 
 pub(crate) use guard::DeployGuard;
-pub(crate) use machine::{MAX_PROCESSES, destroy_container, ensure_image, launch, set_state};
+pub(crate) use log::{DeployLog, RunningLogs, running};
+pub(crate) use machine::{MAX_PROCESSES, Pull, destroy_container, ensure_image, launch, set_state};
 pub(crate) use power::{restart, start, stop};
 pub(crate) use remove::remove_service;
 
@@ -32,6 +36,7 @@ pub(crate) async fn redeploy(
     service: &Service,
     image: ImageRef,
     port: Port,
+    log: &DeployLog,
 ) -> Result<DeployResponse> {
     let request = DeployRequest {
         name: service.name.clone(),
@@ -53,13 +58,14 @@ pub(crate) async fn redeploy(
         no_release: false,
         allow_image_change: false,
     };
-    deploy(state, service.environment_id, request).await
+    deploy(state, service.environment_id, request, log).await
 }
 
 pub(crate) async fn deploy(
     state: &AppState,
     environment: EnvironmentId,
     mut request: DeployRequest,
+    log: &DeployLog,
 ) -> Result<DeployResponse> {
     if !request.image.has_lowercase_repository() {
         return Err(bird_core::ValidationError::Image(request.image.to_string()).into());
@@ -107,18 +113,75 @@ pub(crate) async fn deploy(
         })
         .await?;
     tracing::info!(service = %service.name, deployment = %deployment.id, image = %deployment.image, "deploying");
+    log.register(state, deployment.id);
+    let (service_id, deployment_id) = (service.id, deployment.id);
+    let rollout = Rollout {
+        service,
+        previous_settings,
+        domains,
+        attached,
+        deployment,
+        previous,
+        env,
+        jobs,
+    };
+    let result = roll_out(state, rollout, log).await;
+    if let Err(err) = &result {
+        log.bird(format!(
+            "The deploy failed: {err}. The previous deployment keeps serving."
+        ));
+    }
+    log.finish(state, service_id, deployment_id).await;
+    result
+}
 
-    let released = match &service.release {
-        Some(release) => release::run(state, &service, &deployment, &env, release).await,
-        None => Ok(()),
+// a saved deployment on its way to serving traffic
+struct Rollout {
+    service: Service,
+    previous_settings: Option<Service>,
+    domains: Vec<Hostname>,
+    attached: Vec<Volume>,
+    deployment: Deployment,
+    previous: Option<Deployment>,
+    env: BTreeMap<EnvKey, String>,
+    jobs: Option<Vec<CronJobSpec>>,
+}
+
+async fn roll_out(state: &AppState, rollout: Rollout, log: &DeployLog) -> Result<DeployResponse> {
+    let Rollout {
+        service,
+        previous_settings,
+        domains,
+        attached,
+        deployment,
+        previous,
+        env,
+        jobs,
+    } = rollout;
+    let started = std::time::Instant::now();
+    for line in state.built.take(&deployment.image) {
+        log.push(DeployLogKind::Build, None, line);
+    }
+    log.bird(format!(
+        "Deploying {} as deployment {}",
+        deployment.image, deployment.id
+    ));
+
+    let released = match pull(state, &deployment.image, log).await {
+        Ok(()) => match &service.release {
+            Some(release) => release::run(state, &service, &deployment, &env, release, log).await,
+            None => Ok(()),
+        },
+        Err(err) => Err(err),
     };
     let mut stopped = Vec::new();
     let launched = match released {
         Ok(()) => {
             if !attached.is_empty() {
+                log.bird("Stopping the previous machine first, since only one may use the volumes");
                 stopped = recreate::stop_previous(state, previous.as_ref()).await;
             }
-            launch_all(state, &service, &deployment, &env).await
+            launch_all(state, &service, &deployment, &env, log).await
         }
         Err(err) => Err(err),
     };
@@ -137,12 +200,14 @@ pub(crate) async fn deploy(
     }
 
     let id = deployment.id;
+    log.bird("Moving traffic to the new machines");
     state
         .db
         .call(move |store| store.activate_deployment(id))
         .await?;
     routing::refresh(state).await?;
     if let Some(previous) = previous {
+        log.bird("Stopping the previous machines");
         machine::retire(state, previous.id).await;
     }
     // jobs change with a deploy that worked, so a failed one keeps running the old ones
@@ -154,6 +219,10 @@ pub(crate) async fn deploy(
     let cleanup = state.clone();
     tokio::spawn(async move { images::remove_unused(&cleanup).await });
     tracing::info!(service = %service.name, deployment = %deployment.id, "deployed");
+    log.bird(format!(
+        "Deployed in {:.1}s",
+        started.elapsed().as_secs_f32()
+    ));
 
     Ok(DeployResponse {
         service: service.name,
@@ -163,21 +232,44 @@ pub(crate) async fn deploy(
     })
 }
 
+// a pulled image is reported once, before machines or the release command need it
+async fn pull(state: &AppState, image: &ImageRef, log: &DeployLog) -> Result<()> {
+    if image.is_local() {
+        log.bird(format!("Using the image built on this server, {image}"));
+        return ensure_image(state, image).await;
+    }
+    log.bird(format!("Pulling {image}"));
+    let started = std::time::Instant::now();
+    ensure_image(state, image).await?;
+    log.bird(format!("Pulled in {:.1}s", started.elapsed().as_secs_f32()));
+    Ok(())
+}
+
 async fn launch_all(
     state: &AppState,
     service: &Service,
     deployment: &Deployment,
     env: &BTreeMap<EnvKey, String>,
+    log: &DeployLog,
 ) -> Result<()> {
+    let replicas = service.replicas.get();
+    log.bird(if replicas == 1 {
+        "Starting 1 machine".to_owned()
+    } else {
+        format!("Starting {replicas} machines")
+    });
     let mut launches = JoinSet::new();
-    for _ in 0..service.replicas.get() {
-        let (state, service, deployment, env) = (
+    for _ in 0..replicas {
+        let (state, service, deployment, env, log) = (
             state.clone(),
             service.clone(),
             deployment.clone(),
             env.clone(),
+            log.clone(),
         );
-        launches.spawn(async move { machine::launch(&state, &service, &deployment, env).await });
+        launches.spawn(async move {
+            machine::launch(&state, &service, &deployment, env, Pull::Done, &log).await
+        });
     }
     let mut first_error = None;
     while let Some(joined) = launches.join_next().await {

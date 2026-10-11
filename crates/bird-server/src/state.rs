@@ -6,9 +6,11 @@ use bird_proxy::Routes;
 use tokio::sync::{Notify, Semaphore};
 
 use crate::backups::BackupStorage;
+use crate::build_output::BuildOutputs;
 use crate::cron::CronRuns;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
+use crate::deploy::RunningLogs;
 use crate::routing::Policies;
 use crate::shutdown::Shutdown;
 use crate::throttle::LoginThrottle;
@@ -30,6 +32,8 @@ pub(crate) struct AppState {
     pub(crate) backups: Arc<BackupStorage>,
     // one permit per open terminal, held until its process is hung up
     pub(crate) terminals: Arc<Semaphore>,
+    // one permit per open `bird connect` connection
+    pub(crate) tunnels: Arc<Semaphore>,
     // failed sign-ins per user and address, kept in memory only
     pub(crate) logins: Arc<LoginThrottle>,
     pub(crate) crons: Arc<CronRuns>,
@@ -38,6 +42,8 @@ pub(crate) struct AppState {
     // present when birdd gets certificates
     pub(crate) acme: Option<Arc<CertFailures>>,
     pub(crate) policies: Arc<Policies>,
+    pub(crate) deploy_logs: Arc<RunningLogs>,
+    pub(crate) built: Arc<BuildOutputs>,
 }
 
 impl AppState {

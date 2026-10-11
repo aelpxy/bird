@@ -11,15 +11,18 @@ impl IntoResponse for Error {
         if status.is_server_error() {
             tracing::error!(error = %self, "request failed");
         }
-        let logs = match &self {
-            Error::Unhealthy { logs, .. } | Error::ReleaseFailed { logs, .. } => logs.clone(),
-            _ => Vec::new(),
-        };
-        let body = ErrorBody {
-            error: self.to_string(),
-            logs,
-        };
-        (status, Json(body)).into_response()
+        (status, Json(body(&self))).into_response()
+    }
+}
+
+pub(crate) fn body(error: &Error) -> ErrorBody {
+    let logs = match error {
+        Error::Unhealthy { logs, .. } | Error::ReleaseFailed { logs, .. } => logs.clone(),
+        _ => Vec::new(),
+    };
+    ErrorBody {
+        error: error.to_string(),
+        logs,
     }
 }
 
@@ -95,11 +98,14 @@ fn status_of(error: &Error) -> StatusCode {
         Error::InvalidLogin | Error::InvalidCode => StatusCode::UNAUTHORIZED,
         Error::TooManyAttempts(_) => StatusCode::TOO_MANY_REQUESTS,
         Error::ContextTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
-        Error::UpgradeRequired => StatusCode::UPGRADE_REQUIRED,
-        Error::TooManyTerminals | Error::TooManyCronRuns | Error::ShuttingDown => {
-            StatusCode::SERVICE_UNAVAILABLE
+        Error::UpgradeRequired | Error::TunnelUpgradeRequired => StatusCode::UPGRADE_REQUIRED,
+        Error::TooManyTerminals
+        | Error::TooManyTunnels
+        | Error::TooManyCronRuns
+        | Error::ShuttingDown => StatusCode::SERVICE_UNAVAILABLE,
+        Error::Unhealthy { .. } | Error::ReleaseFailed { .. } | Error::Unreachable { .. } => {
+            StatusCode::BAD_GATEWAY
         }
-        Error::Unhealthy { .. } | Error::ReleaseFailed { .. } => StatusCode::BAD_GATEWAY,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }

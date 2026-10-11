@@ -25,6 +25,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0020_cron.sql"),
     include_str!("../migrations/0021_release.sql"),
     include_str!("../migrations/0022_proxy.sql"),
+    include_str!("../migrations/0023_deployment_logs.sql"),
 ];
 
 pub(crate) fn migrate(conn: &mut Connection) -> Result<()> {

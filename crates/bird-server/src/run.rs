@@ -211,11 +211,14 @@ fn app_state(
         shutdown,
         builds: Arc::new(Semaphore::new(MAX_CONCURRENT_BUILDS)),
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
+        tunnels: Arc::new(Semaphore::new(api::MAX_TUNNELS)),
         logins: Arc::new(LoginThrottle::default()),
         crons: Arc::new(CronRuns::default()),
         dashboard_domain: config.dashboard_domain.clone(),
         acme: config.acme_directory.as_ref().map(|_| Arc::default()),
         policies: Arc::default(),
+        deploy_logs: Arc::default(),
+        built: Arc::default(),
         backups: Arc::new(backups),
     }
 }

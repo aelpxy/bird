@@ -6,6 +6,8 @@ use bird_core::{Deployment, DeploymentId, EnvKey, ImageRef, MachineId, MachineSt
 use bird_podman::{ContainerSpec, ContainerState, Lifecycle, Limits, RegistryAuth};
 use tokio::time::Instant;
 
+use super::log::DeployLog;
+use super::output::watch_output;
 use crate::state::AppState;
 use crate::{Error, Result, health, labels};
 
@@ -37,13 +39,24 @@ pub(crate) async fn ensure_image(state: &AppState, image: &ImageRef) -> Result<(
     Ok(())
 }
 
+/// Whether a launch pulls the image itself; a deploy pulls once for all its machines
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Pull {
+    Needed,
+    Done,
+}
+
 pub(crate) async fn launch(
     state: &AppState,
     service: &Service,
     deployment: &Deployment,
     env: BTreeMap<EnvKey, String>,
+    pull: Pull,
+    log: &DeployLog,
 ) -> Result<()> {
-    ensure_image(state, &deployment.image).await?;
+    if pull == Pull::Needed {
+        ensure_image(state, &deployment.image).await?;
+    }
 
     let service_id = service.id;
     let attached = state
@@ -94,7 +107,12 @@ pub(crate) async fn launch(
         })
         .await?;
 
-    match boot(state, &container_id, deployment, service).await {
+    let short = short_id(machine.id);
+    log.bird(format!("Machine {short} is starting"));
+    let output = watch_output(state, &container_id, machine.id, log);
+    let booted = boot(state, &container_id, deployment, service).await;
+    output.catch_up(state, &container_id).await;
+    match booted {
         Ok(address) => {
             state
                 .db
@@ -103,15 +121,25 @@ pub(crate) async fn launch(
                     store.set_machine_state(machine.id, MachineState::Running)
                 })
                 .await?;
+            log.bird(format!(
+                "Machine {short} is healthy: it could {}",
+                health::expectation(&service.health)
+            ));
             tracing::info!(machine = %machine.id, %address, "machine running");
             Ok(())
         }
         Err(err) => {
+            log.bird(format!("Machine {short} failed: {err}"));
             destroy_container(state, &container_id).await;
             set_state(state, machine.id, MachineState::Failed).await;
             Err(err)
         }
     }
+}
+
+// the first characters are what the dashboard shows, and enough to tell machines apart
+pub(crate) fn short_id(machine: MachineId) -> String {
+    machine.to_string().chars().take(8).collect()
 }
 
 pub(super) async fn boot(

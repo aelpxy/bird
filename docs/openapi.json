@@ -965,7 +965,7 @@
         },
         "responses": {
           "200": {
-            "description": "Deployed and serving traffic",
+            "description": "Deployed and serving traffic; with `Accept: application/x-ndjson` a newline-delimited JSON stream of DeployEvent instead, ending with deployed or failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -2215,6 +2215,94 @@
           },
           "404": {
             "description": "Service or resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{project}/environments/{environment}/services/{name}/deployments/{id}/log": {
+      "get": {
+        "tags": [
+          "deployments"
+        ],
+        "summary": "What a deploy did: build output, birdd's steps, the release command and new machines' output",
+        "operationId": "get_deployment_log",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Project name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "description": "Environment name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Service name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Deployment id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "follow",
+            "in": "path",
+            "description": "Keep the response open and send new lines while the deploy runs",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The log; with follow=true a newline-delimited JSON stream of DeployLogLine that ends with the deploy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentLog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Service or deployment not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -5769,6 +5857,122 @@
           "manual"
         ]
       },
+      "DeployEvent": {
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeployLogLine"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "log"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeployResponse"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "deployed"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "failed"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "description": "One line of the newline-delimited json a deploy answers with when asked for\n`application/x-ndjson`; it ends with deployed or failed"
+      },
+      "DeployLogKind": {
+        "type": "string",
+        "description": "Where a line of a deploy's log came from",
+        "enum": [
+          "bird",
+          "build",
+          "release",
+          "app"
+        ]
+      },
+      "DeployLogLine": {
+        "type": "object",
+        "required": [
+          "seq",
+          "at",
+          "kind",
+          "text"
+        ],
+        "properties": {
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix milliseconds"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DeployLogKind"
+          },
+          "machine": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MachineId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Counts from 0 within the deploy, so a follower can tell what it has seen",
+            "minimum": 0
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
       "DeployRequest": {
         "type": "object",
         "required": [
@@ -5977,6 +6181,25 @@
           "variables": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "DeploymentLog": {
+        "type": "object",
+        "required": [
+          "lines",
+          "done"
+        ],
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "description": "False while the deploy is still running"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeployLogLine"
+            }
           }
         }
       },

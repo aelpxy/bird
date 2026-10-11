@@ -9,6 +9,7 @@ import { notifySuccess } from '@/lib/toast'
 import type { Service } from '../../services/api'
 import { buildArgs, dockerfile } from '../schemas'
 import { useSourceDeploy } from '../use-source-deploy'
+import { LiveDeployLog } from '@/features/deployments/components/live-deploy-panel'
 import { BuildProgress } from './build-progress'
 import { FolderPicker } from './folder-picker'
 
@@ -54,6 +55,7 @@ export function SourceDeployDialog({ scope, service }: { scope: Scope; service: 
         )}
       </dialog.form.AppField>
       {source.progress && <BuildProgress progress={source.progress} />}
+      {source.progress?.phase === 'deploying' && <LiveDeployLog scope={scope} service={service.name} />}
     </FormDialog>
   )
 }

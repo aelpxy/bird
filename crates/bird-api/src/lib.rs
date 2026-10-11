@@ -3,6 +3,7 @@ mod builds;
 mod commands;
 mod cron;
 mod deploy;
+mod deploy_log;
 mod deployments;
 mod domains;
 mod error;
@@ -25,6 +26,7 @@ pub use builds::BuildEvent;
 pub use commands::{CommandEvent, ExecRequest, RunRequest};
 pub use cron::{CronJobSummary, CronRunDetail, CronRunSummary};
 pub use deploy::{DeployRequest, DeployResponse};
+pub use deploy_log::{DeployEvent, DeployLogKind, DeployLogLine, DeploymentLog};
 pub use deployments::{DeploymentInfo, RollbackRequest};
 pub use domains::{AddDomain, DomainStatus, Https, UpdateDomain};
 pub use error::ErrorBody;
@@ -40,7 +42,7 @@ pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
 pub use services::{DeploymentSummary, FailedDeploy, MachineStats, MachineSummary, ServiceSummary};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
-pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TTY_UPGRADE};
+pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TCP_UPGRADE, TTY_UPGRADE};
 pub use users::{
     CreateToken, CreateUser, CreatedUser, IssuedToken, TokenSummary, UserSummary, Whoami,
 };

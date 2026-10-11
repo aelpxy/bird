@@ -97,14 +97,16 @@ async fn run(
     events: mpsc::Sender<Bytes>,
 ) {
     let shutdown = state.shutdown.wait();
+    let mut output = Vec::new();
     let outcome = tokio::select! {
         () = shutdown => Err(Error::BuildFailed("birdd is shutting down".to_owned())),
         () = events.closed() => Err(Error::BuildFailed("the client disconnected".to_owned())),
-        result = queue_and_build(&state, &name, &build, context, &events) => result,
+        result = queue_and_build(&state, &name, &build, context, &events, &mut output) => result,
     };
     let last = match outcome {
         Ok(()) => {
             tracing::info!(service = %name, image = %build.tag, "built");
+            state.built.record(build.tag.clone(), output);
             BuildEvent::Built { image: build.tag }
         }
         Err(err) => {
@@ -123,6 +125,7 @@ async fn queue_and_build(
     build: &Build,
     context: Limited<Body>,
     events: &mpsc::Sender<Bytes>,
+    output: &mut Vec<String>,
 ) -> Result<()> {
     let permit = if let Ok(permit) = Arc::clone(&state.builds).try_acquire_owned() {
         permit
@@ -135,14 +138,17 @@ async fn queue_and_build(
             .map_err(|_| Error::BuildFailed("birdd is shutting down".to_owned()))?
     };
     tracing::info!(service = %name, image = %build.tag, "building");
-    let outcome = tokio::time::timeout(BUILD_TIMEOUT, run_build(state, build, context, events))
-        .await
-        .unwrap_or_else(|_| {
-            Err(Error::BuildFailed(format!(
-                "took longer than {} minutes",
-                BUILD_TIMEOUT.as_secs() / 60
-            )))
-        });
+    let outcome = tokio::time::timeout(
+        BUILD_TIMEOUT,
+        run_build(state, build, context, events, output),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        Err(Error::BuildFailed(format!(
+            "took longer than {} minutes",
+            BUILD_TIMEOUT.as_secs() / 60
+        )))
+    });
     drop(permit);
     outcome
 }
@@ -152,6 +158,7 @@ async fn run_build(
     build: &Build,
     context: Limited<Body>,
     events: &mpsc::Sender<Bytes>,
+    kept: &mut Vec<String>,
 ) -> Result<()> {
     let mut output = state
         .podman
@@ -160,6 +167,7 @@ async fn run_build(
     while let Some(line) = output.next().await {
         match line? {
             BuildLine::Log(line) => {
+                kept.push(line.clone());
                 // a closed stream means the client left, dropping the build cancels it in podman
                 if !send(events, &BuildEvent::Log { line }).await {
                     return Err(Error::BuildFailed("the client disconnected".to_owned()));

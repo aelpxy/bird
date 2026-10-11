@@ -199,6 +199,16 @@ pub enum Error {
     TooManyTerminals,
     #[error("a terminal needs a connection upgraded to bird-tty or websocket")]
     UpgradeRequired,
+    #[error("a tunnel needs a connection upgraded to bird-tcp")]
+    TunnelUpgradeRequired,
+    #[error("too many tunnels are open, close some connections and try again")]
+    TooManyTunnels,
+    #[error("could not reach {service} on port {port}: {reason}")]
+    Unreachable {
+        service: Name,
+        port: bird_core::Port,
+        reason: String,
+    },
     #[error("invalid terminal request: {0}")]
     InvalidTtyRequest(String),
     #[error("{0} has no volumes, there is nothing to back up")]

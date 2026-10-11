@@ -57,7 +57,8 @@ pub(crate) async fn rollback(
                 store.restore_variables(service_id, target_id)
             })
             .await?;
-        deploy::redeploy(&state, &service, target.image.clone(), target.port).await
+        let log = deploy::DeployLog::new();
+        deploy::redeploy(&state, &service, target.image.clone(), target.port, &log).await
     });
     match task.await {
         Ok(result) => result.map(Json),

@@ -161,6 +161,15 @@ pub(crate) enum Command {
         )]
         command: Vec<String>,
     },
+    /// Reach the service's port from this computer, like a database for a local client
+    Connect {
+        /// Port to listen on here, the service's port by default
+        #[arg(long, value_name = "PORT")]
+        local_port: Option<u16>,
+        /// Machine id, or the end of one; left out, the first running machine
+        #[arg(short, long)]
+        machine: Option<String>,
+    },
     /// Manage a service's environment variables, lists them by default
     Env {
         #[command(subcommand)]

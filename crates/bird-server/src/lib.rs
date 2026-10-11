@@ -1,6 +1,7 @@
 mod api;
 mod backoff;
 mod backups;
+mod build_output;
 mod commands;
 mod config;
 mod credentials;

@@ -11,6 +11,8 @@ const TOKEN_SCHEME: &str = "api_token";
         description = "Deploy and run containers on a bird server. Browse these docs at /docs. Every endpoint except the docs needs the API token from birdd's data directory as a bearer token."
     ),
     modifiers(&BearerToken),
+    // only described in prose by the deploy route, which answers with it when asked for a stream
+    components(schemas(bird_api::DeployEvent)),
     security(("api_token" = [])),
     tags(
         (name = "users", description = "Users and their API tokens"),

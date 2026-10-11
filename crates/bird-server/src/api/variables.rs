@@ -100,7 +100,10 @@ async fn apply(
         .call(move |store| store.active_deployment(service_id))
         .await?;
     let deployment = match active.filter(|_| deploy) {
-        Some(active) => Some(deploy::redeploy(state, &service, active.image, active.port).await?),
+        Some(active) => {
+            let log = deploy::DeployLog::new();
+            Some(deploy::redeploy(state, &service, active.image, active.port, &log).await?)
+        }
         None => None,
     };
     Ok(VariablesResponse {

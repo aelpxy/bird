@@ -10,7 +10,8 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
-use bird_proxy::{Proxy, ProxyConfig, RouteTable, Routes};
+use bird_core::MachineId;
+use bird_proxy::{Proxy, ProxyConfig, Route, RouteTable, Routes};
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::server::conn::http1;
@@ -51,7 +52,12 @@ async fn upstream() -> Result<(), Box<dyn std::error::Error>> {
 async fn proxy() -> Result<(), Box<dyn std::error::Error>> {
     let upstream: SocketAddr = UPSTREAM.parse()?;
     let mut table = RouteTable::new();
-    table.insert(&"bench.localhost".parse()?, &[upstream]);
+    // a machine id like every deployed app has, so the x-machine-id header is part of the cost
+    let route = Route {
+        upstreams: vec![(upstream, Some(MachineId::generate()))],
+        ..Route::default()
+    };
+    table.insert_route(&"bench.localhost".parse()?, route);
     let routes = Routes::new();
     routes.replace(table);
 

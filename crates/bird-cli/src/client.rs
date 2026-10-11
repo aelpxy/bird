@@ -7,7 +7,9 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper::client::conn::http1::{Connection, SendRequest};
-use hyper::header::{AUTHORIZATION, CONNECTION, CONTENT_TYPE, HOST, UPGRADE, USER_AGENT};
+use hyper::header::{
+    ACCEPT, AUTHORIZATION, CONNECTION, CONTENT_TYPE, HOST, HeaderValue, UPGRADE, USER_AGENT,
+};
 use hyper::upgrade::Upgraded;
 use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
@@ -18,6 +20,7 @@ use tokio::net::TcpStream;
 use crate::scope::Scope;
 
 const JSON: &str = "application/json";
+const NDJSON: &str = "application/x-ndjson";
 // shown in `bird session` to tell a signed-in CLI from a browser
 const AGENT: &str = concat!("bird-cli/", env!("CARGO_PKG_VERSION"));
 
@@ -173,6 +176,22 @@ impl ApiClient {
         on_line: impl FnMut(&str) -> Result<()>,
     ) -> Result<()> {
         let request = self.request(Method::GET, path, None, JSON)?;
+        self.read_lines(request, timeout, on_line).await
+    }
+
+    // posts json and asks for the answer as a stream of json lines
+    pub(crate) async fn post_lines<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+        timeout: Duration,
+        on_line: impl FnMut(&str) -> Result<()>,
+    ) -> Result<()> {
+        let mut request =
+            self.request(Method::POST, path, Some(serde_json::to_vec(body)?), JSON)?;
+        request
+            .headers_mut()
+            .insert(ACCEPT, HeaderValue::from_static(NDJSON));
         self.read_lines(request, timeout, on_line).await
     }
 

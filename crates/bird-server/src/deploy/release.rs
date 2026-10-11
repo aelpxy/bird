@@ -1,7 +1,10 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use bird_api::DeployLogKind;
 use bird_core::{Command, Deployment, EnvKey, Service};
+
+use super::log::{DeployLog, LineSplitter};
 
 use crate::state::AppState;
 use crate::{Error, Result, commands};
@@ -17,13 +20,23 @@ pub(super) async fn run(
     deployment: &Deployment,
     env: &BTreeMap<EnvKey, String>,
     release: &Command,
+    log: &DeployLog,
 ) -> Result<()> {
     let target =
         commands::RunTarget::for_deployment(state, service, &deployment.image, env).await?;
     tracing::info!(service = %service.name, deployment = %deployment.id, "running release command");
-    let (result, output) = commands::run_collecting(state, &target, release, RELEASE_TIMEOUT).await;
+    log.bird(format!("Running the release command: {release}"));
+    let mut splitter = LineSplitter::default();
+    let to_log = |line| log.push(DeployLogKind::Release, None, line);
+    let (result, output) =
+        commands::run_collecting(state, &target, release, RELEASE_TIMEOUT, |chunk| {
+            splitter.feed(chunk, to_log);
+        })
+        .await;
+    splitter.finish(to_log);
     let reason = match result {
         Ok(Some(0)) => {
+            log.bird("The release command succeeded");
             tracing::info!(service = %service.name, deployment = %deployment.id, "release command succeeded");
             return Ok(());
         }
