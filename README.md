@@ -41,6 +41,14 @@ We plan a common runtime interface with adapters for Podman, Firecracker, [conta
 
 ## Quick start
 
+On a Linux server, as the user bird should run as:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aelpxy/bird/main/install.sh | bash
+```
+
+It installs podman if needed, downloads bird, starts it as a systemd user service and prints the dashboard's address with an admin to sign in as. Run it again to upgrade; `--help` lists its options.
+
 Prebuilt static Linux binaries of every commit on `main` are on the [edge release](https://github.com/aelpxy/bird/releases/tag/edge). To build it yourself:
 
 ```sh
