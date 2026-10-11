@@ -1,15 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, X } from 'lucide-react'
 import { z } from 'zod'
 import { useAppForm } from '@/components/form/app-form'
-import { Button } from '@/components/ui/button'
 import { focusRing, labelClass } from '@/components/ui/control-styles'
 import { ErrorAlert } from '@/components/ui/error-alert'
-import { IconButton } from '@/components/ui/icon-button'
 import type { Schemas } from '@/lib/api/client'
 import type { Scope } from '@/lib/api/paths'
 import { notifySuccess } from '@/lib/toast'
-import { command, image, name, port, wholeNumber } from '@/lib/validation'
+import { command, image, port, wholeNumber } from '@/lib/validation'
 import { deploy, type Service } from '../api'
 
 type HealthKind = 'http' | 'tcp' | 'path'
@@ -30,7 +27,6 @@ const schema = z
     healthTimeout: wholeNumber(1, 3600, 'the timeout'),
     memory: wholeNumber(32, 262_144, 'the memory limit'),
     cpus: z.number({ error: 'Enter the CPU limit.' }).min(0.1, 'CPU goes from 0.1 to 64 cores.').max(64, 'CPU goes from 0.1 to 64 cores.'),
-    volumes: z.array(z.object({ name: name('Name the volume.'), path: z.string().trim().regex(/^\/.+/, 'An absolute path, like /var/lib/app.') })),
     allowImageChange: z.boolean(),
   })
   // only the parts being changed need a value
@@ -63,7 +59,6 @@ function request(service: Service, values: z.output<typeof schema>): Schemas['De
     health_timeout: values.healthTimeout,
     memory: values.memory,
     cpus: Math.round(values.cpus * 1000),
-    volumes: values.volumes,
     allow_image_change: values.allowImageChange,
   }
   if (values.commandMode === 'set') body.command = command.parse(values.command)
@@ -95,7 +90,6 @@ export function ServiceConfigForm({ scope, service }: { scope: Scope; service: S
       healthTimeout: service.health_timeout,
       memory: service.memory,
       cpus: service.cpus / 1000,
-      volumes: [] as { name: string; path: string }[],
       allowImageChange: false,
     },
     validators: { onChange: schema },
@@ -194,46 +188,16 @@ export function ServiceConfigForm({ scope, service }: { scope: Scope; service: S
           <form.AppField name="cpus">{(field) => <field.NumberField label="CPU per machine (cores)" inputMode="decimal" step={0.1} min={0.1} max={64} />}</form.AppField>
         </div>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className={`${labelClass} mb-1`}>Volumes</legend>
-          {service.volumes.map((volume) => (
-            <p key={volume.name} className="font-mono text-ui text-fg">
-              {volume.name} → {volume.path}
-            </p>
-          ))}
-          <form.AppField name="volumes" mode="array">
-            {(volumesField) => (
-              <>
-                {volumesField.state.value.map((_, index) => (
-                  <div key={index} className="grid grid-cols-[9rem_1fr_auto] items-start gap-2">
-                    <form.AppField name={`volumes[${index}].name`}>{(field) => <field.TextField label="Volume name" hideLabel placeholder="data" mono autoComplete="off" />}</form.AppField>
-                    <form.AppField name={`volumes[${index}].path`}>{(field) => <field.TextField label="Mount path" hideLabel placeholder="/var/lib/app" mono autoComplete="off" />}</form.AppField>
-                    <IconButton label="Remove this volume" tone="danger" className="mt-1" onClick={() => volumesField.removeValue(index)}>
-                      <X aria-hidden className="size-4" />
-                    </IconButton>
-                  </div>
-                ))}
-                <div>
-                  <Button type="button" variant="ghost" size="sm" className="-ml-2.5" onClick={() => volumesField.pushValue({ name: '', path: '' })}>
-                    <Plus aria-hidden className="size-3.5" />
-                    Add a volume
-                  </Button>
-                </div>
-                <p className="text-xs text-fg-faint">Volumes keep their data across deploys and cannot move to another path. A service with volumes runs one machine.</p>
-                {(service.volumes.length > 0 || volumesField.state.value.length > 0) && (
-                  <form.AppField name="allowImageChange">
-                    {(field) => (
-                      <field.CheckboxField
-                        label="Allow a different image to use the volumes"
-                        description="birdd refuses an image other than the one that wrote the data, so a major upgrade cannot corrupt it by accident."
-                      />
-                    )}
-                  </form.AppField>
-                )}
-              </>
+        {service.volumes.length > 0 && (
+          <form.AppField name="allowImageChange">
+            {(field) => (
+              <field.CheckboxField
+                label="Allow a different image to use the volumes"
+                description="birdd refuses an image other than the one that wrote the data, so a major upgrade cannot corrupt it by accident."
+              />
             )}
           </form.AppField>
-        </fieldset>
+        )}
 
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(submitting) =>

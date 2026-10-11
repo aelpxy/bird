@@ -36,3 +36,13 @@ describe('validation', () => {
     expect(message(command.safeParse('echo "open'))).toBe('A double quote is never closed.')
   })
 })
+
+describe('mount paths', () => {
+  it('accepts absolute paths birdd can mount', async () => {
+    const { mountPath } = await import('./validation')
+    expect(mountPath.safeParse('/var/lib/postgresql/data').success).toBe(true)
+    for (const bad of ['data', '/', '/a/../b', '/with space', '/a:b', '/a,b']) {
+      expect(mountPath.safeParse(bad).success, bad).toBe(false)
+    }
+  })
+})

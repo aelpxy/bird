@@ -28,10 +28,14 @@ type FormDialogProps = {
   // shown while submitting, for work that takes a while, like a deploy
   pendingNote?: ReactNode
   size?: 'md' | 'lg'
+  // the footer's left side, like a back button in a dialog with steps
+  footerStart?: ReactNode
+  // for a step that has nothing to submit yet
+  hideSubmit?: boolean
   children: ReactNode
 }
 
-export function FormDialog({ dialog, trigger, title, description, submitLabel, pendingNote, size = 'md', children }: FormDialogProps) {
+export function FormDialog({ dialog, trigger, title, description, submitLabel, pendingNote, size = 'md', footerStart, hideSubmit = false, children }: FormDialogProps) {
   const { form } = dialog
   return (
     <Dialog.Root open={dialog.open} onOpenChange={dialog.setOpen}>
@@ -51,9 +55,10 @@ export function FormDialog({ dialog, trigger, title, description, submitLabel, p
                   </p>
                 )}
               </div>
-              <div className="flex justify-end gap-2 border-t border-line bg-canvas/40 px-5 py-3">
+              <div className="flex items-center gap-2 border-t border-line bg-canvas/40 px-5 py-3">
+                <div className="flex-1">{footerStart}</div>
                 <Dialog.Close render={<Button variant="ghost" disabled={dialog.pending} />}>Cancel</Dialog.Close>
-                <form.SubmitButton>{submitLabel}</form.SubmitButton>
+                {!hideSubmit && <form.SubmitButton>{submitLabel}</form.SubmitButton>}
               </div>
             </form.FormElement>
           </form.AppForm>

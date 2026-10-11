@@ -1,13 +1,18 @@
-import { FolderOpen } from 'lucide-react'
+import { Check, FolderOpen, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { hintClass, labelClass } from '@/components/ui/control-styles'
 import { plural } from '@/lib/format'
 import { readPicked, type PickedFolder } from '../pack'
 
-type FolderPickerProps = { folder: PickedFolder | null; onFolder: (folder: PickedFolder | null) => void }
+type FolderPickerProps = {
+  folder: PickedFolder | null
+  onFolder: (folder: PickedFolder | null) => void
+  // checked as soon as a folder is picked, so a wrong folder shows before any upload
+  dockerfile?: string
+}
 
 // the build context; the Dockerfile and build arguments are fields of the form around it
-export function FolderPicker({ folder, onFolder }: FolderPickerProps) {
+export function FolderPicker({ folder, onFolder, dockerfile = 'Dockerfile' }: FolderPickerProps) {
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => {
     // not in React's types, but every current browser supports picking a whole folder
@@ -37,7 +42,29 @@ export function FolderPicker({ folder, onFolder }: FolderPickerProps) {
           onChange={(event) => onFolder(event.target.files?.length ? readPicked(event.target.files) : null)}
         />
       </label>
-      <p className={hintClass}>Packed in your browser, leaving out what .dockerignore excludes, then built on the server.</p>
+      {folder ? (
+        <ul className="flex flex-col gap-1 font-mono text-2xs">
+          <FolderCheck ok={folder.files.some((entry) => entry.path === dockerfile.trim())} yes={`${dockerfile} found`} no={`No ${dockerfile} at the top of this folder`} />
+          <FolderCheck
+            ok={folder.files.some((entry) => entry.path === '.dockerignore')}
+            yes=".dockerignore found, its rules apply"
+            no="No .dockerignore, every file is sent"
+            soft
+          />
+        </ul>
+      ) : (
+        <p className={hintClass}>Packed in your browser, leaving out what .dockerignore excludes, then built on the server.</p>
+      )}
     </div>
+  )
+}
+
+function FolderCheck({ ok, yes, no, soft = false }: { ok: boolean; yes: string; no: string; soft?: boolean }) {
+  const Icon = ok ? Check : X
+  return (
+    <li className={`flex items-center gap-1.5 ${ok ? 'text-ok' : soft ? 'text-fg-faint' : 'text-bad'}`}>
+      <Icon aria-hidden className="size-3" />
+      {ok ? yes : no}
+    </li>
   )
 }

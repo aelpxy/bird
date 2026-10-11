@@ -78,3 +78,15 @@ export const command = z.string().transform((value, context) => {
   }
   return split.args
 })
+
+// where a volume appears inside the container
+export const mountPath = z
+  .string()
+  .trim()
+  .min(1, 'Enter where the volume is mounted.')
+  .refine((value) => value.startsWith('/') && value.length > 1, 'An absolute path, like /var/lib/app.')
+  .refine((value) => value.length <= 255, 'Use at most 255 characters.')
+  .refine((value) => !value.split('/').includes('..'), 'The path cannot contain "..".')
+  .refine((value) => /^[!-~]+$/.test(value) && !/[:,]/.test(value), 'No spaces, colons or commas.')
+
+export const volume = z.object({ name: name('Name the volume.'), path: mountPath })

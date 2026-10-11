@@ -32,7 +32,7 @@ function Overview() {
         <MachinesPanel service={data} />
       </Section>
       <Section title="Configuration">
-        <ServiceConfig service={data} />
+        <ServiceConfig scope={scope} service={data} />
       </Section>
     </div>
   )

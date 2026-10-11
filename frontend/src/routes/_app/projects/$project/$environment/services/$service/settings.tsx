@@ -5,6 +5,7 @@ import { useServiceScope } from '@/features/services/use-service-scope'
 const sections = [
   { to: '/projects/$project/$environment/services/$service/settings', label: 'Deployment', exact: true },
   { to: '/projects/$project/$environment/services/$service/settings/domains', label: 'Domains' },
+  { to: '/projects/$project/$environment/services/$service/settings/volumes', label: 'Volumes' },
   { to: '/projects/$project/$environment/services/$service/settings/scaling', label: 'Scaling' },
   { to: '/projects/$project/$environment/services/$service/settings/danger', label: 'Danger zone' },
 ] as const

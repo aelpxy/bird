@@ -47,6 +47,7 @@ import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsDangerRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/danger'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/domains'
 import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsScalingRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/scaling'
+import { Route as AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRouteImport } from './routes/_app/projects/$project/$environment/services/$service/settings/volumes'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -265,6 +266,15 @@ const AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute =
         AppProjectsProjectEnvironmentServicesServiceSettingsRoute,
     } as any,
   )
+const AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute =
+  AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRouteImport.update(
+    {
+      id: '/volumes',
+      path: '/volumes',
+      getParentRoute: () =>
+        AppProjectsProjectEnvironmentServicesServiceSettingsRoute,
+    } as any,
+  )
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -303,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
   '/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
+  '/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/projects/$project/$environment/services/$service/settings/': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -336,6 +347,7 @@ export interface FileRoutesByTo {
   '/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
   '/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
+  '/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/projects/$project/$environment/services/$service/settings': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -377,6 +389,7 @@ export interface FileRoutesById {
   '/_app/projects/$project/$environment/services/$service/settings/danger': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   '/_app/projects/$project/$environment/services/$service/settings/domains': typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
   '/_app/projects/$project/$environment/services/$service/settings/scaling': typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
+  '/_app/projects/$project/$environment/services/$service/settings/volumes': typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   '/_app/projects/$project/$environment/services/$service/settings/': typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -418,6 +431,7 @@ export interface FileRouteTypes {
     | '/projects/$project/$environment/services/$service/settings/danger'
     | '/projects/$project/$environment/services/$service/settings/domains'
     | '/projects/$project/$environment/services/$service/settings/scaling'
+    | '/projects/$project/$environment/services/$service/settings/volumes'
     | '/projects/$project/$environment/services/$service/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -451,6 +465,7 @@ export interface FileRouteTypes {
     | '/projects/$project/$environment/services/$service/settings/danger'
     | '/projects/$project/$environment/services/$service/settings/domains'
     | '/projects/$project/$environment/services/$service/settings/scaling'
+    | '/projects/$project/$environment/services/$service/settings/volumes'
     | '/projects/$project/$environment/services/$service/settings'
   id:
     | '__root__'
@@ -491,6 +506,7 @@ export interface FileRouteTypes {
     | '/_app/projects/$project/$environment/services/$service/settings/danger'
     | '/_app/projects/$project/$environment/services/$service/settings/domains'
     | '/_app/projects/$project/$environment/services/$service/settings/scaling'
+    | '/_app/projects/$project/$environment/services/$service/settings/volumes'
     | '/_app/projects/$project/$environment/services/$service/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -767,6 +783,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRouteImport
       parentRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsRoute
     }
+    '/_app/projects/$project/$environment/services/$service/settings/volumes': {
+      id: '/_app/projects/$project/$environment/services/$service/settings/volumes'
+      path: '/volumes'
+      fullPath: '/projects/$project/$environment/services/$service/settings/volumes'
+      preLoaderRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRouteImport
+      parentRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsRoute
+    }
   }
 }
 
@@ -823,6 +846,7 @@ interface AppProjectsProjectEnvironmentServicesServiceSettingsRouteChildren {
   AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsDangerRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute
+  AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute
   AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute: typeof AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute
 }
 
@@ -834,6 +858,8 @@ const AppProjectsProjectEnvironmentServicesServiceSettingsRouteChildren: AppProj
       AppProjectsProjectEnvironmentServicesServiceSettingsDomainsRoute,
     AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute:
       AppProjectsProjectEnvironmentServicesServiceSettingsScalingRoute,
+    AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute:
+      AppProjectsProjectEnvironmentServicesServiceSettingsVolumesRoute,
     AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute:
       AppProjectsProjectEnvironmentServicesServiceSettingsIndexRoute,
   }
