@@ -11,8 +11,9 @@ describe('deployment presentation', () => {
     expect(splitImage('ghcr.io/a/b@sha256:0123456789abcdef0123')).toEqual({ repository: 'ghcr.io/a/b', tag: 'sha256:0123456789ab' })
   })
 
-  it('opens on the deploy in progress, else the live one', () => {
-    expect(preferredDeployment([deployment('a', 'failed'), deployment('b', 'active')])?.id).toBe('b')
+  it('opens on the deploy in progress, else a newest one that failed, else the live one', () => {
+    expect(preferredDeployment([deployment('a', 'failed'), deployment('b', 'active')])?.id).toBe('a')
+    expect(preferredDeployment([deployment('a', 'superseded'), deployment('b', 'active')])?.id).toBe('b')
     expect(preferredDeployment([deployment('a', 'deploying'), deployment('b', 'active')])?.id).toBe('a')
     expect(preferredDeployment([deployment('a', 'failed')])?.id).toBe('a')
   })

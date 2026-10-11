@@ -3,7 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -80,13 +80,16 @@ jobs:
           path: frontend/dist
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
       # the api is started in the same step, a background process may not outlive its step
       - name: Run every test against podman
         run: |
           mkdir -p /run/podman
           podman system service --time=0 unix:///run/podman/podman.sock &
           for _ in $(seq 1 50); do [ -S /run/podman/podman.sock ] && break; sleep 0.2; done
-          cargo test --no-fail-fast -- --include-ignored
+          cargo nextest run --no-fail-fast --run-ignored all
 
   build:
     name: build ${{ matrix.arch }}

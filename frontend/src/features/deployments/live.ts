@@ -3,7 +3,7 @@ import type { Scope } from '@/lib/api/paths'
 import type { DeployLogLine } from './api'
 
 // deploys this browser started, by service, so any page of that service can show their log
-export type LiveDeploy = { lines: DeployLogLine[]; running: boolean; error?: string }
+export type LiveDeploy = { lines: DeployLogLine[]; running: boolean; startedAt: number; error?: string }
 
 const deploys = new Map<string, LiveDeploy>()
 const listeners = new Set<() => void>()
@@ -19,7 +19,7 @@ function set(key: string, deploy: LiveDeploy | undefined) {
 }
 
 export function startLive(key: string) {
-  set(key, { lines: [], running: true })
+  set(key, { lines: [], running: true, startedAt: Date.now() })
 }
 
 export function pushLive(key: string, line: DeployLogLine) {
@@ -31,6 +31,11 @@ export function endLive(key: string, error?: string) {
   const current = deploys.get(key)
   // a deploy that worked has nothing left to read; a failed one stays until dismissed
   set(key, error && current ? { ...current, running: false, error } : undefined)
+}
+
+// birdd's newest step says what the deploy is doing; app and build output is too noisy for a summary
+export function currentStep(deploy: LiveDeploy): string | undefined {
+  return deploy.lines.findLast((line) => line.kind === 'bird')?.text
 }
 
 export function dismissLive(key: string) {

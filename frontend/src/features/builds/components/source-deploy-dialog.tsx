@@ -9,7 +9,7 @@ import { notifySuccess } from '@/lib/toast'
 import type { Service } from '../../services/api'
 import { buildArgs, dockerfile } from '../schemas'
 import { useSourceDeploy } from '../use-source-deploy'
-import { LiveDeployLog } from '@/features/deployments/components/live-deploy-panel'
+import { LiveDeployLog } from '@/features/deployments/components/live-deploy-log'
 import { BuildProgress } from './build-progress'
 import { FolderPicker } from './folder-picker'
 

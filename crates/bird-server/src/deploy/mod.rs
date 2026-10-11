@@ -162,10 +162,7 @@ async fn roll_out(state: &AppState, rollout: Rollout, log: &DeployLog) -> Result
     for line in state.built.take(&deployment.image) {
         log.push(DeployLogKind::Build, None, line);
     }
-    log.bird(format!(
-        "Deploying {} as deployment {}",
-        deployment.image, deployment.id
-    ));
+    log.bird(format!("Deploying {}", deployment.image));
 
     let released = match pull(state, &deployment.image, log).await {
         Ok(()) => match &service.release {

@@ -24,6 +24,10 @@ const kinds: { value: Kind; label: string }[] = [
   { value: 'app', label: 'App' },
 ]
 
+function duration(seconds: number): string {
+  return seconds < 60 ? `${seconds.toFixed(1)}s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
+}
+
 type DeploymentDetailProps = { scope: Scope; service: string; deployment: Deployment }
 
 export function DeploymentDetail({ scope, service, deployment }: DeploymentDetailProps) {
@@ -56,22 +60,11 @@ export function DeploymentDetail({ scope, service, deployment }: DeploymentDetai
               {deployment.image}
             </span>
           </div>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-2xs">
-            <dt className="text-fg-faint uppercase">Started</dt>
-            <dd className="text-fg-muted">{dateTime(deployment.created_at)}</dd>
-            {took !== undefined && (
-              <>
-                <dt className="text-fg-faint uppercase">Took</dt>
-                <dd className="text-fg-muted">{took < 60 ? `${took.toFixed(1)}s` : `${Math.floor(took / 60)}m ${Math.round(took % 60)}s`}</dd>
-              </>
-            )}
-            <dt className="text-fg-faint uppercase">Port</dt>
-            <dd className="text-fg-muted">{deployment.port}</dd>
-            <dt className="text-fg-faint uppercase">Config</dt>
-            <dd className="text-fg-muted">{plural(deployment.variables, 'variable')}</dd>
-            <dt className="text-fg-faint uppercase">Id</dt>
-            <dd className="truncate text-fg-muted">{deployment.id}</dd>
-          </dl>
+          <p className="mt-2 font-mono text-2xs text-fg-faint">
+            {[dateTime(deployment.created_at), took !== undefined && `took ${duration(took)}`, `port ${deployment.port}`, plural(deployment.variables, 'variable')]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <CopyButton value={deployment.id} label="Copy id" />

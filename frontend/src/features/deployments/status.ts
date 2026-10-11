@@ -22,7 +22,13 @@ export function shortId(id: string): string {
   return id.slice(0, 8)
 }
 
-// the deploy in progress first, else the one serving traffic, else the newest
+// the deploy in progress first, else the newest if it failed, so a failure is what you see after it, else the live one
 export function preferredDeployment(deployments: Deployment[]): Deployment | undefined {
-  return deployments.find((d) => d.status === 'deploying') ?? deployments.find((d) => d.status === 'active') ?? deployments[0]
+  const newest = deployments.at(0)
+  return (
+    deployments.find((d) => d.status === 'deploying') ??
+    (newest?.status === 'failed' ? newest : undefined) ??
+    deployments.find((d) => d.status === 'active') ??
+    newest
+  )
 }
