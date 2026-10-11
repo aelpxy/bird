@@ -49,7 +49,7 @@ bird backup schedule -s postgres --every 1d --keep 7
 
 Commands act on the service in `./bird.toml`, or the one named with `-s`. Run `bird --help` for everything else: projects and environments, volumes, cron jobs, users and orgs, private registries.
 
-A `bird.toml` is one service:
+A `bird.toml` is one service ([every field](docs/bird-toml.md)):
 
 ```toml
 name = "api"

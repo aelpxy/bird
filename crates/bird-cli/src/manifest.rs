@@ -120,11 +120,10 @@ dockerfile = \"Dockerfile\"
 mod tests {
     use super::*;
 
-    // the full example in the readme, so the docs fail the build when a field changes
+    // the full example in the docs, so they fail the build when a field changes
     #[test]
-    fn readme_example_parses() {
-        let readme = include_str!("../../../README.md");
-        let section = &readme[readme.find("### bird.toml").unwrap()..];
+    fn documented_example_parses() {
+        let section = include_str!("../../../docs/bird-toml.md");
         let start = section.find("```toml\n").unwrap() + "```toml\n".len();
         let example = &section[start..start + section[start..].find("```").unwrap()];
         let manifest: Manifest = toml::from_str(example).unwrap();
