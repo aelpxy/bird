@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { inputClass } from '@/components/ui/control-styles'
 import { FieldShell } from './field-shell'
 import { useFieldContext } from './form-context'
@@ -15,6 +15,12 @@ type SelectFieldProps<T extends string | number> = {
 // a native select: the platform's own picker is the most usable one on every device
 export function SelectField<T extends string | number>({ label, options, description, hideLabel, disabled }: SelectFieldProps<T>) {
   const field = useFieldContext<T>()
+  const first = options[0]?.value
+  const listed = options.some((option) => option.value === field.state.value)
+  // a browser shows the first option when the value is not one of them, so the form must hold it too
+  useEffect(() => {
+    if (!listed && first !== undefined) field.setValue(first)
+  }, [listed, first, field])
   return (
     <FieldShell label={label} description={description} hideLabel={hideLabel}>
       {(control) => (
