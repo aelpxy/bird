@@ -18,7 +18,7 @@ impl LogFollower {
         Self {
             body,
             buffer: Vec::new(),
-            lines: Lines::default(),
+            lines: Lines::timestamped(),
         }
     }
 

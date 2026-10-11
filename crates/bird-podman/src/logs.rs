@@ -29,12 +29,14 @@ pub enum LogStart {
 pub struct LogLine {
     pub stream: LogStream,
     pub text: String,
+    /// When podman recorded the line, in unix milliseconds
+    pub at: Option<i64>,
 }
 
 impl Podman {
     pub async fn logs(&self, id: &str, tail: u32) -> Result<Vec<LogLine>> {
         let path = format!(
-            "/containers/{}/logs?stdout=true&stderr=true&tail={tail}",
+            "/containers/{}/logs?stdout=true&stderr=true&timestamps=true&tail={tail}",
             encode(id)
         );
         let response = self.get(&path).await?;
@@ -52,7 +54,7 @@ impl Podman {
             LogStart::Beginning => String::new(),
         };
         let path = format!(
-            "/containers/{}/logs?follow=true&stdout=true&stderr=true{from}",
+            "/containers/{}/logs?follow=true&stdout=true&stderr=true&timestamps=true{from}",
             encode(id)
         );
         Ok(LogFollower::new(self.follow(id, &path).await?))
@@ -82,7 +84,7 @@ impl Podman {
 }
 
 fn demux(body: &[u8]) -> Vec<LogLine> {
-    let mut lines = Lines::default();
+    let mut lines = Lines::timestamped();
     if next_frame(body).is_none() {
         lines.push(LogStream::Stdout, body);
     } else {
@@ -132,15 +134,18 @@ mod tests {
             vec![
                 LogLine {
                     stream: LogStream::Stdout,
-                    text: "hello".to_owned()
+                    text: "hello".to_owned(),
+                    at: None
                 },
                 LogLine {
                     stream: LogStream::Stderr,
-                    text: "oops".to_owned()
+                    text: "oops".to_owned(),
+                    at: None
                 },
                 LogLine {
                     stream: LogStream::Stderr,
-                    text: "again".to_owned()
+                    text: "again".to_owned(),
+                    at: None
                 },
             ]
         );

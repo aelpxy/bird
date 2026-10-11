@@ -49,6 +49,26 @@ async fn wait_for_log(podman: &Podman, id: &str, text: &str) -> Vec<bird_podman:
     logs
 }
 
+// every line carries when podman recorded it, and none still starts with podman's own prefix
+fn assert_timed(logs: &[bird_podman::LogLine]) {
+    let now_ms = i64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("the clock is after 1970")
+            .as_millis(),
+    )
+    .expect("milliseconds since 1970 fit in an i64");
+    for line in logs {
+        let at = line.at.expect("podman was asked for timestamps");
+        assert!((now_ms - at).abs() < 120_000, "{line:?}");
+        let prefix = line.text.get(..20).unwrap_or_default();
+        assert!(
+            !(prefix.get(4..5) == Some("-") && prefix.get(10..11) == Some("T")),
+            "{line:?}"
+        );
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires a running podman socket"]
 async fn container_lifecycle() {
@@ -123,6 +143,7 @@ async fn container_lifecycle() {
             .any(|l| l.stream == LogStream::Stdout && l.text.contains("GET /")),
         "{logs:?}"
     );
+    assert_timed(&logs);
 
     podman.pause_container(&id).await.unwrap();
     assert_eq!(
