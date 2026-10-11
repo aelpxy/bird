@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CheckboxField } from '@/components/ui/checkbox-field'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { IconButton } from '@/components/ui/icon-button'
+import { Table, TableCell, TableRow } from '@/components/ui/table'
 import type { Scope } from '@/lib/api/paths'
 import { bytes, dateTime, timeAgo } from '@/lib/format'
 import { notifySuccess } from '@/lib/toast'
@@ -18,34 +20,31 @@ const triggers: Record<Backup['trigger'], string> = {
 
 type BackupsListProps = { scope: Scope; service: string; backups: Backup[] }
 
+const LAYOUT = 'sm:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,1.6fr)_5.5rem_auto]'
+const COLUMNS = [{ label: 'Taken' }, { label: 'Trigger' }, { label: 'Volumes' }, { label: 'Size' }, { label: '' }]
+
 export function BackupsList({ scope, service, backups }: BackupsListProps) {
   const queryClient = useQueryClient()
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['services', scope.project, scope.environment, service] })
   return (
-    <ul className="divide-y divide-line border border-line bg-surface">
+    <Table label="Backups" columns={COLUMNS} layout={LAYOUT}>
       {backups.map((backup) => {
         const total = backup.volumes.reduce((sum, volume) => sum + volume.size_bytes, 0)
         return (
-          <li key={backup.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-fg" title={dateTime(backup.created_at)}>
-                  {timeAgo(backup.created_at)}
-                </span>
-                <Badge>{triggers[backup.trigger]}</Badge>
-              </div>
-              <p className="mt-1 font-mono text-2xs text-fg-faint">
-                {backup.volumes.map((volume) => `${volume.name} ${bytes(volume.size_bytes)}`).join(' · ')} · {bytes(total)}{' '}
-                total · stored in {backup.storage}
+          <TableRow key={backup.id} layout={LAYOUT}>
+            <TableCell>
+              <p className="text-sm font-medium text-fg" title={dateTime(backup.created_at)}>
+                {timeAgo(backup.created_at)}
               </p>
-            </div>
-            <div className="flex gap-2">
+              <p className="mt-0.5 font-mono text-2xs text-fg-faint">in {backup.storage}</p>
+            </TableCell>
+            <TableCell className="flex justify-end gap-2 sm:order-last">
               <RestoreButton scope={scope} service={service} backup={backup} onDone={refresh} />
               <ConfirmDialog
                 trigger={
-                  <Button variant="secondary" size="sm" aria-label={`Delete the backup from ${timeAgo(backup.created_at)}`}>
-                    <Trash2 aria-hidden className="size-3.5" />
-                  </Button>
+                  <IconButton label={`Delete the backup from ${timeAgo(backup.created_at)}`} tone="danger">
+                    <Trash2 aria-hidden className="size-4" />
+                  </IconButton>
                 }
                 title="Delete this backup?"
                 description={`The copy from ${dateTime(backup.created_at)} is deleted from storage.`}
@@ -57,11 +56,20 @@ export function BackupsList({ scope, service, backups }: BackupsListProps) {
                   await refresh()
                 }}
               />
-            </div>
-          </li>
+            </TableCell>
+            <TableCell label="Trigger">
+              <Badge>{triggers[backup.trigger]}</Badge>
+            </TableCell>
+            <TableCell label="Volumes" className="truncate font-mono text-xs text-fg-muted">
+              {backup.volumes.map((volume) => `${volume.name} ${bytes(volume.size_bytes)}`).join(' · ')}
+            </TableCell>
+            <TableCell label="Size" className="tabular font-mono text-xs text-fg">
+              {bytes(total)}
+            </TableCell>
+          </TableRow>
         )
       })}
-    </ul>
+    </Table>
   )
 }
 

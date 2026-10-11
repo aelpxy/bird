@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cronJobsQuery } from '@/features/cron/api'
-import { CronJobCard } from '@/features/cron/components/cron-job-card'
+import { CronJobsTable } from '@/features/cron/components/cron-jobs-table'
 import { useServiceScope } from '@/features/services/use-service-scope'
 
 export const Route = createFileRoute('/_app/projects/$project/$environment/services/$service/cron')({
@@ -21,7 +21,7 @@ command = ["bin/report"]`
 function Cron() {
   const { scope, service } = useServiceScope()
   const jobs = useQuery(cronJobsQuery(scope, service))
-  if (jobs.isPending) return <Skeleton className="h-40 w-full " />
+  if (jobs.isPending) return <Skeleton className="h-40 w-full" />
   if (jobs.isError) return <ErrorState error={jobs.error} onRetry={() => void jobs.refetch()} />
   if (jobs.data.length === 0) {
     return (
@@ -40,9 +40,7 @@ function Cron() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-fg-muted">Schedules are in UTC. Jobs come from bird.toml; each run is a fresh container.</p>
-      {jobs.data.map((job) => (
-        <CronJobCard key={job.name} scope={scope} service={service} job={job} />
-      ))}
+      <CronJobsTable scope={scope} service={service} jobs={jobs.data} />
     </div>
   )
 }
