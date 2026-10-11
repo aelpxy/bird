@@ -10,11 +10,14 @@
 #   --uninstall            stop and remove bird, keep its data
 #
 # From a checkout (./install.sh) it builds bird from source instead of downloading it.
-# Run it again to upgrade. It never runs as root itself and only asks for sudo to install podman
-# and to let your user bind ports 80 and 443.
+# Run it again to upgrade. Run as root, it creates a `bird` user and runs bird as that user;
+# otherwise it only asks for sudo to install podman and to let your user bind ports 80 and 443.
 set -euo pipefail
 
 github="https://github.com/aelpxy/bird"
+script_url="https://raw.githubusercontent.com/aelpxy/bird/main/install.sh"
+service_user="bird"
+args=("$@")
 bin_dir="$HOME/.local/bin"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 drop_in="$unit_dir/birdd.service.d/setup.conf"
@@ -85,12 +88,19 @@ while (($#)); do
     esac
 done
 
-[[ $EUID -ne 0 ]] || fail "run this as the user bird should run as, not root"
 [[ "$(uname -s)" == Linux ]] || fail "bird runs on Linux only"
-systemctl --user show-environment >/dev/null 2>&1 \
+((EUID == 0)) || systemctl --user show-environment >/dev/null 2>&1 \
     || fail "no systemd user session; log in directly (not with su) or enable lingering first"
 
-if $uninstall; then
+as_root() {
+    if ((EUID == 0)); then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+if $uninstall && ((EUID != 0)); then
     step "removing bird"
     systemctl --user disable --now birdd 2>/dev/null || true
     rm -f "$bin_dir/birdd" "$bin_dir/bird" "$unit_dir/birdd.service" "$drop_in"
@@ -114,8 +124,48 @@ install_podman() {
     else
         fail "podman is not installed and this distro's package manager is unknown; install podman 5 or newer"
     fi
-    step "installing podman (needs sudo)"
-    sudo "${install[@]}" || fail "could not install podman; install podman 5 or newer yourself"
+    step "installing podman"
+    as_root "${install[@]}" || fail "could not install podman; install podman 5 or newer yourself"
+}
+
+allow_low_ports() {
+    as_root sh -c 'echo net.ipv4.ip_unprivileged_port_start=80 > /etc/sysctl.d/90-bird.conf && sysctl -q --system'
+}
+
+# rootless podman is the point, so root sets up a user and installs as them
+install_as_service_user() {
+    [[ -z $repo ]] || fail "from a checkout, run ./install.sh as the user bird should run as, not root"
+    local home uid
+    if ! id "$service_user" >/dev/null 2>&1; then
+        step "creating the user $service_user to run bird"
+        useradd --create-home --shell /bin/bash "$service_user"
+    fi
+    grep -q "^$service_user:" /etc/subuid \
+        || usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$service_user"
+    home="$(getent passwd "$service_user" | cut -d: -f6)"
+    uid="$(id -u "$service_user")"
+    if ! $uninstall && ! $high_ports && (($(sysctl -n net.ipv4.ip_unprivileged_port_start) > 80)); then
+        allow_low_ports
+    fi
+    loginctl enable-linger "$service_user"
+    for _ in $(seq 1 50); do
+        [[ -S /run/user/$uid/bus ]] && break
+        sleep 0.2
+    done
+    [[ -S /run/user/$uid/bus ]] || fail "the systemd user session of $service_user did not start"
+    curl -fsSL "$script_url" | (cd / && runuser -u "$service_user" -- env \
+        HOME="$home" USER="$service_user" LOGNAME="$service_user" \
+        XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        bash -s -- "${args[@]}")
+    if $uninstall; then
+        rm -f /usr/local/bin/bird
+        exit 0
+    fi
+    # so root can use the cli without switching users
+    install -Dm755 "$home/.local/bin/bird" -t /usr/local/bin
+    /usr/local/bin/bird login "$api" <"$home/.local/share/bird/api-token" >/dev/null
+    ok "bird runs as $service_user; the bird command also works for root"
+    exit 0
 }
 
 step "checking requirements"
@@ -124,6 +174,7 @@ podman_version="$(podman version --format '{{.Client.Version}}')"
 ((${podman_version%%.*} >= 5)) \
     || fail "bird needs podman 5 or newer, this is $podman_version; upgrade your distro or its podman"
 ok "podman $podman_version"
+((EUID != 0)) || install_as_service_user
 
 build_from_source() {
     if ! command -v cargo >/dev/null; then
@@ -191,7 +242,7 @@ env_lines=()
 if ! $high_ports; then
     if (($(sysctl -n net.ipv4.ip_unprivileged_port_start) > 80)); then
         step "letting your user bind ports 80 and 443 (needs sudo once)"
-        if sudo sh -c 'echo net.ipv4.ip_unprivileged_port_start=80 > /etc/sysctl.d/90-bird.conf && sysctl -q --system'; then
+        if allow_low_ports; then
             ok "ports 80 and 443 are bindable"
         else
             warn "no sudo, so the proxy listens on 8080 and 8443 instead"
