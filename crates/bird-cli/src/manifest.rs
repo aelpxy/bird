@@ -120,6 +120,21 @@ dockerfile = \"Dockerfile\"
 mod tests {
     use super::*;
 
+    // the agent skill carries its own copies, since it is used outside this repository
+    #[test]
+    fn agent_skill_references_match_the_docs() {
+        assert_eq!(
+            include_str!("../../../skills/bird/reference/bird-toml.md"),
+            include_str!("../../../docs/bird-toml.md"),
+            "copy docs/bird-toml.md to skills/bird/reference/"
+        );
+        assert_eq!(
+            include_str!("../../../skills/bird/reference/github-actions.md"),
+            include_str!("../../../docs/github-actions.md"),
+            "copy docs/github-actions.md to skills/bird/reference/"
+        );
+    }
+
     // the full example in the docs, so they fail the build when a field changes
     #[test]
     fn documented_example_parses() {

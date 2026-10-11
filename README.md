@@ -63,7 +63,7 @@ release = ["bin/migrate"]              # runs before each deploy's new machines 
 DATABASE_URL = "${{postgres.DATABASE_URL}}"
 ```
 
-To deploy on every push, use the [GitHub Action](docs/github-actions.md). For AI coding agents, [skills/bird/SKILL.md](skills/bird/SKILL.md) teaches them to deploy with bird; copy it into `.claude/skills/bird/` or point your agent at it.
+To deploy on every push, use the [GitHub Action](docs/github-actions.md). For AI coding agents, [skills/bird](skills/bird/SKILL.md) teaches them to deploy with bird. Copy the whole folder into `.claude/skills/`, or point your agent at it.
 
 ## How it works
 
