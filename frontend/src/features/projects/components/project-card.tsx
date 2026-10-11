@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowUpRight } from 'lucide-react'
 import { focusRing } from '@/components/ui/control-styles'
-import { Eyebrow } from '@/components/ui/eyebrow'
 import { plural } from '@/lib/format'
 import { serviceStatus } from '@/features/services/status'
 import type { PlacedService } from '@/features/overview/use-overview'
@@ -17,8 +16,7 @@ export function ProjectCard({ project, services }: { project: Project; services:
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Eyebrow>{project.org}</Eyebrow>
-          <p className="mt-1.5 truncate text-title font-semibold tracking-[-0.01em] text-fg">{project.name}</p>
+          <p className="truncate text-title font-semibold tracking-[-0.01em] text-fg">{project.name}</p>
         </div>
         <ArrowUpRight aria-hidden className="size-4 shrink-0 text-fg-faint transition-colors group-hover:text-fg" />
       </div>

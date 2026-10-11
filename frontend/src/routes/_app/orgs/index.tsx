@@ -9,10 +9,11 @@ import { ErrorState } from '@/components/ui/error-state'
 import { FormDialog } from '@/components/ui/form-dialog'
 import { PageHeader } from '@/components/ui/page-header'
 import { Skeleton } from '@/components/ui/skeleton'
+import { plural } from '@/lib/format'
 import { notifySuccess } from '@/lib/toast'
 import { NAME_HINT, name } from '@/lib/validation'
 import { createOrg } from '@/features/orgs/api'
-import { orgsQuery } from '@/features/projects/api'
+import { orgsQuery, projectsQuery } from '@/features/projects/api'
 
 export const Route = createFileRoute('/_app/orgs/')({
   head: () => ({ meta: [{ title: 'Orgs · bird' }] }),
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/_app/orgs/')({
 function Orgs() {
   const queryClient = useQueryClient()
   const orgs = useQuery(orgsQuery)
+  const { data: projects = [] } = useQuery(projectsQuery)
   const newOrg = useDialogForm({
     schema: z.object({ name: name('Enter an org name.') }),
     defaultValues: { name: '' },
@@ -71,6 +73,7 @@ function Orgs() {
               >
                 <Building2 aria-hidden className="size-4 text-fg-faint" />
                 <span className="flex-1 text-sm font-medium text-fg">{org.name}</span>
+                <span className="font-mono text-2xs text-fg-faint">{plural(projects.filter((project) => project.org === org.name).length, 'project')}</span>
                 {org.role && <Badge>{org.role}</Badge>}
                 <ChevronRight aria-hidden className="size-4 text-fg-faint group-hover:text-fg-muted" />
               </Link>

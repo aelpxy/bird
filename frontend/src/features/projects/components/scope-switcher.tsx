@@ -1,7 +1,7 @@
 import { Menu } from '@base-ui/react/menu'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Check, ChevronsUpDown, Plus, Settings } from 'lucide-react'
+import { Building2, Check, ChevronsUpDown, Plus, Settings } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { focusRing } from '@/components/ui/control-styles'
 import { menuItemClass, menuPopupClass, menuSeparatorClass } from '@/components/ui/overlay-styles'
@@ -10,12 +10,14 @@ import { preferredEnvironment, projectsQuery } from '@/features/projects/api'
 import { NewEnvironmentDialog } from './new-environment-dialog'
 
 const itemClass = `${menuItemClass} justify-between gap-6`
+const groupLabelClass = 'px-2 pt-2 pb-1 font-mono text-2xs tracking-[0.08em] text-fg-faint uppercase'
 
-// projects / project / environment, each a menu to jump to a sibling
+// projects / org / project / environment; the last two are menus to jump to a sibling
 export function ScopeSwitcher({ scope }: { scope: Scope }) {
   const { data: projects = [] } = useQuery(projectsQuery)
   const current = projects.find((project) => project.name === scope.project)
   const [creating, setCreating] = useState(false)
+  const orgs = [...new Set(projects.map((project) => project.org))].sort()
 
   return (
     <nav aria-label="Project and environment" className="flex flex-wrap items-center gap-1 border-b border-line pb-3">
@@ -23,26 +25,47 @@ export function ScopeSwitcher({ scope }: { scope: Scope }) {
         Projects
       </Link>
       <Slash />
+      {current && (
+        <>
+          <Link
+            to="/orgs/$org"
+            params={{ org: current.org }}
+            title={`Org ${current.org}, which owns this project`}
+            className={`flex items-center gap-1.5 px-1.5 py-1 text-sm text-fg-muted transition-colors hover:text-fg ${focusRing}`}
+          >
+            <Building2 aria-hidden className="size-3.5 text-fg-faint" />
+            {current.org}
+          </Link>
+          <Slash />
+        </>
+      )}
       <Picker kind="Project" value={scope.project}>
-        {projects.map((project) => {
-          const environment = preferredEnvironment(project)
-          return (
-            <Menu.Item
-              key={project.name}
-              className={itemClass}
-              render={
-                environment ? (
-                  <Link to="/projects/$project/$environment" params={{ project: project.name, environment }} />
-                ) : (
-                  <Link to="/projects/$project" params={{ project: project.name }} />
+        {orgs.map((org) => (
+          <Menu.Group key={org}>
+            {orgs.length > 1 && <Menu.GroupLabel className={groupLabelClass}>{org}</Menu.GroupLabel>}
+            {projects
+              .filter((project) => project.org === org)
+              .map((project) => {
+                const environment = preferredEnvironment(project)
+                return (
+                  <Menu.Item
+                    key={project.name}
+                    className={itemClass}
+                    render={
+                      environment ? (
+                        <Link to="/projects/$project/$environment" params={{ project: project.name, environment }} />
+                      ) : (
+                        <Link to="/projects/$project" params={{ project: project.name }} />
+                      )
+                    }
+                  >
+                    {project.name}
+                    {project.name === scope.project && <Check aria-hidden className="size-3.5" />}
+                  </Menu.Item>
                 )
-              }
-            >
-              {project.name}
-              {project.name === scope.project && <Check aria-hidden className="size-3.5" />}
-            </Menu.Item>
-          )
-        })}
+              })}
+          </Menu.Group>
+        ))}
         <Menu.Separator className={menuSeparatorClass} />
         <Menu.Item className={menuItemClass} render={<Link to="/projects/$project/-/settings" params={{ project: scope.project }} />}>
           <Settings aria-hidden className="size-3.5" />

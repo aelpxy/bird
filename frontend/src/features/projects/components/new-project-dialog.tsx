@@ -11,14 +11,15 @@ import { createProject, orgsQuery, projectsQuery } from '../api'
 
 const schema = z.object({ name: name('Enter a project name.'), org: z.string() })
 
-export function NewProjectDialog() {
+// with an org it creates the project there, otherwise it asks when there are several
+export function NewProjectDialog({ org }: { org?: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { data: orgs = [] } = useQuery(orgsQuery)
   const dialog = useDialogForm({
     schema,
     // empty means the first org, which the select shows first
-    defaultValues: { name: '', org: '' },
+    defaultValues: { name: '', org: org ?? '' },
     onSubmit: async (values) => {
       const project = await createProject({ name: values.name, org: values.org || orgs[0]?.name })
       await queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey })
@@ -37,13 +38,13 @@ export function NewProjectDialog() {
         </Button>
       }
       title="New project"
-      description="A project groups services, with a production environment to start."
+      description={`A project groups services, with a production environment to start${org ? `. It belongs to ${org}.` : '.'}`}
       submitLabel="Create project"
     >
       <dialog.form.AppField name="name">
         {(field) => <field.TextField label="Project name" placeholder="shop" description={NAME_HINT} autoFocus autoComplete="off" autoCapitalize="none" spellCheck={false} />}
       </dialog.form.AppField>
-      {orgs.length > 1 && (
+      {!org && orgs.length > 1 && (
         <dialog.form.AppField name="org">
           {(field) => <field.SelectField label="Org" options={orgs.map((org) => ({ value: org.name, label: org.name }))} />}
         </dialog.form.AppField>

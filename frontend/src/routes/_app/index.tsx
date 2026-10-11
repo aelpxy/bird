@@ -9,7 +9,7 @@ import { ServiceRows } from '@/features/overview/components/service-rows'
 import { StatTiles } from '@/features/overview/components/stat-tiles'
 import { useOverview } from '@/features/overview/use-overview'
 import { NewProjectDialog } from '@/features/projects/components/new-project-dialog'
-import { ProjectCard } from '@/features/projects/components/project-card'
+import { ProjectsByOrg } from '@/features/projects/components/projects-by-org'
 
 export const Route = createFileRoute('/_app/')({
   head: () => ({ meta: [{ title: 'Overview · bird' }] }),
@@ -74,13 +74,7 @@ function Overview() {
           </div>
 
           <Section title="Projects">
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {overview.projects.map((project) => (
-                <li key={project.name}>
-                  <ProjectCard project={project} services={overview.services.filter(({ scope }) => scope.project === project.name)} />
-                </li>
-              ))}
-            </ul>
+            <ProjectsByOrg projects={overview.projects} services={overview.services} />
           </Section>
         </>
       )}
