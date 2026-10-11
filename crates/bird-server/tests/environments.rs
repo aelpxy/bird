@@ -94,12 +94,21 @@ async fn environments_are_isolated() {
         "{:?}",
         reference.body
     );
+    let greeting = birdd
+        .call(
+            &root,
+            reqwest::Method::PATCH,
+            &format!("{production}/services/only-here/variables"),
+            Some(json!({ "set": { "GREETING": "hi" }, "deploy": false })),
+        )
+        .await;
+    assert_eq!(greeting.status, StatusCode::OK, "{:?}", greeting.body);
     let linked = birdd
         .call(
             &root,
             reqwest::Method::PATCH,
             &format!("{production}/services/probe/variables"),
-            Some(json!({ "set": { "X": "${{only-here.HOSTNAME}}" }, "deploy": false })),
+            Some(json!({ "set": { "X": "${{only-here.GREETING}}" }, "deploy": false })),
         )
         .await;
     assert_eq!(linked.status, StatusCode::OK, "{:?}", linked.body);
