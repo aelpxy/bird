@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Scope } from '@/lib/api/paths'
 import { stripAnsi } from '@/lib/ansi'
-import { filterLines, prepare, type LogFilters, type ShownLine } from '../filters'
+import { filterLines, prepareAll, type LogFilters, type ShownLine } from '../filters'
 import { MACHINE_COLORS } from '../machine-colors'
 import { minutesOf, type LogRange } from '../ranges'
 import { type LogLine, type StreamState, useLogStream } from '../use-log-stream'
@@ -13,6 +13,8 @@ import { LogDetails } from './log-details'
 import { LogHistogram } from './log-histogram'
 import { LogLineRow } from './log-line'
 import { LogToolbar } from './log-toolbar'
+
+const QUERY_DELAY_MS = 150
 
 const streamBadges: Record<StreamState, { label: string; tone: 'ok' | 'warn' | 'neutral' }> = {
   connecting: { label: 'Connecting', tone: 'neutral' },
@@ -34,8 +36,22 @@ export function LogViewer({ scope, service, query, range, onQuery, onRange }: Pr
   const scroller = useRef<HTMLDivElement>(null)
   const search = useRef<HTMLInputElement>(null)
 
-  // detecting levels, fields and stripping colors is done once per line, not on every filter change
-  const prepared = useMemo(() => (paused ?? lines).map(prepare), [paused, lines])
+  // what is typed shows at once; filtering and the address follow once typing pauses
+  const [typed, setTyped] = useState(query)
+  // the route passes a new function each render, and live lines re-render often, so the timer
+  // must not restart with it
+  const latestOnQuery = useRef(onQuery)
+  useEffect(() => {
+    latestOnQuery.current = onQuery
+  })
+  useEffect(() => {
+    if (typed === query) return
+    const timer = window.setTimeout(() => latestOnQuery.current(typed), QUERY_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [typed, query])
+
+  // each line is prepared once, so a new batch costs only its own lines
+  const prepared = useMemo(() => prepareAll(paused ?? lines), [paused, lines])
   // the chart shows what the query matches over the whole time, the list only the picked stretch
   const matched = useMemo(() => filterLines(prepared, { ...filters, query, window: undefined }), [prepared, filters, query])
   const shown = useMemo(() => {
@@ -87,7 +103,9 @@ export function LogViewer({ scope, service, query, range, onQuery, onRange }: Pr
   }
 
   function addTerm(term: string) {
-    onQuery(query.trim() ? `${query.trim()} ${term}` : term)
+    const next = typed.trim() ? `${typed.trim()} ${term}` : term
+    setTyped(next)
+    onQuery(next)
   }
 
   function download(lines: ShownLine[]) {
@@ -105,10 +123,10 @@ export function LogViewer({ scope, service, query, range, onQuery, onRange }: Pr
       <div className={`flex flex-col border border-line bg-surface ${fullscreen ? 'min-h-0 flex-1' : ''}`}>
         <LogToolbar
           searchRef={search}
-          filters={{ ...filters, query }}
+          filters={{ ...filters, query: typed }}
           onFilters={({ query: next, ...rest }) => {
             setFilters(rest)
-            if (next !== query) onQuery(next)
+            setTyped(next)
           }}
           range={{ value: range, set: onRange }}
           machines={machines}

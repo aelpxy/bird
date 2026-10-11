@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { fieldTerm, parseQuery, type Queryable } from './query'
 
-const line = (plain: string, extra: Partial<Queryable> = {}): Queryable => ({ plain, machine: '01a2b3c4', stream: 'stdout', ...extra })
+const line = (plain: string, extra: Partial<Queryable> = {}): Queryable => ({ plain, lower: plain.toLowerCase(), machine: '01a2b3c4', stream: 'stdout', ...extra })
 
 describe('log query', () => {
-  const api = line('GET /api 500', { level: 'error', fields: { status: '500', path: '/api/users', user: 'ana lee' } })
-  const home = line('GET / 200', { level: 'info', fields: { status: '200', path: '/' } })
+  const api = line('GET /api 500', { level: 'error', lowerFields: { status: '500', path: '/api/users', user: 'ana lee' } })
+  const home = line('GET / 200', { level: 'info', lowerFields: { status: '200', path: '/' } })
 
   it('needs every word, in any order and case', () => {
     expect(parseQuery('500 get', false).test(api)).toBe(true)

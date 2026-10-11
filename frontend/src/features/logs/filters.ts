@@ -17,13 +17,30 @@ export type LogFilters = {
   window?: { from: number; to: number }
 }
 
-export type ShownLine = LogLine & { plain: string; level: LogLevel | undefined; fields?: Fields }
+// `lower` and `lowerFields` are worked out once per line, so searching never lowercases again
+export type ShownLine = LogLine & { plain: string; lower: string; level: LogLevel | undefined; fields?: Fields; lowerFields?: Fields }
 
 export type FilterResult = { lines: ShownLine[]; matcher: RegExp | null; error?: string }
 
 export function prepare(line: LogLine): ShownLine {
   const plain = stripAnsi(line.text)
-  return { ...line, plain, level: detectLevel(plain), fields: parseFields(plain) }
+  const fields = parseFields(plain)
+  const lowerFields = fields && Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value.toLowerCase()]))
+  return { ...line, plain, lower: plain.toLowerCase(), level: detectLevel(plain), fields, lowerFields }
+}
+
+// lines are prepared once and remembered by identity, so a new batch costs only its own lines
+const prepared = new WeakMap<LogLine, ShownLine>()
+
+export function prepareAll(lines: LogLine[]): ShownLine[] {
+  return lines.map((line) => {
+    let shown = prepared.get(line)
+    if (!shown) {
+      shown = prepare(line)
+      prepared.set(line, shown)
+    }
+    return shown
+  })
 }
 
 export function filterLines(lines: ShownLine[], filters: LogFilters): FilterResult {

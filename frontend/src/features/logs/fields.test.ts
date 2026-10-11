@@ -12,6 +12,10 @@ describe('log fields', () => {
     expect(parseFields('time=12:00 level=info msg="user signed in" user=ana')).toEqual({ time: '12:00', level: 'info', msg: 'user signed in', user: 'ana' })
   })
 
+  it('finds pairs after a leading time and level', () => {
+    expect(parseFields('2026-10-11T22:06:52Z INFO request: done latency=0 ms status=200 path=/health')).toEqual({ latency: '0', status: '200', path: '/health' })
+  })
+
   it('leaves prose and broken JSON alone', () => {
     expect(parseFields('GET / 200 took a=b')).toBeUndefined()
     expect(parseFields('{not json')).toBeUndefined()

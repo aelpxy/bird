@@ -4,10 +4,15 @@ export type Bucket = { start: number; end: number; error: number; warn: number; 
 
 // line counts over time by severity, in equal slices between the first and the last line
 export function buckets(lines: { at?: number | null; level?: LogLevel }[], count: number): Bucket[] {
-  const times = lines.flatMap((line) => (line.at == null ? [] : [line.at]))
-  if (times.length === 0) return []
-  const first = Math.min(...times)
-  const last = Math.max(...times)
+  // a loop, since spreading tens of thousands of times into Math.min overflows the stack
+  let first = Infinity
+  let last = -Infinity
+  for (const line of lines) {
+    if (line.at == null) continue
+    if (line.at < first) first = line.at
+    if (line.at > last) last = line.at
+  }
+  if (first === Infinity) return []
   const width = Math.max(1, (last - first + 1) / count)
   const result: Bucket[] = Array.from({ length: count }, (_, index) => ({ start: first + index * width, end: first + (index + 1) * width, error: 0, warn: 0, other: 0 }))
   for (const line of lines) {

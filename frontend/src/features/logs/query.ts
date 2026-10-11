@@ -1,7 +1,7 @@
 import type { Fields } from './fields'
 import type { LogLevel } from './level'
 
-export type Queryable = { plain: string; level?: LogLevel; machine: string; stream: string; fields?: Fields }
+export type Queryable = { plain: string; lower: string; level?: LogLevel; machine: string; stream: string; lowerFields?: Fields }
 
 export type Query = { test: (line: Queryable) => boolean; highlight: RegExp | null; error?: string }
 
@@ -31,7 +31,7 @@ export function parseQuery(input: string, regex: boolean): Query {
 }
 
 function matches(line: Queryable, { key, value }: Term): boolean {
-  if (!key) return line.plain.toLowerCase().includes(value)
+  if (!key) return line.lower.includes(value)
   switch (key.toLowerCase()) {
     case 'level':
       return line.level !== undefined && line.level.startsWith(value)
@@ -40,9 +40,9 @@ function matches(line: Queryable, { key, value }: Term): boolean {
     case 'stream':
       return line.stream.startsWith(value)
   }
-  const field = line.fields?.[key]
+  const field = line.lowerFields?.[key]
   if (field === undefined) return false
-  return value === '*' || field.toLowerCase().includes(value)
+  return value === '*' || field.includes(value)
 }
 
 function unquote(raw: string): string {

@@ -38,10 +38,11 @@ function flatten(object: Record<string, unknown>, prefix: string, into: Fields) 
   }
 }
 
-// at least two pairs and starting with one, so prose that mentions a=b stays prose
+// at least two pairs, so prose that mentions a=b once stays prose; tracing-style lines put a time
+// and level before them, so the pairs may start anywhere
 function fromLogfmt(text: string): Fields | undefined {
   const pairs = [...text.matchAll(LOGFMT_PAIR)]
-  if (pairs.length < 2 || pairs[0].index !== 0) return undefined
+  if (pairs.length < 2) return undefined
   const fields: Fields = {}
   for (const [, key, raw] of pairs) fields[key] = raw.startsWith('"') ? unquote(raw) : raw
   return fields
