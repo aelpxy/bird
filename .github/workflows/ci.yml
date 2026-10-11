@@ -94,7 +94,8 @@ jobs:
   build:
     name: build ${{ matrix.arch }}
     if: github.event_name == 'push'
-    needs: [frontend, check, podman]
+    # edge does not wait for tests, so a push is installable in minutes
+    needs: frontend
     strategy:
       matrix:
         include:
@@ -136,7 +137,8 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: publish
+    name: publish edge
+    if: github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -148,27 +150,38 @@ jobs:
           pattern: bird-*-linux
           path: dist
           merge-multiple: true
-      # every commit on main replaces the edge prerelease; a version tag gets a release of its own
+      # every commit on main replaces the edge prerelease
       - name: Move the edge tag to this commit
-        if: github.ref == 'refs/heads/main'
         run: |
           git tag -f edge "$GITHUB_SHA"
           git push -f origin refs/tags/edge
       - uses: softprops/action-gh-release@v3
-        if: github.ref == 'refs/heads/main'
         with:
           tag_name: edge
           name: edge
           body: |
-            Prebuilt from ${{ github.sha }} on main, replaced by every commit. Not a stable release.
+            Prebuilt from ${{ github.sha }} on main, replaced by every commit, published before its tests finish. Not a stable release.
 
             Static Linux binaries of `birdd` and `bird` with the dashboard built in; birdd needs Podman 5 or newer.
           prerelease: true
           make_latest: false
           files: dist/*
           fail_on_unmatched_files: true
+
+  release:
+    name: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, check, podman]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: bird-*-linux
+          path: dist
+          merge-multiple: true
       - uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/v')
         with:
           generate_release_notes: true
           make_latest: true
