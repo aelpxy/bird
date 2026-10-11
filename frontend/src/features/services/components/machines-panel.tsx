@@ -1,6 +1,7 @@
 import { Server } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Sparkline } from '@/components/ui/sparkline'
 import { Table, TableCell, TableRow } from '@/components/ui/table'
 import { bytes, timeAgo } from '@/lib/format'
 import type { Machine, Service } from '@/features/services/api'
@@ -49,8 +50,15 @@ function MachineRow({ machine, service }: { machine: Machine; service: Service }
             value={(stats.cpu_millicores / 1000).toFixed(2)}
             limit={`${Number((service.cpus / 1000).toFixed(2))} ${service.cpus === 1000 ? 'core' : 'cores'}`}
             ratio={stats.cpu_millicores / service.cpus}
+            history={machine.history?.map((point) => point.cpu_millicores / service.cpus)}
           />
-          <Meter label="Memory" value={bytes(stats.memory_bytes)} limit={bytes(memoryLimit)} ratio={stats.memory_bytes / memoryLimit} />
+          <Meter
+            label="Memory"
+            value={bytes(stats.memory_bytes)}
+            limit={bytes(memoryLimit)}
+            ratio={stats.memory_bytes / memoryLimit}
+            history={machine.history?.map((point) => point.memory_bytes / memoryLimit)}
+          />
           <TableCell label="Network" className="tabular text-fg">
             <span>
               ↓{bytes(stats.net_rx_bytes)} <span className="text-fg-faint">↑{bytes(stats.net_tx_bytes)}</span>
@@ -66,9 +74,12 @@ function MachineRow({ machine, service }: { machine: Machine; service: Service }
   )
 }
 
-function Meter({ label, value, limit, ratio }: { label: string; value: string; limit: string; ratio: number }) {
+type MeterProps = { label: string; value: string; limit: string; ratio: number; history?: number[] }
+
+function Meter({ label, value, limit, ratio, history = [] }: MeterProps) {
   const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)))
   const color = percent >= 90 ? 'bg-bad' : percent >= 70 ? 'bg-warn' : 'bg-fg'
+  const line = percent >= 90 ? 'text-bad' : percent >= 70 ? 'text-warn' : 'text-fg-muted'
   return (
     <TableCell label={label} className="tabular">
       <div className="flex items-center gap-3">
@@ -76,18 +87,22 @@ function Meter({ label, value, limit, ratio }: { label: string; value: string; l
           {value}
           <span className="text-fg-faint"> / {limit}</span>
         </span>
-        <div
-          role="meter"
-          aria-label={`${label} use`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          aria-valuetext={`${percent}% of the limit`}
-          title={`${percent}%`}
-          className="h-1 w-12 shrink-0 bg-raised"
-        >
-          <div className={`h-full ${color} transition-[width] duration-500`} style={{ width: `${percent}%` }} />
-        </div>
+        {history.length >= 2 ? (
+          <Sparkline values={history} label={`${label} over the last ${Math.round((history.length * 30) / 60)} minutes, now ${percent}% of the limit`} className={line} />
+        ) : (
+          <div
+            role="meter"
+            aria-label={`${label} use`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+            aria-valuetext={`${percent}% of the limit`}
+            title={`${percent}%`}
+            className="h-1 w-12 shrink-0 bg-raised"
+          >
+            <div className={`h-full ${color} transition-[width] duration-500`} style={{ width: `${percent}%` }} />
+          </div>
+        )}
       </div>
     </TableCell>
   )

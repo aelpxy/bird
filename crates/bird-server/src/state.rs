@@ -11,6 +11,7 @@ use crate::cron::CronRuns;
 use crate::db::Db;
 use crate::deploy::DeployGuard;
 use crate::deploy::RunningLogs;
+use crate::metrics::Metrics;
 use crate::routing::Policies;
 use crate::shutdown::Shutdown;
 use crate::throttle::LoginThrottle;
@@ -44,6 +45,7 @@ pub(crate) struct AppState {
     pub(crate) policies: Arc<Policies>,
     pub(crate) deploy_logs: Arc<RunningLogs>,
     pub(crate) built: Arc<BuildOutputs>,
+    pub(crate) metrics: Arc<Metrics>,
 }
 
 impl AppState {

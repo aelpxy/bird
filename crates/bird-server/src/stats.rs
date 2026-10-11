@@ -31,7 +31,7 @@ pub(crate) async fn sample(
 }
 
 // one container at a time: podman fails the whole request when any of them was removed meanwhile
-async fn snapshot(
+pub(crate) async fn snapshot(
     state: &AppState,
     containers: &[(MachineId, String)],
 ) -> BTreeMap<String, ContainerStats> {

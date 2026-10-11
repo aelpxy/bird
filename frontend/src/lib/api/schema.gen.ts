@@ -1356,6 +1356,11 @@ export interface components {
             processes: number;
         };
         MachineSummary: {
+            /**
+             * @description CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only
+             *     sent with stats
+             */
+            history?: components["schemas"]["MetricPoint"][];
             id: components["schemas"]["MachineId"];
             state: components["schemas"]["MachineState"];
             stats?: components["schemas"]["MachineStats"] | null;
@@ -1367,6 +1372,20 @@ export interface components {
         };
         /** Format: int32 */
         MemoryLimit: number;
+        MetricPoint: {
+            /**
+             * Format: int64
+             * @description Unix seconds
+             */
+            at: number;
+            /**
+             * Format: int64
+             * @description Thousandths of a core in use, averaged since the point before
+             */
+            cpu_millicores: number;
+            /** Format: int64 */
+            memory_bytes: number;
+        };
         MountPath: string;
         Name: string;
         OrgMember: {

@@ -6767,6 +6767,13 @@
           "updated_at"
         ],
         "properties": {
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetricPoint"
+            },
+            "description": "CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only\nsent with stats"
+          },
           "id": {
             "$ref": "#/components/schemas/MachineId"
           },
@@ -6796,6 +6803,32 @@
         "format": "int32",
         "maximum": 262144,
         "minimum": 32
+      },
+      "MetricPoint": {
+        "type": "object",
+        "required": [
+          "at",
+          "cpu_millicores",
+          "memory_bytes"
+        ],
+        "properties": {
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix seconds"
+          },
+          "cpu_millicores": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Thousandths of a core in use, averaged since the point before",
+            "minimum": 0
+          },
+          "memory_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
       },
       "MountPath": {
         "type": "string"

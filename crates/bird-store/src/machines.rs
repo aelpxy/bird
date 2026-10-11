@@ -66,6 +66,15 @@ impl Store {
         )
     }
 
+    pub fn list_running_machines(&self) -> Result<Vec<Machine>> {
+        self.query_all(
+            "SELECT id, deployment_id, container_id, address, state, created_at, updated_at
+             FROM machines WHERE state = ?1 ORDER BY id",
+            [MachineState::Running.as_str()],
+            rows::machine,
+        )
+    }
+
     pub fn list_service_machines(&self, service_id: ServiceId) -> Result<Vec<Machine>> {
         self.query_all(
             "SELECT m.id, m.deployment_id, m.container_id, m.address, m.state, m.created_at,

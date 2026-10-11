@@ -40,7 +40,9 @@ pub use orgs::{CreateOrg, OrgMember, OrgSummary, SetMember};
 pub use projects::{CreateEnvironment, CreateProject, ProjectSummary};
 pub use registries::{RegistryLogin, RegistrySummary};
 pub use scale::ScaleRequest;
-pub use services::{DeploymentSummary, FailedDeploy, MachineStats, MachineSummary, ServiceSummary};
+pub use services::{
+    DeploymentSummary, FailedDeploy, MachineStats, MachineSummary, MetricPoint, ServiceSummary,
+};
 pub use templates::{CreateFromTemplate, TemplateDeployResponse, TemplateSummary};
 pub use tty::{Frame, FrameError, MAX_FRAME_BYTES, TCP_UPGRADE, TTY_UPGRADE};
 pub use users::{

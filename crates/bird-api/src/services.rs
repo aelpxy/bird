@@ -60,6 +60,20 @@ pub struct MachineSummary {
     /// Only sampled when asked for, and only for running machines
     #[serde(default)]
     pub stats: Option<MachineStats>,
+    /// CPU and memory every 30 seconds over the last hour birdd watched it, oldest first; only
+    /// sent with stats
+    #[serde(default)]
+    pub history: Vec<MetricPoint>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct MetricPoint {
+    /// Unix seconds
+    pub at: i64,
+    /// Thousandths of a core in use, averaged since the point before
+    pub cpu_millicores: u64,
+    pub memory_bytes: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

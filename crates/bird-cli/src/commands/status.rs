@@ -220,6 +220,7 @@ mod tests {
                     state: MachineState::Running,
                     updated_at: 1100,
                     stats: None,
+                    history: Vec::new(),
                 }],
             }),
             failed_deploy: None,

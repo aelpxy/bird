@@ -17,6 +17,7 @@ mod images;
 mod labels;
 mod listen;
 mod login;
+mod metrics;
 mod orgs;
 mod passwords;
 mod routing;

@@ -14,6 +14,7 @@ use crate::commands::tty;
 use crate::cron::{self, CronRuns, CronScheduler};
 use crate::db::Db;
 use crate::deploy::DeployGuard;
+use crate::metrics;
 use crate::shutdown::{self, Shutdown};
 use crate::state::AppState;
 use crate::supervisor::{self, Supervisor};
@@ -112,6 +113,7 @@ pub async fn run_until(
             manager.run(shutdown.wait()).await;
         }
     };
+    let metrics = metrics::run(state.clone(), shutdown.wait());
     let terminals = Arc::clone(&state.terminals);
     let crons = Arc::clone(&state.crons);
     // the peer address is kept with sign-ins and sessions
@@ -119,14 +121,15 @@ pub async fn run_until(
     let api = axum::serve(api_listener, app)
         .with_graceful_shutdown(shutdown.wait())
         .into_future();
-    let ((), https_result, api_result, (), (), (), ()) = tokio::join!(
+    let ((), https_result, api_result, (), (), (), (), ()) = tokio::join!(
         proxy.serve(proxy_listener, shutdown.wait()),
         https,
         api,
         supervisor.run(shutdown.wait()),
         renewals,
         scheduler.run(shutdown.wait()),
-        cron.run(shutdown.wait())
+        cron.run(shutdown.wait()),
+        metrics
     );
     https_result.map_err(|err| Error::Certificate(err.to_string()))?;
     api_result?;
@@ -221,6 +224,7 @@ fn app_state(
         policies: Arc::default(),
         deploy_logs: Arc::default(),
         built: Arc::default(),
+        metrics: Arc::default(),
         backups: Arc::new(backups),
     }
 }
