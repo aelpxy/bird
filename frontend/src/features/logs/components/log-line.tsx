@@ -21,8 +21,6 @@ const levelStyles: Record<LogLevel, { mark: string; row: string }> = {
   debug: { mark: 'bg-transparent', row: 'opacity-70' },
 }
 
-export const MACHINE_COLORS = ['text-info', 'text-ansi-magenta', 'text-warn', 'text-ok', 'text-ansi-cyan']
-
 const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hour12: false })
 const full = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
 

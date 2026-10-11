@@ -37,8 +37,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
   )
 }
 
-export function LogToolbar(props: LogToolbarProps) {
-  const { filters, onFilters } = props
+export function LogToolbar({ searchRef, filters, onFilters, machines, matches, error, paused, wrap, showTime, fullscreen, onClear, onDownload }: LogToolbarProps) {
   const set = (patch: Partial<LogFilters>) => onFilters({ ...filters, ...patch })
   return (
     <div className="flex flex-col border-b border-line">
@@ -47,7 +46,7 @@ export function LogToolbar(props: LogToolbarProps) {
           <span className="sr-only">Search the logs</span>
           <Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-fg-faint" />
           <input
-            ref={props.searchRef}
+            ref={searchRef}
             type="search"
             value={filters.query}
             onChange={(event) => set({ query: event.target.value })}
@@ -58,11 +57,11 @@ export function LogToolbar(props: LogToolbarProps) {
               }
             }}
             placeholder="Search  ( / )"
-            aria-invalid={props.error ? true : undefined}
+            aria-invalid={error ? true : undefined}
             className="h-7 w-full border border-line bg-sunken pr-16 pl-8 font-mono text-xs text-fg placeholder:text-fg-faint focus:border-fg-muted focus:outline-none aria-invalid:border-bad"
           />
           <span className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center gap-1">
-            {props.matches !== null && <span className="tabular font-mono text-2xs text-fg-faint">{props.matches}</span>}
+            {matches !== null && <span className="tabular font-mono text-2xs text-fg-faint">{matches}</span>}
             <IconButton label="Use a regular expression" aria-pressed={filters.regex} onClick={() => set({ regex: !filters.regex })} className={`size-5 ${filters.regex ? 'bg-raised text-fg' : ''}`}>
               <Regex aria-hidden className="size-3.5" />
             </IconButton>
@@ -89,29 +88,29 @@ export function LogToolbar(props: LogToolbarProps) {
           ]}
         />
         <div className="ml-auto flex items-center gap-0.5">
-          <IconButton label={props.paused.on ? `Resume${props.paused.missed ? `, ${props.paused.missed} new lines` : ''}` : 'Pause'} aria-pressed={props.paused.on} onClick={() => props.paused.set(!props.paused.on)}>
-            {props.paused.on ? <Play aria-hidden className="size-3.5" /> : <Pause aria-hidden className="size-3.5" />}
+          <IconButton label={paused.on ? `Resume${paused.missed ? `, ${paused.missed} new lines` : ''}` : 'Pause'} aria-pressed={paused.on} onClick={() => paused.set(!paused.on)}>
+            {paused.on ? <Play aria-hidden className="size-3.5" /> : <Pause aria-hidden className="size-3.5" />}
           </IconButton>
-          <IconButton label="Show times" aria-pressed={props.showTime.on} onClick={() => props.showTime.set(!props.showTime.on)} className={props.showTime.on ? 'text-fg' : ''}>
+          <IconButton label="Show times" aria-pressed={showTime.on} onClick={() => showTime.set(!showTime.on)} className={showTime.on ? 'text-fg' : ''}>
             <Clock aria-hidden className="size-3.5" />
           </IconButton>
-          <IconButton label="Wrap long lines" aria-pressed={props.wrap.on} onClick={() => props.wrap.set(!props.wrap.on)} className={props.wrap.on ? 'text-fg' : ''}>
+          <IconButton label="Wrap long lines" aria-pressed={wrap.on} onClick={() => wrap.set(!wrap.on)} className={wrap.on ? 'text-fg' : ''}>
             <WrapText aria-hidden className="size-3.5" />
           </IconButton>
-          <IconButton label="Download what is shown" onClick={props.onDownload}>
+          <IconButton label="Download what is shown" onClick={onDownload}>
             <Download aria-hidden className="size-3.5" />
           </IconButton>
-          <IconButton label="Clear" onClick={props.onClear}>
+          <IconButton label="Clear" onClick={onClear}>
             <Trash2 aria-hidden className="size-3.5" />
           </IconButton>
-          <IconButton label={props.fullscreen.on ? 'Exit full screen' : 'Full screen'} aria-pressed={props.fullscreen.on} onClick={() => props.fullscreen.set(!props.fullscreen.on)}>
-            {props.fullscreen.on ? <Minimize2 aria-hidden className="size-3.5" /> : <Maximize2 aria-hidden className="size-3.5" />}
+          <IconButton label={fullscreen.on ? 'Exit full screen' : 'Full screen'} aria-pressed={fullscreen.on} onClick={() => fullscreen.set(!fullscreen.on)}>
+            {fullscreen.on ? <Minimize2 aria-hidden className="size-3.5" /> : <Maximize2 aria-hidden className="size-3.5" />}
           </IconButton>
         </div>
       </div>
-      {props.machines.length > 1 && (
+      {machines.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 border-t border-line px-2 py-1.5" role="group" aria-label="Machines">
-          {props.machines.map((machine) => {
+          {machines.map((machine) => {
             const shown = !filters.hiddenMachines.has(machine.id)
             return (
               <button
@@ -133,7 +132,7 @@ export function LogToolbar(props: LogToolbarProps) {
           })}
         </div>
       )}
-      {props.error && <p className="border-t border-line px-3 py-1.5 font-mono text-2xs text-bad">Pattern: {props.error}</p>}
+      {error && <p className="border-t border-line px-3 py-1.5 font-mono text-2xs text-bad">Pattern: {error}</p>}
     </div>
   )
 }

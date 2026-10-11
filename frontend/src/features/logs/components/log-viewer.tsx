@@ -6,7 +6,8 @@ import type { Scope } from '@/lib/api/paths'
 import { stripAnsi } from '@/lib/ansi'
 import { filterLines, prepare, type LogFilters, type ShownLine } from '../filters'
 import { type LogLine, type StreamState, useLogStream } from '../use-log-stream'
-import { LogLineRow, MACHINE_COLORS } from './log-line'
+import { LogLineRow } from './log-line'
+import { MACHINE_COLORS } from '../machine-colors'
 import { LogToolbar } from './log-toolbar'
 
 const streamBadges: Record<StreamState, { label: string; tone: 'ok' | 'warn' | 'neutral' }> = {
