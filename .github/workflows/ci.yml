@@ -136,10 +136,41 @@ jobs:
           path: bird-${{ matrix.arch }}-linux.tar.gz*
           if-no-files-found: error
 
+  build-macos:
+    name: build cli ${{ matrix.arch }}-macos
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        arch: [aarch64, x86_64]
+    runs-on: macos-15
+    env:
+      TARGET: ${{ matrix.arch }}-apple-darwin
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ env.TARGET }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ env.TARGET }}
+      - run: cargo build --release --locked -p bird-cli --target "$TARGET"
+      - name: Package
+        run: |
+          dir="bird-${{ matrix.arch }}-macos"
+          mkdir "$dir"
+          cp "target/$TARGET/release/bird" README.md "$dir/"
+          tar -czf "$dir.tar.gz" "$dir"
+          shasum -a 256 "$dir.tar.gz" > "$dir.tar.gz.sha256"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bird-${{ matrix.arch }}-macos
+          path: bird-${{ matrix.arch }}-macos.tar.gz*
+          if-no-files-found: error
+
   publish:
     name: publish edge
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, build-macos]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -147,7 +178,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
-          pattern: bird-*-linux
+          pattern: bird-*
           path: dist
           merge-multiple: true
       # every commit on main replaces the edge prerelease
@@ -162,7 +193,7 @@ jobs:
           body: |
             Prebuilt from ${{ github.sha }} on main, replaced by every commit, published before its tests finish. Not a stable release.
 
-            Static Linux binaries of `birdd` and `bird` with the dashboard built in; birdd needs Podman 5 or newer.
+            Static Linux binaries of `birdd` and `bird` with the dashboard built in, and the `bird` cli for macOS; birdd needs Podman 5 or newer.
           prerelease: true
           make_latest: false
           files: dist/*
@@ -171,14 +202,14 @@ jobs:
   release:
     name: release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, check, podman]
+    needs: [build, build-macos, check, podman]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v8
         with:
-          pattern: bird-*-linux
+          pattern: bird-*
           path: dist
           merge-multiple: true
       - uses: softprops/action-gh-release@v3

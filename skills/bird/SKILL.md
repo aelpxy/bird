@@ -21,12 +21,12 @@ bird whoami                                # check the connection
 
 Or save the login once: `printf '%s' "$TOKEN" | bird login https://bird.example.com --token`.
 
-If `bird` is missing, install the cli from the release (Linux, x86_64 or aarch64):
+If `bird` is missing, install the cli from the release (Linux or macOS, x86_64 or aarch64):
 
 ```sh
-arch=$(uname -m | sed 's/arm64/aarch64/')
-curl -fsSL "https://github.com/aelpxy/bird/releases/download/edge/bird-$arch-linux.tar.gz" | tar -xz
-install -m 0755 "bird-$arch-linux/bird" ~/.local/bin/bird
+name="bird-$(uname -m | sed 's/arm64/aarch64/')-$(uname -s | sed 's/Darwin/macos/; s/Linux/linux/')"
+curl -fsSL "https://github.com/aelpxy/bird/releases/download/edge/$name.tar.gz" | tar -xz
+mkdir -p ~/.local/bin && install -m 0755 "$name/bird" ~/.local/bin/bird
 ```
 
 ## 2. Deploy an app
