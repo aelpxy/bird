@@ -2,6 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bird_core::Hostname;
 use http_body_util::{BodyExt, LengthLimitError, Limited};
 use hyper::body::{Body, Incoming};
 use hyper::header::{HOST, HeaderValue, UPGRADE};
@@ -25,9 +26,20 @@ pub(crate) struct Forwarder {
     routes: Routes,
     tls: Option<Tls>,
     client: Client<HttpConnector, Limited<Incoming>>,
+    limits: Limits,
+    control: Option<Control>,
+}
+
+struct Limits {
     response_timeout: Duration,
     body_idle_timeout: Duration,
     max_body_bytes: usize,
+}
+
+struct Control {
+    host: Hostname,
+    upstream: Authority,
+    limits: Limits,
 }
 
 impl Forwarder {
@@ -41,13 +53,27 @@ impl Forwarder {
             .pool_timer(TokioTimer::new())
             .timer(TokioTimer::new())
             .build(connector);
+        let control = config.control.as_ref().and_then(|route| {
+            Some(Control {
+                host: route.host.clone(),
+                upstream: Authority::try_from(route.upstream.to_string()).ok()?,
+                limits: Limits {
+                    response_timeout: route.response_timeout,
+                    body_idle_timeout: route.body_idle_timeout,
+                    max_body_bytes: route.max_body_bytes,
+                },
+            })
+        });
         Self {
             routes,
             tls,
             client,
-            response_timeout: config.response_timeout,
-            body_idle_timeout: config.body_idle_timeout,
-            max_body_bytes: config.max_body_bytes,
+            limits: Limits {
+                response_timeout: config.response_timeout,
+                body_idle_timeout: config.body_idle_timeout,
+                max_body_bytes: config.max_body_bytes,
+            },
+            control,
         }
     }
 
@@ -69,11 +95,25 @@ impl Forwarder {
         let Some(host) = request_host(&request) else {
             return error_response(StatusCode::BAD_REQUEST, "missing or invalid host\n");
         };
-        if let Some(tls) = http_edge.filter(|tls| tls.certificates.contains(&host)) {
+        let control = self
+            .control
+            .as_ref()
+            .filter(|control| control.host.as_str() == host);
+        // birdd's sign-in must never cross the network in the clear, so it is https before its certificate too
+        if let Some(tls) =
+            http_edge.filter(|tls| control.is_some() || tls.certificates.contains(&host))
+        {
             return edge::https_redirect(&host, request.uri(), tls.https_port);
         }
-        let upstream = match self.routes.pick(&host) {
-            Ok(upstream) => upstream,
+        let picked = match control {
+            Some(control) => Ok((control.upstream.clone(), &control.limits)),
+            None => self
+                .routes
+                .pick(&host)
+                .map(|upstream| (upstream, &self.limits)),
+        };
+        let (upstream, limits) = match picked {
+            Ok(picked) => picked,
             Err(RouteError::UnknownHost) => {
                 return error_response(StatusCode::NOT_FOUND, "no app is deployed at this host\n");
             }
@@ -86,7 +126,7 @@ impl Forwarder {
         };
 
         if usize::try_from(request.body().size_hint().lower())
-            .map_or(true, |length| length > self.max_body_bytes)
+            .map_or(true, |length| length > limits.max_body_bytes)
         {
             return error_response(StatusCode::PAYLOAD_TOO_LARGE, "request body too large\n");
         }
@@ -105,8 +145,8 @@ impl Forwarder {
         set_forwarded(request.headers_mut(), forwarded_for, original_host, scheme);
 
         let method = request.method().clone();
-        let request = request.map(|body| Limited::new(body, self.max_body_bytes));
-        match tokio::time::timeout(self.response_timeout, self.client.request(request)).await {
+        let request = request.map(|body| Limited::new(body, limits.max_body_bytes));
+        match tokio::time::timeout(limits.response_timeout, self.client.request(request)).await {
             Ok(Ok(mut response)) => {
                 let tunnel =
                     downstream.filter(|_| response.status() == StatusCode::SWITCHING_PROTOCOLS);
@@ -125,7 +165,7 @@ impl Forwarder {
                 tracing::debug!(%method, %upstream, status = %parts.status, "proxied");
                 Response::from_parts(
                     parts,
-                    IdleTimeout::new(body, self.body_idle_timeout).boxed(),
+                    IdleTimeout::new(body, limits.body_idle_timeout).boxed(),
                 )
             }
             Ok(Err(err)) if exceeded_body_limit(&err) => {

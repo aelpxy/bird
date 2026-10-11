@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use bird_core::Name;
 use bird_podman::{Podman, default_socket};
-use bird_proxy::{CertStore, Challenges, Proxy, ProxyConfig, Routes, Tls};
+use bird_proxy::{CertStore, Challenges, Proxy, Routes, Tls};
 use bird_store::Store;
 use tokio::sync::{Notify, Semaphore};
 
@@ -20,7 +20,9 @@ use crate::supervisor::{self, Supervisor};
 use crate::throttle::LoginThrottle;
 use crate::tls::{self, AcmeSettings, CertManager};
 use crate::token::ApiToken;
-use crate::{Config, Error, Result, api, data_dir, environments, listen, routing};
+use crate::{
+    Config, Error, Result, api, dashboard_domain, data_dir, environments, listen, routing,
+};
 
 pub(crate) const DEFAULT_ORG: &str = "default";
 const DEFAULT_PROJECT: &str = "default";
@@ -38,6 +40,7 @@ pub async fn run_until(
     config: Config,
     stop: impl Future<Output = ()> + Send + 'static,
 ) -> Result<()> {
+    let proxy_config = dashboard_domain::proxy_config(&config)?;
     let data_dir = config.data_dir();
     data_dir::prepare(&data_dir)?;
     let db = Db::open(&data_dir.join("bird.db"))?;
@@ -68,6 +71,7 @@ pub async fn run_until(
         terminals: Arc::new(Semaphore::new(tty::MAX_TERMINALS)),
         logins: Arc::new(LoginThrottle::default()),
         crons: Arc::new(CronRuns::default()),
+        dashboard_domain: config.dashboard_domain.clone(),
         backups: Arc::new(backup_storage(&config, &data_dir).await?),
     };
     environments::ensure_networks(&state).await?;
@@ -103,7 +107,7 @@ pub async fn run_until(
 
     let proxy = Proxy::new(
         state.routes.clone(),
-        ProxyConfig::default(),
+        proxy_config,
         edge.as_ref().map(|(tls, _)| tls.clone()),
     );
     let certificates = edge.map(|(tls, settings)| {

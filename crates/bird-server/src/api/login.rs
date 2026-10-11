@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use axum::extract::{ConnectInfo, State};
 use axum::http::header::{SET_COOKIE, USER_AGENT};
@@ -35,7 +35,7 @@ pub(crate) async fn login(
         username: request.username,
         password: request.password,
         code: request.code,
-        address: Some(peer.ip().to_string()),
+        address: Some(client_address(peer.ip(), &headers).to_string()),
         agent,
     };
     Ok(match login::sign_in(&state, attempt).await? {
@@ -89,4 +89,14 @@ pub(crate) async fn logout(
         StatusCode::NO_CONTENT,
         [(SET_COOKIE, cookies::clear_session())],
     ))
+}
+
+// behind the proxy every peer is loopback, and the proxy replaces any forwarded-for a client sent
+fn client_address(peer: IpAddr, headers: &HeaderMap) -> IpAddr {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse().ok())
+        .filter(|_| peer.is_loopback())
+        .unwrap_or(peer)
 }

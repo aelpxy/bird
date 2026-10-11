@@ -143,10 +143,15 @@ impl CertManager {
     }
 
     async fn due_hostnames(&self) -> Result<Vec<Hostname>> {
+        let also = self.state.dashboard_domain.clone();
         let (hostnames, certificates) = self
             .state
             .db
-            .call(|store| Ok((store.list_hostnames()?, store.list_certificates()?)))
+            .call(move |store| {
+                let mut hostnames = store.list_hostnames()?;
+                hostnames.extend(also.clone());
+                Ok((hostnames, store.list_certificates(also.as_ref())?))
+            })
             .await?;
         let expiry: HashMap<Hostname, i64> = certificates
             .into_iter()

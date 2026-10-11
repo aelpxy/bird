@@ -5,6 +5,7 @@ mod commands;
 mod config;
 mod credentials;
 mod cron;
+mod dashboard_domain;
 mod data_dir;
 mod db;
 mod deploy;

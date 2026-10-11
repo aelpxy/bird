@@ -4,8 +4,8 @@ use bird_api::{DeployRequest, VolumeSpec};
 use bird_core::{EnvironmentId, Hostname, Service, ServiceState, Volume};
 use bird_store::Store;
 
-use crate::Result;
 use crate::state::AppState;
+use crate::{Error, Result};
 
 // a failed deploy must not leave its image, port, command or limits for the next one to inherit
 pub(super) async fn restore(state: &AppState, previous: Option<Service>) {
@@ -28,6 +28,13 @@ pub(super) async fn save(
     request: DeployRequest,
     new_volumes: Vec<VolumeSpec>,
 ) -> Result<(Service, Option<Service>, Vec<Hostname>, Vec<Volume>)> {
+    if let Some(dashboard) = state
+        .dashboard_domain
+        .as_ref()
+        .filter(|dashboard| request.domains.contains(dashboard))
+    {
+        return Err(Error::DashboardDomain(dashboard.clone()));
+    }
     state
         .db
         .call(move |store| {

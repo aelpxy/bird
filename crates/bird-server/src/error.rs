@@ -141,6 +141,12 @@ pub enum Error {
     ServiceExists { name: Name, template: Name },
     #[error("domain {0} is already routed to a service")]
     DomainTaken(bird_core::Hostname),
+    #[error("domain {0} serves bird's dashboard")]
+    DashboardDomain(bird_core::Hostname),
+    #[error(
+        "--dashboard-domain {0} needs --acme-directory, so signing in never crosses the network in plain http"
+    )]
+    DashboardNeedsTls(bird_core::Hostname),
     #[error("{0} has no variable {1}")]
     VariableNotFound(Name, EnvKey),
     #[error("image {0} is no longer on this server, deploy from source again to rebuild it")]

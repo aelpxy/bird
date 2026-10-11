@@ -66,6 +66,7 @@ Infra model inspired by Fly.io (machines, edge proxy, private network), product 
 
 * `frontend/` is the web dashboard: Vite, React, TanStack Router and Query, Base UI, Tailwind 4. `pnpm build` (Vite, then `tsc -b`), `pnpm lint` (type-aware oxlint, deprecated APIs are errors) and `pnpm test` (Vitest) must pass.
 * birdd embeds `frontend/dist` at build time (`crates/bird-server/build.rs`) and serves it on the API port, unknown non-`/v1` paths getting `index.html`; build the frontend before birdd, or birdd answers that its dashboard was not built. CI publishes static musl binaries to the `edge` prerelease on every push to `main`, and a release for `v*` tags.
+* `--dashboard-domain` serves the dashboard and API through the proxy as its `ControlRoute`: birdd's own upstream with long timeouts and the build-context body cap, redirected to https even before its certificate exists, and refused without ACME unless it is `*.localhost`. No service may claim it, and sign-ins read the client from `X-Forwarded-For` when the peer is loopback.
 * It talks to birdd only through `/v1` with the session cookie; `src/lib/api/schema.gen.ts` is generated from `docs/openapi.json` with `pnpm gen:api`, so regenerate it when the spec changes.
 * Imports use the `@/` alias for `src/`; files are kebab-case, grouped by feature under `src/features`, shared pieces in `src/components` and `src/lib`.
 * Follow `frontend/DESIGN.md`: only the design tokens exist as colors, pages are built from `src/components/ui`, forms use TanStack Form with Zod schemas.

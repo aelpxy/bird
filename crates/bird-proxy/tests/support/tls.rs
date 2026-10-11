@@ -44,6 +44,10 @@ fn issue(host: &str) -> (Certificate, CertificateDer<'static>) {
 }
 
 pub fn spawn_edge(routes: Routes) -> Edge {
+    spawn_edge_with(routes, ProxyConfig::default())
+}
+
+pub fn spawn_edge_with(routes: Routes, config: ProxyConfig) -> Edge {
     let plain_listener = bird_proxy::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     let secure_listener = bird_proxy::bind("127.0.0.1:0".parse().unwrap()).unwrap();
     let http = plain_listener.local_addr().unwrap();
@@ -59,7 +63,7 @@ pub fn spawn_edge(routes: Routes) -> Edge {
         https_port: https.port(),
     };
 
-    let proxy = Arc::new(Proxy::new(routes, ProxyConfig::default(), Some(tls)));
+    let proxy = Arc::new(Proxy::new(routes, config, Some(tls)));
     let plain = Arc::clone(&proxy);
     tokio::spawn(async move { plain.serve(plain_listener, std::future::pending()).await });
     tokio::spawn(async move {

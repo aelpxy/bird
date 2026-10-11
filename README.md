@@ -26,7 +26,7 @@ On a Linux server with Podman 5 or newer, as the user bird should run as:
 curl -fsSL https://raw.githubusercontent.com/aelpxy/bird/main/install.sh | bash
 ```
 
-It installs podman if needed, downloads bird, starts it as a systemd user service and prints the dashboard's address with an admin to sign in as. Run it again to upgrade; `--help` lists its options. Prebuilt binaries of every commit on `main` are on the [edge release](https://github.com/aelpxy/bird/releases/tag/edge).
+It installs podman if needed, downloads bird, starts it as a systemd user service and prints the dashboard's address with an admin to sign in as. Run it again to upgrade; `--help` lists its options. To reach the dashboard at a domain over HTTPS, point the domain's DNS at the server and add `bash -s -- --acme-email you@example.com --dashboard-domain bird.example.com`. Prebuilt binaries of every commit on `main` are on the [edge release](https://github.com/aelpxy/bird/releases/tag/edge).
 
 ## Usage
 

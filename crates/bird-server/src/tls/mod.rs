@@ -20,7 +20,11 @@ pub(crate) struct AcmeSettings {
 }
 
 pub(crate) async fn load_certificates(state: &AppState, store: &CertStore) -> Result<()> {
-    let certificates = state.db.call(|store| store.list_certificates()).await?;
+    let also = state.dashboard_domain.clone();
+    let certificates = state
+        .db
+        .call(move |store| store.list_certificates(also.as_ref()))
+        .await?;
     let loaded = store.replace(&certificates);
     tracing::debug!(loaded, "tls certificates loaded");
     Ok(())

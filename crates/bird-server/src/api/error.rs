@@ -28,6 +28,7 @@ fn status_of(error: &Error) -> StatusCode {
         Error::Store(bird_store::Error::AlreadyExists(_))
         | Error::Busy(_)
         | Error::DomainTaken(_)
+        | Error::DashboardDomain(_)
         | Error::NotRollbackable { .. }
         | Error::VolumeNeedsSingleMachine(_)
         | Error::VolumePathChanged { .. }

@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+use crate::ControlRoute;
+
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
     pub max_connections: usize,
@@ -12,6 +14,7 @@ pub struct ProxyConfig {
     pub pool_idle_timeout: Duration,
     pub pool_max_idle_per_host: usize,
     pub shutdown_grace: Duration,
+    pub control: Option<ControlRoute>,
 }
 
 impl Default for ProxyConfig {
@@ -27,6 +30,7 @@ impl Default for ProxyConfig {
             pool_idle_timeout: Duration::from_secs(90),
             pool_max_idle_per_host: usize::MAX,
             shutdown_grace: Duration::from_secs(30),
+            control: None,
         }
     }
 }

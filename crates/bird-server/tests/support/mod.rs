@@ -26,6 +26,7 @@ static NEXT: AtomicU32 = AtomicU32::new(0);
 
 pub struct Birdd {
     pub api: String,
+    pub proxy: String,
     pub root: String,
     // starts every project name, so networks never clash with another birdd on this podman
     pub prefix: String,
@@ -44,6 +45,10 @@ pub struct Response {
 
 impl Birdd {
     pub async fn start() -> Self {
+        Self::start_with(&[]).await
+    }
+
+    pub async fn start_with(extra: &[&str]) -> Self {
         let id = format!(
             "t{}x{}",
             std::process::id(),
@@ -52,18 +57,20 @@ impl Birdd {
         let data_dir = std::env::temp_dir().join(format!("bird-it-{id}"));
         let network = format!("bird-it-{id}");
         let api = format!("127.0.0.1:{}", free_port());
-        let args = vec![
+        let proxy = format!("127.0.0.1:{}", free_port());
+        let mut args = vec![
             "birdd".to_owned(),
             "--data-dir".to_owned(),
             data_dir.to_str().expect("temp paths are utf-8").to_owned(),
             "--api-addr".to_owned(),
             api.clone(),
             "--proxy-addr".to_owned(),
-            format!("127.0.0.1:{}", free_port()),
+            proxy.clone(),
             "--network".to_owned(),
             network.clone(),
             "--no-db-backup".to_owned(),
         ];
+        args.extend(extra.iter().map(|&arg| arg.to_owned()));
         // reqwest is built without a crypto provider of its own; an error means one is installed
         let _ = rustls::crypto::ring::default_provider().install_default();
         let http = reqwest::Client::builder()
@@ -78,6 +85,7 @@ impl Birdd {
             .to_owned();
         Self {
             api,
+            proxy,
             root,
             prefix: id,
             network,

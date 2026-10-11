@@ -5,6 +5,7 @@
 #   curl -fsSL .../install.sh | bash -s -- --acme-email you@x.com
 #
 #   --acme-email <email>   also get Let's Encrypt certificates
+#   --dashboard-domain <host>  serve the dashboard at this domain over https, needs --acme-email
 #   --high-ports           proxy on :8080/:8443, no sudo needed
 #   --version <tag>        install this release instead of edge (the latest commit on main)
 #   --uninstall            stop and remove bird, keep its data
@@ -24,6 +25,7 @@ drop_in="$unit_dir/birdd.service.d/setup.conf"
 data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bird"
 api="127.0.0.1:7070"
 acme_email=""
+dashboard_domain=""
 high_ports=false
 uninstall=false
 version=""
@@ -50,9 +52,10 @@ fail() {
 
 usage() {
     cat <<'EOF'
-usage: install.sh [--acme-email <email>] [--high-ports] [--version <tag>] [--uninstall]
+usage: install.sh [--acme-email <email>] [--dashboard-domain <host>] [--high-ports] [--version <tag>] [--uninstall]
 
   --acme-email <email>   also get Let's Encrypt certificates
+  --dashboard-domain <host>  serve the dashboard at this domain over https, needs --acme-email
   --high-ports           proxy on :8080/:8443, no sudo needed
   --version <tag>        install this release instead of edge (the latest commit on main)
   --uninstall            stop and remove bird, keep its data
@@ -65,6 +68,11 @@ while (($#)); do
         --acme-email)
             [[ $# -ge 2 ]] || fail "--acme-email needs an address"
             acme_email="$2"
+            shift 2
+            ;;
+        --dashboard-domain)
+            [[ $# -ge 2 ]] || fail "--dashboard-domain needs a domain, like bird.example.com"
+            dashboard_domain="$2"
             shift 2
             ;;
         --high-ports)
@@ -89,6 +97,8 @@ while (($#)); do
 done
 
 [[ "$(uname -s)" == Linux ]] || fail "bird runs on Linux only"
+[[ -z $dashboard_domain || -n $acme_email || $dashboard_domain == *.localhost ]] \
+    || fail "--dashboard-domain needs --acme-email, so signing in only ever happens over https"
 ((EUID == 0)) || systemctl --user show-environment >/dev/null 2>&1 \
     || fail "no systemd user session; log in directly (not with su) or enable lingering first"
 
@@ -260,6 +270,7 @@ if [[ -n $acme_email ]]; then
         "BIRD_ACME_EMAIL=$acme_email"
     )
 fi
+[[ -z $dashboard_domain ]] || env_lines+=("BIRD_DASHBOARD_DOMAIN=$dashboard_domain")
 
 step "starting the birdd service"
 if ((${#env_lines[@]})); then
@@ -307,8 +318,16 @@ $high_ports && proxy_port=8080
 cat <<EOF
 
 ${bold}bird is ready.${reset}
-  dashboard:         http://$api  (from another machine: ssh -L 7070:$api $USER@$(hostname))
 EOF
+if [[ -n $dashboard_domain ]]; then
+    cat <<EOF
+  dashboard:         https://$dashboard_domain  (point its DNS at this server; the certificate follows)
+EOF
+else
+    cat <<EOF
+  dashboard:         http://$api  (from your computer: ssh -L 7070:$api <you>@<this server>)
+EOF
+fi
 if [[ -n $admin ]]; then
     cat <<EOF
   sign in as:        $admin / $password  (shown only now; change it under Account)

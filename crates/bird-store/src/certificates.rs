@@ -23,12 +23,14 @@ impl Store {
         Ok(())
     }
 
-    pub fn list_certificates(&self) -> Result<Vec<Certificate>> {
+    /// Certificates of current domains, and of `also`, a hostname that is not a service's domain
+    pub fn list_certificates(&self, also: Option<&Hostname>) -> Result<Vec<Certificate>> {
         self.query_all(
             "SELECT c.hostname, c.chain_pem, c.key_pem, c.not_after
-             FROM certificates c JOIN domains d ON d.hostname = c.hostname
+             FROM certificates c
+             WHERE c.hostname IN (SELECT hostname FROM domains) OR c.hostname = ?1
              ORDER BY c.hostname",
-            [],
+            [also.map(Hostname::as_str)],
             rows::certificate,
         )
     }
@@ -98,8 +100,17 @@ mod tests {
             .put_certificate(&certificate("gone.example.com", 3))
             .unwrap();
 
-        let listed = store.list_certificates().unwrap();
+        let listed = store.list_certificates(None).unwrap();
         assert_eq!(listed, vec![certificate("web.example.com", 2)]);
+        let also: Hostname = "gone.example.com".parse().unwrap();
+        let listed = store.list_certificates(Some(&also)).unwrap();
+        assert_eq!(
+            listed,
+            vec![
+                certificate("gone.example.com", 3),
+                certificate("web.example.com", 2)
+            ]
+        );
         assert_eq!(store.list_hostnames().unwrap(), vec![host]);
     }
 

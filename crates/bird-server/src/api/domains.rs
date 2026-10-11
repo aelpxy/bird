@@ -31,6 +31,9 @@ pub(crate) async fn add(
     let service = state.service(environment, &name).await?;
     let service_id = service.id;
     let hostname = request.hostname;
+    if state.dashboard_domain.as_ref() == Some(&hostname) {
+        return Err(Error::DashboardDomain(hostname));
+    }
     let claimed = hostname.clone();
     state
         .db

@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use bird_core::{BackupInterval, BackupKeep};
+use bird_core::{BackupInterval, BackupKeep, Hostname};
 use clap::Parser;
 
 #[derive(Debug, Clone, Parser)]
@@ -31,6 +31,10 @@ pub struct Config {
     /// Extra root CA trusted for the ACME directory, for test CAs like Pebble
     #[arg(long, env = "BIRD_ACME_CA_CERT")]
     pub acme_ca_cert: Option<PathBuf>,
+
+    /// Serve the dashboard and api at this domain through the proxy, https only
+    #[arg(long, env = "BIRD_DASHBOARD_DOMAIN")]
+    pub dashboard_domain: Option<Hostname>,
 
     #[arg(long, env = "BIRD_DATA_DIR")]
     pub data_dir: Option<PathBuf>,

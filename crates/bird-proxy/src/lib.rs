@@ -1,6 +1,7 @@
 mod body;
 mod challenges;
 mod config;
+mod control;
 mod drain;
 mod edge;
 mod forward;
@@ -16,6 +17,7 @@ mod upgrade;
 
 pub use challenges::Challenges;
 pub use config::ProxyConfig;
+pub use control::ControlRoute;
 pub use listener::bind;
 pub use routes::{RouteTable, Routes};
 pub use server::Proxy;

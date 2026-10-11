@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bird_core::{EnvironmentId, Name, Service};
+use bird_core::{EnvironmentId, Hostname, Name, Service};
 use bird_podman::Podman;
 use bird_proxy::Routes;
 use tokio::sync::{Notify, Semaphore};
@@ -31,6 +31,8 @@ pub(crate) struct AppState {
     // failed sign-ins per user and address, kept in memory only
     pub(crate) logins: Arc<LoginThrottle>,
     pub(crate) crons: Arc<CronRuns>,
+    // served by birdd itself through the proxy, so no service may claim it
+    pub(crate) dashboard_domain: Option<Hostname>,
 }
 
 impl AppState {
