@@ -2,9 +2,9 @@
 #
 # Install:
 #   install -Dm755 target/release/birdd target/release/bird -t ~/.local/bin
-#   install -Dm644 contrib/systemd/birdd.service -t ~/.config/systemd/user
+#   install -Dm644 contrib/systemd/birdd.service contrib/systemd/birdd.socket -t ~/.config/systemd/user
 #   systemctl --user daemon-reload
-#   systemctl --user enable --now podman.socket birdd
+#   systemctl --user enable --now podman.socket birdd.socket birdd
 #   loginctl enable-linger "$USER"   # start at boot without a login session
 #
 # birdd listens on ports 80 and 443; let unprivileged users bind them (once, as root):
@@ -18,6 +18,9 @@
 Description=bird daemon (API, proxy and machine supervisor)
 Wants=podman.socket
 After=podman.socket
+# birdd.socket keeps the ports open across restarts; without it birdd binds them itself
+Wants=birdd.socket
+After=birdd.socket
 
 [Service]
 Type=exec

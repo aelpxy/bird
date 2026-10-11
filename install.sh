@@ -22,6 +22,7 @@ args=("$@")
 bin_dir="$HOME/.local/bin"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 drop_in="$unit_dir/birdd.service.d/setup.conf"
+socket_drop_in="$unit_dir/birdd.socket.d/setup.conf"
 data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bird"
 api="127.0.0.1:7070"
 acme_email=""
@@ -112,9 +113,9 @@ as_root() {
 
 if $uninstall && ((EUID != 0)); then
     step "removing bird"
-    systemctl --user disable --now birdd 2>/dev/null || true
-    rm -f "$bin_dir/birdd" "$bin_dir/bird" "$unit_dir/birdd.service" "$drop_in"
-    rmdir "$unit_dir/birdd.service.d" 2>/dev/null || true
+    systemctl --user disable --now birdd birdd.socket 2>/dev/null || true
+    rm -f "$bin_dir/birdd" "$bin_dir/bird" "$unit_dir/birdd.service" "$unit_dir/birdd.socket" "$drop_in" "$socket_drop_in"
+    rmdir "$unit_dir/birdd.service.d" "$unit_dir/birdd.socket.d" 2>/dev/null || true
     systemctl --user daemon-reload
     ok "bird is removed; its machines keep running until you remove them with podman"
     echo "its data is still in $data_dir; delete it to start over"
@@ -200,7 +201,7 @@ build_from_source() {
     fi
     (cd "$repo" && cargo build --release --quiet)
     install -Dm755 "$repo/target/release/birdd" "$repo/target/release/bird" -t "$bin_dir"
-    install -Dm644 "$repo/contrib/systemd/birdd.service" -t "$unit_dir"
+    install -Dm644 "$repo/contrib/systemd/birdd.service" "$repo/contrib/systemd/birdd.socket" -t "$unit_dir"
 }
 
 download() {
@@ -225,7 +226,7 @@ download() {
     (cd "$tmp" && sha256sum --check --quiet "$name.tar.gz.sha256") || fail "the download does not match its checksum"
     tar -xzf "$tmp/$name.tar.gz" -C "$tmp"
     install -Dm755 "$tmp/$name/birdd" "$tmp/$name/bird" -t "$bin_dir"
-    install -Dm644 "$tmp/$name/birdd.service" -t "$unit_dir"
+    install -Dm644 "$tmp/$name/birdd.service" "$tmp/$name/birdd.socket" -t "$unit_dir"
 }
 
 if [[ -n $repo && -z $version ]]; then
@@ -260,15 +261,21 @@ if ! $high_ports; then
         fi
     fi
 fi
+proxy_addr="0.0.0.0:80"
+https_addr="0.0.0.0:443"
 if $high_ports; then
-    env_lines+=("BIRD_PROXY_ADDR=0.0.0.0:8080" "BIRD_HTTPS_ADDR=0.0.0.0:8443")
+    proxy_addr="0.0.0.0:8080"
+    https_addr="0.0.0.0:8443"
+    env_lines+=("BIRD_PROXY_ADDR=$proxy_addr" "BIRD_HTTPS_ADDR=$https_addr")
 fi
+socket_lines=("$api" "$proxy_addr")
 if [[ -n $acme_email ]]; then
     $high_ports && warn "let's encrypt checks domains on port 80, forward it to 8080 or certificates fail"
     env_lines+=(
         "BIRD_ACME_DIRECTORY=https://acme-v02.api.letsencrypt.org/directory"
         "BIRD_ACME_EMAIL=$acme_email"
     )
+    socket_lines+=("$https_addr")
 fi
 [[ -z $dashboard_domain ]] || env_lines+=("BIRD_DASHBOARD_DOMAIN=$dashboard_domain")
 
@@ -283,9 +290,25 @@ if ((${#env_lines[@]})); then
 else
     rm -f "$drop_in"
 fi
+# systemd holds these ports while birdd restarts, so upgrades refuse no connections
+old_sockets="$(cat "$socket_drop_in" 2>/dev/null || true)"
+mkdir -p "$(dirname "$socket_drop_in")"
+{
+    echo "# written by install.sh, rerunning it replaces this file"
+    echo "[Socket]"
+    echo "ListenStream="
+    printf 'ListenStream=%s\n' "${socket_lines[@]}"
+} >"$socket_drop_in"
 systemctl --user daemon-reload
-systemctl --user enable birdd >/dev/null 2>&1
-systemctl --user restart birdd
+systemctl --user enable birdd.socket birdd >/dev/null 2>&1
+if systemctl --user is-active --quiet birdd.socket && [[ $old_sockets == "$(cat "$socket_drop_in")" ]]; then
+    systemctl --user restart birdd
+else
+    # the first time, or with other ports, birdd lets go of its ports before systemd takes them
+    systemctl --user stop birdd 2>/dev/null || true
+    systemctl --user restart birdd.socket
+    systemctl --user start birdd
+fi
 
 # birdd writes its token on first start and answers once its api is up
 for _ in $(seq 1 60); do

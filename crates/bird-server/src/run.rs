@@ -71,12 +71,14 @@ pub async fn run_until(
     let scheduler = Scheduler::new(state.clone(), database_backups(&config, &data_dir));
     let cron = CronScheduler::new(state.clone());
 
-    let api_listener = listen::bind(config.api_addr)?;
-    let proxy_listener = listen::bind(config.proxy_addr)?;
+    let mut inherited = listen::Inherited::from_env();
+    let api_listener = inherited.take(config.api_addr)?;
+    let proxy_listener = inherited.take(config.proxy_addr)?;
     let https_listener = match edge {
-        Some(_) => Some(listen::bind(config.https_addr)?),
+        Some(_) => Some(inherited.take(config.https_addr)?),
         None => None,
     };
+    inherited.warn_unused();
     tracing::info!(
         api = %config.api_addr,
         proxy = %config.proxy_addr,

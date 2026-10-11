@@ -31,6 +31,8 @@ http-body = "1"
 http-body-util = "0.1"
 hyper = { version = "1", default-features = false }
 hyper-util = { version = "0.1", default-features = false }
+# adopts the sockets systemd holds across restarts, which needs unsafe code we forbid ourselves
+listenfd = "1"
 # terminal modes and process signals through a safe api, since unsafe code is forbidden
 rustix = { version = "1", default-features = false, features = ["std"] }
 # s3-compatible backup storage, signed with ring like the rest of bird

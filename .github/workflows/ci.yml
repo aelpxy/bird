@@ -127,7 +127,7 @@ jobs:
         run: |
           dir="bird-${{ matrix.arch }}-linux"
           mkdir "$dir"
-          cp "target/$TARGET/release/birdd" "target/$TARGET/release/bird" README.md contrib/systemd/birdd.service "$dir/"
+          cp "target/$TARGET/release/birdd" "target/$TARGET/release/bird" README.md contrib/systemd/birdd.service contrib/systemd/birdd.socket "$dir/"
           tar -czf "$dir.tar.gz" "$dir"
           sha256sum "$dir.tar.gz" > "$dir.tar.gz.sha256"
       - uses: actions/upload-artifact@v7

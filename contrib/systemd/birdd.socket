@@ -1,0 +1,14 @@
+# Holds birdd's ports open while it restarts or upgrades, so visitors wait a moment instead of
+# being refused. install.sh writes birdd.socket.d/setup.conf when ports differ from these; the
+# addresses must match birdd's --api-addr, --proxy-addr and --https-addr.
+
+[Unit]
+Description=bird daemon sockets (API and proxy)
+
+[Socket]
+ListenStream=127.0.0.1:7070
+ListenStream=0.0.0.0:80
+Backlog=4096
+
+[Install]
+WantedBy=sockets.target
