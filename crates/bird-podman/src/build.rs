@@ -7,9 +7,10 @@ use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use serde::Deserialize;
 
+use crate::auth::registry_config;
 use crate::error::check;
 use crate::query::encode;
-use crate::{Error, Podman, Result};
+use crate::{Error, Podman, RegistryAuth, Result};
 
 // covers uploading the context; the build itself streams for as long as it takes
 const UPLOAD_TIMEOUT: Duration = Duration::from_mins(10);
@@ -46,6 +47,7 @@ impl Podman {
         tag: &ImageRef,
         dockerfile: &str,
         args: &BTreeMap<EnvKey, String>,
+        registries: &BTreeMap<String, RegistryAuth>,
     ) -> Result<BuildOutput>
     where
         B: hyper::body::Body<Data = Bytes> + Send + 'static,
@@ -62,7 +64,13 @@ impl Podman {
             path.push_str(&encode(&serde_json::to_string(args)?));
         }
         let streamed = self
-            .upload(&path, "application/x-tar", context, UPLOAD_TIMEOUT)
+            .upload(
+                &path,
+                "application/x-tar",
+                context,
+                registry_config(registries)?,
+                UPLOAD_TIMEOUT,
+            )
             .await?;
         if !streamed.status.is_success() {
             let status = streamed.status.as_u16();

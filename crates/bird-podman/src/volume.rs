@@ -96,6 +96,7 @@ impl Podman {
                 &format!("/volumes/{}/import", encode(name)),
                 "application/x-tar",
                 archive,
+                None,
                 IMPORT_TIMEOUT,
             )
             .await?;

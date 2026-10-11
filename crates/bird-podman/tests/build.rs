@@ -39,7 +39,13 @@ async fn lines(podman: &Podman, dockerfile: &str, tag: &ImageRef) -> Vec<BuildLi
         "hi & bye".to_owned(),
     )]);
     let mut output = podman
-        .build_image(context(dockerfile), tag, "Dockerfile", &args)
+        .build_image(
+            context(dockerfile),
+            tag,
+            "Dockerfile",
+            &args,
+            &BTreeMap::new(),
+        )
         .await
         .expect("podman accepts the build");
     let mut lines = Vec::new();

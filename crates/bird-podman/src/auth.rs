@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use serde::Serialize;
@@ -38,6 +39,29 @@ impl RegistryAuth {
     }
 }
 
+// a build may pull from any registry, so podman takes all of them as a host-keyed map in
+// X-Registry-Config; none means no header
+pub(crate) fn registry_config(
+    registries: &BTreeMap<String, RegistryAuth>,
+) -> Result<Option<String>, serde_json::Error> {
+    if registries.is_empty() {
+        return Ok(None);
+    }
+    let map: BTreeMap<&str, Credentials<'_>> = registries
+        .iter()
+        .map(|(host, auth)| {
+            (
+                host.as_str(),
+                Credentials {
+                    username: &auth.username,
+                    password: &auth.password,
+                },
+            )
+        })
+        .collect();
+    Ok(Some(base64url(&serde_json::to_vec(&map)?)))
+}
+
 fn base64url(input: &[u8]) -> String {
     let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
@@ -75,6 +99,21 @@ mod tests {
             assert_eq!(base64url(input.as_bytes()), expected);
         }
         assert_eq!(base64url(&[0xfb, 0xff]), "-_8=");
+    }
+
+    #[test]
+    fn maps_every_registry_by_host() {
+        let auth = RegistryAuth {
+            username: "u".to_owned(),
+            password: "p".to_owned(),
+            tls_verify: true,
+        };
+        assert_eq!(registry_config(&BTreeMap::new()).unwrap(), None);
+        let registries = BTreeMap::from([("ghcr.io".to_owned(), auth)]);
+        assert_eq!(
+            registry_config(&registries).unwrap().unwrap(),
+            base64url(br#"{"ghcr.io":{"username":"u","password":"p"}}"#)
+        );
     }
 
     #[test]

@@ -54,6 +54,7 @@ impl Podman {
         path: &str,
         content_type: &str,
         body: B,
+        registry_config: Option<String>,
         timeout: Duration,
     ) -> Result<Streamed>
     where
@@ -61,7 +62,7 @@ impl Podman {
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     {
         self.transport
-            .upload(path, content_type, body, timeout)
+            .upload(path, content_type, body, registry_config, timeout)
             .await
     }
 

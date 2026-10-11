@@ -9,7 +9,7 @@ use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE};
 use axum::response::{IntoResponse, Response};
 use bird_api::{BuildEvent, ErrorBody};
 use bird_core::{BuildFile, EnvKey, ImageRef, Name};
-use bird_podman::BuildLine;
+use bird_podman::{BuildLine, RegistryAuth};
 use bytes::Bytes;
 use http_body_util::Limited;
 use serde::Deserialize;
@@ -160,9 +160,30 @@ async fn run_build(
     events: &mpsc::Sender<Bytes>,
     kept: &mut Vec<String>,
 ) -> Result<()> {
+    // a Dockerfile may start FROM a private image, so builds use every saved registry login
+    let registries = state
+        .db
+        .call(|store| store.list_registries())
+        .await?
+        .into_iter()
+        .map(|registry| {
+            let auth = RegistryAuth {
+                username: registry.username,
+                password: registry.password,
+                tls_verify: !registry.insecure,
+            };
+            (registry.host.to_string(), auth)
+        })
+        .collect();
     let mut output = state
         .podman
-        .build_image(context, &build.tag, &build.dockerfile, &build.args)
+        .build_image(
+            context,
+            &build.tag,
+            &build.dockerfile,
+            &build.args,
+            &registries,
+        )
         .await?;
     while let Some(line) = output.next().await {
         match line? {

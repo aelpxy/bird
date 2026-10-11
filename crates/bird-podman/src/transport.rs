@@ -99,6 +99,7 @@ impl Transport {
         path: &str,
         content_type: &str,
         body: B,
+        registry_config: Option<String>,
         timeout: Duration,
     ) -> Result<Streamed>
     where
@@ -106,12 +107,21 @@ impl Transport {
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     {
         tracing::debug!(path, "podman upload");
-        tokio::time::timeout(timeout, self.open_upload(path, content_type, body))
-            .await
-            .map_err(|_| Error::Timeout)?
+        tokio::time::timeout(
+            timeout,
+            self.open_upload(path, content_type, body, registry_config),
+        )
+        .await
+        .map_err(|_| Error::Timeout)?
     }
 
-    async fn open_upload<B>(&self, path: &str, content_type: &str, body: B) -> Result<Streamed>
+    async fn open_upload<B>(
+        &self,
+        path: &str,
+        content_type: &str,
+        body: B,
+        registry_config: Option<String>,
+    ) -> Result<Streamed>
     where
         B: Body<Data = Bytes> + Send + 'static,
         B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
@@ -129,12 +139,15 @@ impl Transport {
                 tracing::debug!(error = %err, "podman upload connection closed");
             }
         });
-        let request = Request::builder()
+        let mut builder = Request::builder()
             .method(Method::POST)
             .uri(format!("{API_PREFIX}{path}"))
             .header(HOST, "podman")
-            .header(CONTENT_TYPE, content_type)
-            .body(body)?;
+            .header(CONTENT_TYPE, content_type);
+        if let Some(registry_config) = registry_config {
+            builder = builder.header("X-Registry-Config", registry_config);
+        }
+        let request = builder.body(body)?;
         let response = sender.send_request(request).await?;
         Ok(Streamed {
             status: response.status(),

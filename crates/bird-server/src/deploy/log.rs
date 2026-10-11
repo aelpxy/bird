@@ -11,6 +11,8 @@ use crate::state::AppState;
 // a deploy's log lives in memory until it ends; the newest lines win when it grows past this
 const MAX_LINES: usize = 3000;
 const MAX_LINE_CHARS: usize = 2000;
+// what one deploy may keep in memory and in bird.db, however long its lines
+const MAX_BYTES: usize = 1024 * 1024;
 const LIVE_BUFFER: usize = 1024;
 
 /// What one deploy did, as it happens; cloning shares it
@@ -26,6 +28,7 @@ struct Shared {
 struct Lines {
     next: u32,
     kept: VecDeque<DeployLogLine>,
+    bytes: usize,
 }
 
 // deploys still running, so a follower can catch up on them before they are saved
@@ -67,10 +70,14 @@ impl DeployLog {
             text,
         };
         lines.next = lines.next.saturating_add(1);
-        if lines.kept.len() >= MAX_LINES {
-            lines.kept.pop_front();
-        }
+        lines.bytes += line.text.len();
         lines.kept.push_back(line.clone());
+        while lines.kept.len() > MAX_LINES || lines.bytes > MAX_BYTES {
+            let Some(dropped) = lines.kept.pop_front() else {
+                break;
+            };
+            lines.bytes -= dropped.text.len();
+        }
         // nobody listening is fine, the line is kept for later
         let _ = shared.live.send(line);
     }
@@ -213,6 +220,14 @@ mod tests {
         assert_eq!(kept.len(), MAX_LINES);
         assert_eq!(kept[0].text, "6");
         assert!(kept.last().unwrap().text.ends_with('…'));
+
+        let wide = DeployLog::new();
+        for _ in 0..MAX_LINES {
+            wide.bird("x".repeat(MAX_LINE_CHARS));
+        }
+        let (kept, _) = wide.follow();
+        assert!(kept.iter().map(|line| line.text.len()).sum::<usize>() <= MAX_BYTES);
+        assert_eq!(kept.len(), MAX_BYTES / MAX_LINE_CHARS);
         assert_eq!(DeployLog::discard().follow().0, Vec::new());
     }
 

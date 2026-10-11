@@ -258,44 +258,76 @@ async fn schedules_run_skip_stopped_services_and_restarts_interrupt_runs() {
     let root = birdd.root.clone();
     let production = scope("default", "production");
     let service = format!("{production}/services/web");
+    let idle = format!("{production}/services/idle");
+    let tick =
+        json!({ "name": "tick", "schedule": "* * * * *", "command": ["sh", "-c", "echo tick"] });
     let deployed = deploy_with_jobs(
         &birdd,
         &production,
-        json!({ "cron": [
-            { "name": "tick", "schedule": "* * * * *", "command": ["sh", "-c", "echo tick"] },
-            { "name": "long", "schedule": "0 0 1 1 *", "command": ["sleep", "300"] }
-        ] }),
+        json!({ "cron": [tick, { "name": "long", "schedule": "0 0 1 1 *", "command": ["sleep", "300"] }] }),
     )
     .await;
     assert_eq!(deployed.status, StatusCode::OK, "{:?}", deployed.body);
+    // a stopped service waits for the same minute, so one minute shows both a run and a skip
+    let deployed = deploy_with_jobs(
+        &birdd,
+        &production,
+        json!({ "name": "idle", "cron": [tick] }),
+    )
+    .await;
+    assert_eq!(deployed.status, StatusCode::OK, "{:?}", deployed.body);
+    let stopped = birdd
+        .post(&root, &format!("{idle}/stop"), json!(null))
+        .await;
+    assert!(stopped.status.is_success(), "{:?}", stopped.body);
 
     // within a minute and the scheduler's tick
     let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
-    let tick = loop {
-        let found = runs(&birdd, &service, "tick").await;
-        if let Some(run) = found.iter().find(|run| run["status"] == "succeeded") {
-            break run.clone();
+    let (ran, skipped) = loop {
+        let ran = runs(&birdd, &service, "tick").await;
+        let skipped = runs(&birdd, &idle, "tick").await;
+        let ran = ran.iter().find(|run| run["status"] == "succeeded").cloned();
+        let skipped = skipped
+            .iter()
+            .find(|run| run["status"] == "skipped")
+            .cloned();
+        if let (Some(ran), Some(skipped)) = (&ran, &skipped) {
+            break (ran.clone(), skipped.clone());
         }
         assert!(
             tokio::time::Instant::now() < deadline,
-            "tick never ran on its own: {found:?}"
+            "tick never ran and skipped on its own: {ran:?} {skipped:?}"
         );
         tokio::time::sleep(Duration::from_secs(2)).await;
     };
-    assert_eq!(tick["trigger"], "schedule", "{tick}");
-    let started = tick["started_at"].as_i64().unwrap();
+    assert_eq!(ran["trigger"], "schedule", "{ran}");
+    let started = ran["started_at"].as_i64().unwrap();
     // a 10s tick plus a loaded host's startup, still well short of the next minute
     assert!(
         started % 60 < 45,
-        "it ran well after the minute began: {tick}"
+        "it ran well after the minute began: {ran}"
     );
     let output = birdd
         .get(
             &root,
-            &format!("{service}/cron/tick/runs/{}", tick["id"].as_str().unwrap()),
+            &format!("{service}/cron/tick/runs/{}", ran["id"].as_str().unwrap()),
         )
         .await;
     assert_eq!(output.body["output"], "tick\n");
+    let detail = birdd
+        .get(
+            &root,
+            &format!("{idle}/cron/tick/runs/{}", skipped["id"].as_str().unwrap()),
+        )
+        .await
+        .body;
+    assert!(
+        detail["output"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("stopped"),
+        "{detail}"
+    );
 
     // a run in progress when birdd stops is recorded as interrupted, and starts again on request
     let long = trigger(&birdd, &service, "long").await;
@@ -311,40 +343,6 @@ async fn schedules_run_skip_stopped_services_and_restarts_interrupt_runs() {
     let again = trigger(&birdd, &service, "long").await;
     assert_eq!(again.status, StatusCode::ACCEPTED, "{:?}", again.body);
 
-    // a stopped service's times pass as skipped runs that say why
-    let stopped = birdd
-        .post(&root, &format!("{service}/stop"), json!(null))
-        .await;
-    assert!(stopped.status.is_success(), "{:?}", stopped.body);
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
-    let skipped = loop {
-        let found = runs(&birdd, &service, "tick").await;
-        if let Some(run) = found.iter().find(|run| run["status"] == "skipped") {
-            break run.clone();
-        }
-        assert!(
-            tokio::time::Instant::now() < deadline,
-            "no skipped run: {found:?}"
-        );
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    };
-    let detail = birdd
-        .get(
-            &root,
-            &format!(
-                "{service}/cron/tick/runs/{}",
-                skipped["id"].as_str().unwrap()
-            ),
-        )
-        .await
-        .body;
-    assert!(
-        detail["output"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("stopped"),
-        "{detail}"
-    );
     let ticks = runs(&birdd, &service, "tick").await;
     assert!(
         ticks.iter().all(|run| run["trigger"] == "schedule"),

@@ -29,6 +29,11 @@ acme_email=""
 dashboard_domain=""
 high_ports=false
 uninstall=false
+# set when root re-runs this script as the service user, whose own PATH and journal root never uses
+for_root=false
+[[ ${BIRD_INSTALL_FOR_ROOT:-} != true ]] || for_root=true
+logs_command="journalctl --user -u birdd -f"
+$for_root && logs_command="journalctl _SYSTEMD_USER_UNIT=birdd.service -f"
 version=""
 
 # piped from curl there is no file, so no checkout to build from
@@ -167,7 +172,7 @@ install_as_service_user() {
     curl -fsSL "$script_url" | (cd / && runuser -u "$service_user" -- env \
         HOME="$home" USER="$service_user" LOGNAME="$service_user" \
         XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
-        bash -s -- "${args[@]}")
+        BIRD_INSTALL_FOR_ROOT=true bash -s -- "${args[@]}")
     if $uninstall; then
         rm -f /usr/local/bin/bird
         exit 0
@@ -179,12 +184,12 @@ install_as_service_user() {
     exit 0
 }
 
-step "checking requirements"
+$for_root || step "checking requirements"
 command -v podman >/dev/null || install_podman
 podman_version="$(podman version --format '{{.Client.Version}}')"
 ((${podman_version%%.*} >= 5)) \
     || fail "bird needs podman 5 or newer, this is $podman_version; upgrade your distro or its podman"
-ok "podman $podman_version"
+$for_root || ok "podman $podman_version"
 ((EUID != 0)) || install_as_service_user
 
 build_from_source() {
@@ -237,7 +242,7 @@ fi
 ok "installed birdd and bird to $bin_dir"
 case ":$PATH:" in
     *":$bin_dir:"*) ;;
-    *) warn "$bin_dir is not on your PATH; add it to use the bird command" ;;
+    *) $for_root || warn "$bin_dir is not on your PATH; add it to use the bird command" ;;
 esac
 
 step "turning on podman's api and lingering"
@@ -318,7 +323,7 @@ for _ in $(seq 1 60); do
     sleep 0.5
 done
 "$bin_dir/bird" whoami >/dev/null 2>&1 \
-    || fail "birdd did not come up; see: journalctl --user -u birdd -e"
+    || fail "birdd did not come up; see: ${logs_command% -f} -e"
 ok "birdd is running and the bird CLI is logged in as root"
 
 # the dashboard signs in with a password, so the first install makes an admin to sign in as
@@ -359,6 +364,6 @@ fi
 cat <<EOF
   deploy something:  bird deploy web docker.io/library/nginx:alpine --domain web.localhost
   try it:            curl -H 'Host: web.localhost' http://127.0.0.1:$proxy_port
-  logs:              journalctl --user -u birdd -f
+  logs:              $logs_command
   root token:        $data_dir/api-token (keep it private)
 EOF

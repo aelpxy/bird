@@ -153,6 +153,11 @@ fn merge(
             dockerfile,
             args: build_args,
         },
+        (None, None, None, None) if dir.join("Dockerfile").is_file() => {
+            bail!(
+                "nothing to deploy: there is a Dockerfile here, so add a [build] line to {MANIFEST_FILE} or run `bird deploy --build .`"
+            )
+        }
         (None, None, None, None) => {
             bail!(
                 "nothing to deploy: pass an image or --build, or set image or [build] in {MANIFEST_FILE}"
