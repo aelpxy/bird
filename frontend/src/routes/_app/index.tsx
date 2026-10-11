@@ -7,7 +7,6 @@ import { Section } from '@/components/ui/section'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ServiceRows } from '@/features/overview/components/service-rows'
 import { StatTiles } from '@/features/overview/components/stat-tiles'
-import { StructureGuide } from '@/features/overview/components/structure-guide'
 import { useOverview } from '@/features/overview/use-overview'
 import { NewProjectDialog } from '@/features/projects/components/new-project-dialog'
 import { ProjectsByOrg } from '@/features/projects/components/projects-by-org'
@@ -46,17 +45,11 @@ function Overview() {
       <PageHeader eyebrow="Overview" title={`${greeting()}, ${session.name}`} description="Everything this server runs, at a glance." actions={<NewProjectDialog />} />
 
       {overview.projects.length === 0 ? (
-        <>
-          <EmptyState icon={FolderKanban} title="No projects yet" description="Create one for your product, then add its app, database and workers to it." action={<NewProjectDialog />} />
-          <StructureGuide />
-        </>
+        <EmptyState icon={FolderKanban} title="No projects yet" description="Create one for your product, then add its app, database and workers to it." action={<NewProjectDialog />} />
       ) : overview.services.length === 0 && !overview.loading ? (
-        <>
-          <StructureGuide project={overview.projects[0]} />
-          <Section title="Projects">
-            <ProjectsByOrg projects={overview.projects} services={overview.services} />
-          </Section>
-        </>
+        <Section title="Projects">
+          <ProjectsByOrg projects={overview.projects} services={overview.services} />
+        </Section>
       ) : (
         <>
           <StatTiles overview={overview} />
