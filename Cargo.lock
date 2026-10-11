@@ -261,10 +261,13 @@ dependencies = [
  "hyper",
  "hyper-util",
  "rustix",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_json",
  "tar",
  "tokio",
+ "tokio-rustls",
  "toml",
 ]
 

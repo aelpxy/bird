@@ -3,6 +3,7 @@ mod client;
 mod commands;
 mod context;
 mod dockerignore;
+mod endpoint;
 mod manifest;
 mod profile;
 mod scope;

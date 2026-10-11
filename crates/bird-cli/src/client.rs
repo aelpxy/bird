@@ -15,8 +15,8 @@ use hyper::{Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tokio::net::TcpStream;
 
+use crate::endpoint::{Endpoint, Io};
 use crate::scope::Scope;
 
 const JSON: &str = "application/json";
@@ -281,16 +281,9 @@ impl ApiClient {
         &self,
     ) -> Result<(
         SendRequest<Full<Bytes>>,
-        Connection<TokioIo<TcpStream>, Full<Bytes>>,
+        Connection<TokioIo<Box<dyn Io>>, Full<Bytes>>,
     )> {
-        let stream = TcpStream::connect(&self.addr)
-            .await
-            .with_context(|| {
-                format!(
-                    "cannot reach birdd at {}; is it running (systemctl --user status birdd), or is --api set to the right address?",
-                    self.addr
-                )
-            })?;
+        let stream = Endpoint::parse(&self.addr)?.connect().await?;
         Ok(hyper::client::conn::http1::handshake(TokioIo::new(stream)).await?)
     }
 
@@ -304,7 +297,7 @@ impl ApiClient {
         let mut request = Request::builder()
             .method(method)
             .uri(path)
-            .header(HOST, &self.addr)
+            .header(HOST, Endpoint::parse(&self.addr)?.authority)
             .header(USER_AGENT, AGENT);
         if let Some(token) = &self.token {
             request = request.header(AUTHORIZATION, format!("Bearer {token}"));

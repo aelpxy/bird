@@ -63,6 +63,8 @@ release = ["bin/migrate"]              # runs before each deploy's new machines 
 DATABASE_URL = "${{postgres.DATABASE_URL}}"
 ```
 
+To deploy on every push, use the [GitHub Action](docs/github-actions.md).
+
 ## How it works
 
 - Deploys start new machines and move traffic only once they pass a health check; a failed deploy keeps the old ones serving.

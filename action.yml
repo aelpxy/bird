@@ -1,0 +1,78 @@
+name: Deploy to bird
+description: Deploy a service to a bird server with `bird deploy`
+branding:
+  icon: upload-cloud
+  color: gray-dark
+
+inputs:
+  api:
+    description: birdd's address, https://<the --dashboard-domain it serves>
+    required: true
+  token:
+    description: An api token from `bird token create`, kept in a repository secret
+    required: true
+  path:
+    description: Directory holding bird.toml
+    default: .
+  service:
+    description: Service to deploy, defaults to the name in bird.toml
+    default: ''
+  project:
+    description: Project to deploy in, defaults to bird.toml, then default
+    default: ''
+  environment:
+    description: Environment to deploy in, defaults to bird.toml, then production
+    default: ''
+  args:
+    description: More arguments for `bird deploy`, like `--build .` or `--env KEY=value`
+    default: ''
+  version:
+    description: The bird release whose cli is used, like edge or v0.2.0
+    default: edge
+
+runs:
+  using: composite
+  steps:
+    # inputs reach the script as environment variables, never spliced into it
+    - name: Install bird
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$(uname -m)" in
+          x86_64) arch=x86_64 ;;
+          aarch64 | arm64) arch=aarch64 ;;
+          *) echo "bird has no build for $(uname -m)" >&2; exit 1 ;;
+        esac
+        [ "$(uname -s)" = Linux ] || { echo "bird's cli runs on Linux runners" >&2; exit 1; }
+        name="bird-$arch-linux"
+        dir="$RUNNER_TEMP/bird-install"
+        mkdir -p "$dir"
+        cd "$dir"
+        base="https://github.com/aelpxy/bird/releases/download/$VERSION"
+        curl -fsSLO "$base/$name.tar.gz"
+        curl -fsSLO "$base/$name.tar.gz.sha256"
+        sha256sum -c "$name.tar.gz.sha256"
+        tar -xzf "$name.tar.gz"
+        mkdir -p "$RUNNER_TEMP/bin"
+        install -m 0755 "$name/bird" "$RUNNER_TEMP/bin/bird"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+    - name: Deploy
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        BIRD_API: ${{ inputs.api }}
+        BIRD_TOKEN: ${{ inputs.token }}
+        BIRD_PROJECT: ${{ inputs.project }}
+        BIRD_ENVIRONMENT: ${{ inputs.environment }}
+        SERVICE: ${{ inputs.service }}
+        ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        [ -n "$BIRD_PROJECT" ] || unset BIRD_PROJECT
+        [ -n "$BIRD_ENVIRONMENT" ] || unset BIRD_ENVIRONMENT
+        read -ra extra <<< "$ARGS"
+        if [ -n "$SERVICE" ]; then extra=(-s "$SERVICE" "${extra[@]}"); fi
+        bird deploy "${extra[@]}"

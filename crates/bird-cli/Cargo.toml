@@ -21,11 +21,14 @@ http-body-util.workspace = true
 hyper = { workspace = true, features = ["client", "http1"] }
 hyper-util = { workspace = true, features = ["tokio"] }
 rustix = { workspace = true, features = ["termios"] }
+rustls.workspace = true
+rustls-native-certs.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tar.workspace = true
 tokio = { workspace = true, features = ["rt", "net", "time", "macros", "io-util", "io-std", "signal", "sync"] }
 toml.workspace = true
+tokio-rustls.workspace = true
 
 [lints]
 workspace = true

@@ -41,6 +41,8 @@ instant-acme = { version = "0.8", default-features = false, features = ["ring", 
 # sha-256 of api tokens, already built for rustls
 ring = { version = "0.17", default-features = false }
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
+# the system's trusted roots, for the cli reaching birdd over https
+rustls-native-certs = "0.8"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

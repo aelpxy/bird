@@ -83,8 +83,8 @@ pub(crate) struct Args {
     /// Print JSON for scripts instead of tables and messages
     #[arg(long, global = true)]
     pub(crate) json: bool,
-    /// birdd API address, defaults to the logged in server or 127.0.0.1:7070
-    #[arg(long, global = true, env = "BIRD_API", value_name = "HOST:PORT")]
+    /// birdd API address, host:port or https://<dashboard domain>; defaults to the logged in server or 127.0.0.1:7070
+    #[arg(long, global = true, env = "BIRD_API", value_name = "ADDRESS")]
     pub(crate) api: Option<String>,
 
     #[command(subcommand)]
@@ -272,7 +272,8 @@ pub(crate) enum Command {
     },
     /// Sign in to a birdd with your username and password, or a token piped in
     Login {
-        #[arg(value_name = "HOST:PORT")]
+        /// host:port of birdd's api, or https://<dashboard domain>
+        #[arg(value_name = "ADDRESS")]
         api: String,
         /// Read an api token instead of asking for a username and password
         #[arg(long)]
