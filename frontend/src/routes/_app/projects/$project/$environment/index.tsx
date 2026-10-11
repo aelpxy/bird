@@ -54,7 +54,8 @@ function Services() {
           title="No services yet"
           description={
             <>
-              Deploy an image, a database or a folder here, or from a folder with a <Code>bird.toml</Code> run{' '}
+              Each part of {scope.project} is its own service: the app, its database, a worker. They reach each other by name on{' '}
+              {scope.environment}&apos;s private network. Deploy an image, a database or a folder here, or from a folder with a <Code>bird.toml</Code> run{' '}
               <Code>
                 bird deploy -p {scope.project} -E {scope.environment}
               </Code>

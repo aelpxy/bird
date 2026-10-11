@@ -38,7 +38,7 @@ export function NewProjectDialog({ org }: { org?: string }) {
         </Button>
       }
       title="New project"
-      description={`A project groups services, with a production environment to start${org ? `. It belongs to ${org}.` : '.'}`}
+      description={`One product, like a shop: its app, database and workers are each added to it as a service. It starts with a production environment${org ? ` and belongs to ${org}.` : '.'}`}
       submitLabel="Create project"
     >
       <dialog.form.AppField name="name">

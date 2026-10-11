@@ -17,6 +17,9 @@ export function ProjectCard({ project, services }: { project: Project; services:
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-title font-semibold tracking-[-0.01em] text-fg">{project.name}</p>
+          <p className="mt-0.5 text-xs text-fg-faint">
+            {plural(services.length, 'service')} in {plural(project.environments.length, 'environment')}
+          </p>
         </div>
         <ArrowUpRight aria-hidden className="size-4 shrink-0 text-fg-faint transition-colors group-hover:text-fg" />
       </div>
@@ -32,7 +35,7 @@ export function ProjectCard({ project, services }: { project: Project; services:
                     <span key={service.name} title={`${service.name}: ${serviceStatus(service).label}`} className={`size-2 ${dotTones[serviceStatus(service).tone]}`} />
                   ))}
                 </span>
-                <span className="tabular w-6 text-right font-mono text-2xs text-fg-faint">{here.length}</span>
+                <span className="tabular text-right font-mono text-2xs text-fg-faint">{here.length === 0 ? 'no services yet' : plural(here.length, 'service')}</span>
               </span>
             </li>
           )
