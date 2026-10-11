@@ -1,13 +1,16 @@
 import { Link } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { Search } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import type { Session } from '@/features/auth/api'
 import { UserMenu } from '@/features/auth/components/user-menu'
+import { CommandPalette } from '@/features/command/components/command-palette'
 import { focusRing } from '@/components/ui/control-styles'
 import { Logo } from './logo'
 
 const navLinkClass = `px-2.5 py-1.5 font-mono text-2xs leading-none font-medium tracking-[0.08em] text-fg-faint uppercase transition-colors hover:text-fg data-[status=active]:text-fg ${focusRing}`
 
 export function AppShell({ session, children }: { session: Session; children: ReactNode }) {
+  const [searching, setSearching] = useState(false)
   return (
     <div className="flex min-h-dvh flex-col">
       <a
@@ -51,9 +54,22 @@ export function AppShell({ session, children }: { session: Session; children: Re
               </ul>
             </nav>
           </div>
-          <UserMenu session={session} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSearching(true)}
+              aria-label="Go to a service, project or page"
+              aria-keyshortcuts="Meta+K Control+K"
+              className={`pressable flex h-7 items-center gap-2 border border-line px-2 text-fg-faint transition-colors hover:border-line-strong hover:text-fg ${focusRing}`}
+            >
+              <Search aria-hidden className="size-3.5" />
+              <kbd className="hidden font-mono text-2xs sm:inline">⌘K</kbd>
+            </button>
+            <UserMenu session={session} />
+          </div>
         </div>
       </header>
+      <CommandPalette session={session} open={searching} onOpenChange={setSearching} />
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {children}
       </main>
